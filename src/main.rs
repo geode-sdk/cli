@@ -4,8 +4,13 @@ use clap::Parser;
 use clap::Subcommand;
 use path_absolutize::*;
 use rustyline::Editor;
+use serde::{Serialize, Deserialize};
 use serde_json::{json, to_string_pretty};
 use std::fs;
+
+const GEODE_VERSION: i32 = 1;
+const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
+const GEODE_CLI_NAME: &str = env!("CARGO_PKG_NAME");
 
 #[derive(Parser)]
 #[clap(version, long_about = None)]
@@ -14,13 +19,42 @@ struct Cli {
     command: Commands,
 }
 
+#[derive(Serialize, Deserialize)]
+struct Configuration {
+    geode_install_path: PathBuf,
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Create a new Geode project
     New {
+        /// Mod name
         name: Option<String>,
+        /// Where to create the project, defaults
+        /// to the current folder
         location: Option<PathBuf>,
     },
+    /// List information about Geode
+    About {},
+    /// Package a mod.json and a platform binary file 
+    /// into a .geode file
+    Pkg {
+        /// Path to the mod's mod.json file
+        mod_json_path: String,
+        /// Path to the directory containing the mod's 
+        /// platform binary. If omitted, will recursively 
+        /// look for a platform binary file starting from 
+        /// the current folder
+        build_dir: Option<PathBuf>,
+    },
+}
+
+fn figure_out_gd_path(out: &mut String) {
+    if cfg!(windows) {
+        
+    } else {
+        panic!("This platform lacks a function for figuring out the default GD path! FUck!")
+    }
 }
 
 fn remove_whitespace(s: &mut String) {
@@ -28,6 +62,16 @@ fn remove_whitespace(s: &mut String) {
 }
 
 fn main() {
+    let mut config = Configuration { geode_install_path: PathBuf::new() };
+    let exe_path = std::env::current_exe().unwrap();
+    let save_dir = exe_path.parent().unwrap();
+    let save_file = save_dir.join("config.json");
+
+    if save_file.exists() {
+        let raw = fs::read_to_string(&save_file).unwrap();
+        config = serde_json::from_str(&raw).unwrap();
+    }
+
     let args = Cli::parse();
     match args.command {
         Commands::New { location, name } => {
@@ -102,7 +146,7 @@ fn main() {
             );
 
             let mod_json = json!({
-                "geode":        1,
+                "geode":        GEODE_VERSION,
                 "version":      version,
                 "id":           id,
                 "name":         project_name,
@@ -124,6 +168,23 @@ fn main() {
             let mod_json_path = absolute_location.join("mod.json");
 
             fs::write(mod_json_path, to_string_pretty(&mod_json).unwrap()).unwrap();
-        }
+        },
+
+        Commands::About {} => {
+            println!(
+                " == {} == \nGeode Version: {}\nCLI Version: {}\nGeode Installation: {}",
+                GEODE_CLI_NAME.green(),
+                GEODE_VERSION.to_string().red(),
+                GEODE_CLI_VERSION.yellow(),
+                config.geode_install_path.to_str().unwrap().purple()
+            );
+        },
+
+        Commands::Pkg { mod_json_path: _, build_dir: _ } => {
+            println!("okay honey");
+        },
     }
+
+    let raw = serde_json::to_string(&config).unwrap();
+    fs::write(save_file, raw).unwrap();
 }
