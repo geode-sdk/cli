@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use colored::*;
 use clap::Parser;
 use clap::Subcommand;
@@ -6,7 +6,11 @@ use path_absolutize::*;
 use rustyline::Editor;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, to_string_pretty};
-use std::fs;
+use std::fs::{self, *};
+use winreg::enums::*;
+use winreg::RegKey;
+use std::io::{self, *};
+use path_slash::PathBufExt;
 
 const GEODE_VERSION: i32 = 1;
 const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -49,11 +53,45 @@ enum Commands {
     },
 }
 
-fn figure_out_gd_path(out: &mut String) {
+fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+where P: AsRef<Path>, {
+    let file = File::open(filename)?;
+    Ok(io::BufReader::new(file).lines())
+}
+
+fn figure_out_gd_path(out: &mut PathBuf) -> Result<()> {
     if cfg!(windows) {
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let steam_key = hklm.open_subkey("SOFTWARE\\WOW6432Node\\Valve\\Steam")?;
+        let install_path: String = steam_key.get_value("InstallPath")?;
         
+        let test_path = PathBuf::from(&install_path).join("steamapps/common/Geometry Dash/GeometryDash.exe");
+        
+        if test_path.exists() && test_path.is_file() {
+            *out = PathBuf::from(&test_path.to_slash().unwrap());
+            return Ok(());
+        }
+        
+        let config_path = PathBuf::from(&install_path).join("config/config.vdf");
+        
+        for line_res in read_lines(&config_path)? {
+            let line = line_res?;
+            if line.to_string().contains("BaseInstallFolder_") {
+                let end = line.rfind("\"").unwrap();
+                let start = line[0..end].rfind("\"").unwrap();
+                let result = &line[start+1..end];
+                let path = PathBuf::from(&result).join("steamapps/common/Geometry Dash/GeometryDash.exe");
+                
+                if path.exists() && path.is_file() {
+                    *out = PathBuf::from(&path.to_slash().unwrap());
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(Error::new(ErrorKind::Other, "Unable to find GD path"))
     } else {
-        panic!("This platform lacks a function for figuring out the default GD path! FUck!")
+        Err(Error::new(ErrorKind::Other, "This platform lacks a function for figuring out the default GD path"))
     }
 }
 
@@ -69,7 +107,21 @@ fn main() {
 
     if save_file.exists() {
         let raw = fs::read_to_string(&save_file).unwrap();
-        config = serde_json::from_str(&raw).unwrap();
+        config = match serde_json::from_str(&raw) {
+            Ok(p) => p,
+            Err(_) => config
+        }
+    }
+
+    if config.geode_install_path.as_os_str().is_empty() {
+        match figure_out_gd_path(&mut config.geode_install_path) {
+            Ok(()) => {
+                println!("Loaded default GD path automatically");
+            },
+            Err(err) => {
+                println!("Unable to figure out GD path: {}", err);
+            },
+        }
     }
 
     let args = Cli::parse();
