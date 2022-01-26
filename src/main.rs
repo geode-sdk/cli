@@ -1,16 +1,17 @@
+use std::process::exit;
 use std::path::{PathBuf, Path};
 use colored::*;
-use clap::Parser;
-use clap::Subcommand;
+use clap::{Parser, Subcommand};
 use path_absolutize::*;
 use rustyline::Editor;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, to_string_pretty};
 use std::fs::{self, *};
-use winreg::enums::*;
-use winreg::RegKey;
 use std::io::{self, *};
-use path_slash::PathBufExt;
+use git2::Repository;
+use fs_extra::dir as fs_dir;
+
+use sysinfo::{System, SystemExt};
 
 const GEODE_VERSION: i32 = 1;
 const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -30,16 +31,16 @@ struct Configuration {
 
 #[derive(Subcommand)]
 enum Commands {
+    /// List information about Geode
+    About {},
     /// Create a new Geode project
     New {
         /// Mod name
-        name: Option<String>,
+        name: String,
         /// Where to create the project, defaults
         /// to the current folder
         location: Option<PathBuf>,
     },
-    /// List information about Geode
-    About {},
     /// Package a mod.json and a platform binary file 
     /// into a .geode file
     Pkg {
@@ -59,41 +60,28 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-fn figure_out_gd_path(out: &mut PathBuf) -> Result<()> {
-    if cfg!(windows) {
-        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-        let steam_key = hklm.open_subkey("SOFTWARE\\WOW6432Node\\Valve\\Steam")?;
-        let install_path: String = steam_key.get_value("InstallPath")?;
-        
-        let test_path = PathBuf::from(&install_path).join("steamapps/common/Geometry Dash/GeometryDash.exe");
-        
-        if test_path.exists() && test_path.is_file() {
-            *out = PathBuf::from(&test_path.to_slash().unwrap());
-            return Ok(());
-        }
-        
-        let config_path = PathBuf::from(&install_path).join("config/config.vdf");
-        
-        for line_res in read_lines(&config_path)? {
-            let line = line_res?;
-            if line.to_string().contains("BaseInstallFolder_") {
-                let end = line.rfind("\"").unwrap();
-                let start = line[0..end].rfind("\"").unwrap();
-                let result = &line[start+1..end];
-                let path = PathBuf::from(&result).join("steamapps/common/Geometry Dash/GeometryDash.exe");
-                
-                if path.exists() && path.is_file() {
-                    *out = PathBuf::from(&path.to_slash().unwrap());
-                    return Ok(());
-                }
-            }
-        }
+fn figure_out_gd_path() -> Result<PathBuf> {
+    let mut sys = System::new();
+    sys.refresh_processes();
 
-        Err(Error::new(ErrorKind::Other, "Unable to find GD path"))
-    } else {
-        Err(Error::new(ErrorKind::Other, "This platform lacks a function for figuring out the default GD path"))
+    let gd_procs = sys.get_process_by_name("Geometry Dash");
+
+    if gd_procs.is_empty() {
+        return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open"));
     }
+
+    if gd_procs.len() > 1 {
+        return Err(Error::new(ErrorKind::Other, "It seems there are two instances of Geometry Dash open. Please re-run with only one instance."));
+    }
+    let mut p = PathBuf::from(gd_procs[0].exe.clone()).parent().unwrap().to_path_buf();
+
+    if cfg!(target_os = "macos") {
+        p = p.parent().unwrap().to_path_buf();
+    }
+    Ok(p)
 }
+
+
 
 fn remove_whitespace(s: &mut String) {
     s.retain(|c| !c.is_whitespace());
@@ -114,15 +102,20 @@ fn main() {
     }
 
     if config.geode_install_path.as_os_str().is_empty() {
-        match figure_out_gd_path(&mut config.geode_install_path) {
-            Ok(()) => {
-                println!("Loaded default GD path automatically");
+        match figure_out_gd_path() {
+            Ok(install_path) => {
+                config.geode_install_path = install_path;
+                println!("Loaded default GD path automatically: {:?}", config.geode_install_path);
             },
             Err(err) => {
                 println!("Unable to figure out GD path: {}", err);
+                exit(1);
             },
         }
     }
+
+    let raw = serde_json::to_string(&config).unwrap();
+    fs::write(save_file, raw).unwrap();
 
     let args = Cli::parse();
     match args.command {
@@ -131,15 +124,12 @@ fn main() {
                 Some(s) => s,
                 None => std::env::current_dir().unwrap()
             };
-            let mut absolute_location = loc.absolutize().unwrap();
-            let mut project_name = match name {
-                Some(s) => s,
-                None => absolute_location.file_name().unwrap().to_str().unwrap().to_string()
-            };
+            let mut project_name = name;
+
             let mut version = String::from("v1.0.0");
             let mut developer = String::from("");
             let mut description = String::from("");
-            let mut buffer = absolute_location.to_str().unwrap().to_string();
+            let mut buffer = loc.absolutize().unwrap().to_str().unwrap().to_string();
 
             let mut rl = Editor::<()>::new();
 
@@ -181,7 +171,7 @@ fn main() {
             project_name = project_name.trim().to_string();
             description = description.trim().to_string();
 
-            absolute_location = std::borrow::Cow::from(std::path::Path::new(&buffer));
+            let project_location = Path::new(&buffer).join(&project_name);
 
             let id = format!("com.{}.{}", developer.to_lowercase(), project_name.to_lowercase());
 
@@ -194,8 +184,44 @@ fn main() {
                 project_name.green(),
                 developer.red(),
                 version.yellow(),
-                absolute_location.to_str().unwrap().purple()
+                project_location.parent().unwrap().to_str().unwrap().purple()
             );
+
+            if project_location.exists() {
+                println!("{}", "Unable to create project in existing directory".red());
+                exit(1);
+            }
+
+            match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
+                Ok(_) => (),
+                Err(e) => panic!("failed to clone template: {}", e),
+            };
+
+            fs::remove_dir_all(&project_location.join(".git")).unwrap();
+
+            for thing in fs::read_dir(&project_location).unwrap() {
+                if !thing.as_ref().unwrap().metadata().unwrap().is_dir() {
+                    let file = thing.unwrap().path();
+                    let contents = fs::read_to_string(&file).unwrap().replace("$Template", &project_name);
+
+                    fs::write(file, contents).unwrap();
+                }
+            }
+
+            let tmp_sdk = std::env::temp_dir().join("sdk");
+
+            if tmp_sdk.exists() {
+                fs_dir::remove(&tmp_sdk).unwrap();
+            }
+
+            match Repository::clone("https://github.com/geode-sdk/sdk", &tmp_sdk) {
+                Ok(_) => (),
+                Err(e) => panic!("failed to clone sdk: {}", e),
+            };
+
+            let options = fs_dir::CopyOptions::new();
+            fs_dir::copy(&tmp_sdk.join("SDK"), &project_location, &options).unwrap();
+            fs_dir::remove(tmp_sdk).unwrap();
 
             let mod_json = json!({
                 "geode":        GEODE_VERSION,
@@ -217,9 +243,12 @@ fn main() {
                 ]
             });
 
-            let mod_json_path = absolute_location.join("mod.json");
+            fs::write(
+                &project_location.join("mod.json"),
+                to_string_pretty(&mod_json).unwrap()
+            ).expect("Unable to write to specified project");
 
-            fs::write(mod_json_path, to_string_pretty(&mod_json).unwrap()).unwrap();
+
         },
 
         Commands::About {} => {
@@ -236,7 +265,4 @@ fn main() {
             println!("okay honey");
         },
     }
-
-    let raw = serde_json::to_string(&config).unwrap();
-    fs::write(save_file, raw).unwrap();
 }
