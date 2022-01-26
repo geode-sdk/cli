@@ -5,7 +5,7 @@ use clap::Subcommand;
 use path_absolutize::*;
 use rustyline::Editor;
 use serde::{Serialize, Deserialize};
-use serde_json::{json, to_string_pretty};
+use serde_json::{json, to_string_pretty, Value};
 use std::fs::{self, *};
 use winreg::enums::*;
 use winreg::RegKey;
@@ -50,6 +50,10 @@ enum Commands {
         /// look for a platform binary file starting from 
         /// the current folder
         build_dir: Option<PathBuf>,
+        /// Whether to copy the created .geode file in 
+        /// <geode_install_dir>/geode/mods
+        #[clap(short, long)]
+        install: bool,
     },
 }
 
@@ -97,6 +101,16 @@ fn figure_out_gd_path(out: &mut PathBuf) -> Result<()> {
 
 fn remove_whitespace(s: &mut String) {
     s.retain(|c| !c.is_whitespace());
+}
+
+fn add_platform_extension(s: &mut String) {
+    if cfg!(windows) {
+        s.push_str(".dll");
+    } else if cfg!(mac) || cfg!(ios) {
+        s.push_str(".dylib");
+    } else if cfg!(android) {
+        s.push_str(".so");
+    }
 }
 
 fn main() {
@@ -232,8 +246,41 @@ fn main() {
             );
         },
 
-        Commands::Pkg { mod_json_path: _, build_dir: _ } => {
-            println!("okay honey");
+        Commands::Pkg { mod_json_path, build_dir: _, install: _ } => {
+            let raw = fs::read_to_string(mod_json_path).unwrap();
+            let mod_json: Value = match serde_json::from_str(&raw) {
+                Ok(p) => p,
+                Err(_) => panic!("mod.json is not a valid JSON file!")
+            };
+            // how do i check if a key exists in a json?!?!?!?
+            let mut binary: String;
+            if mod_json["binary"].is_string() {
+                binary = mod_json["binary"].to_string();
+                add_platform_extension(&mut binary);
+            } else if mod_json["binary"].is_object() {
+                let bin = &mod_json["binary"];
+                if cfg!(windows) || cfg!(linux) {
+                    binary = bin["windows"].to_string();
+                } else if cfg!(mac) {
+                    binary = bin["macos"].to_string();
+                } else if cfg!(ios) {
+                    binary = bin["ios"].to_string();
+                } else if cfg!(android) {
+                    binary = bin["android"].to_string();
+                } else {
+                    panic!("You are not on a supported platform :(");
+                }
+                if binary.is_empty() {
+                    binary = bin["*"].to_string();
+                }
+                match bin["auto"].as_bool() {
+                    Some(v) => if v { add_platform_extension(&mut binary); },
+                    None => add_platform_extension(&mut binary),
+                }
+            } else {
+                panic!("[mod.json].binary is not a string nor an object!");
+            }
+            println!("binary name: {}", binary);
         },
     }
 
