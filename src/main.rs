@@ -228,7 +228,7 @@ fn main() {
                 fs_dir::remove(&tmp_sdk).unwrap();
             }
 
-            match Repository::clone("https://github.com/geode-sdk/sdk", &tmp_sdk) {
+            match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
                 Ok(_) => (),
                 Err(e) => panic!("failed to clone sdk: {}", e),
             };
