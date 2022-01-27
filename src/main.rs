@@ -10,8 +10,11 @@ use std::fs::{self, *};
 use std::io::{self, *};
 use git2::Repository;
 use fs_extra::dir as fs_dir;
+use winreg::enums::*;
+use winreg::RegKey;
+use path_slash::PathBufExt;
 
-use sysinfo::{System, SystemExt};
+use sysinfo::{System, SystemExt, ProcessExt};
 
 const GEODE_VERSION: i32 = 1;
 const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -65,24 +68,61 @@ where P: AsRef<Path>, {
 }
 
 fn figure_out_gd_path() -> Result<PathBuf> {
-    let mut sys = System::new();
-    sys.refresh_processes();
+    if cfg!(windows) {
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let steam_key = hklm.open_subkey("SOFTWARE\\WOW6432Node\\Valve\\Steam")?;
+        let install_path: String = steam_key.get_value("InstallPath")?;
 
-    let gd_procs = sys.get_process_by_name("Geometry Dash");
+        let test_path = PathBuf::from(&install_path).join("steamapps/common/Geometry Dash/GeometryDash.exe");
 
-    if gd_procs.is_empty() {
-        return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open"));
+        if test_path.exists() && test_path.is_file() {
+            let p = PathBuf::from(&test_path.to_slash().unwrap());
+            return Ok(p);
+        }
+
+        let config_path = PathBuf::from(&install_path).join("config/libraryfolders.vdf");
+
+        for line_res in read_lines(&config_path)? {
+            let mut line = line_res?;
+            if line.to_string().contains("\"path\"") {
+                line = line.replace("\"path\"", "");
+                let end = line.rfind("\"").unwrap();
+                let start = line[0..end].rfind("\"").unwrap();
+                let result = &line[start+1..end];
+
+                let path = PathBuf::from(&result).join("steamapps/common/Geometry Dash/GeometryDash.exe");
+
+                if path.exists() && path.is_file() {
+                    let p = PathBuf::from(&path.to_slash().unwrap());
+                    return Ok(p);
+                }
+            }
+        }
+
+        Err(Error::new(ErrorKind::Other, "Unable to find GD path"))
+    } else {
+        let mut sys = System::new();
+        sys.refresh_processes();
+
+        let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
+
+        let gd_proc = match gd_procs.next() {
+            Some(e) => e,
+            None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
+        };
+
+        match gd_procs.next() {
+            Some(_) => return Err(Error::new(ErrorKind::Other, "It seems there are two instances of Geometry Dash open. Please re-run with only one instance.")),
+            None => (),
+        }
+
+        let mut p = gd_proc.exe().parent().unwrap().to_path_buf();
+
+        if cfg!(target_os = "macos") {
+            p = p.parent().unwrap().to_path_buf();
+        }
+        Ok(p)
     }
-
-    if gd_procs.len() > 1 {
-        return Err(Error::new(ErrorKind::Other, "It seems there are two instances of Geometry Dash open. Please re-run with only one instance."));
-    }
-    let mut p = PathBuf::from(gd_procs[0].exe.clone()).parent().unwrap().to_path_buf();
-
-    if cfg!(target_os = "macos") {
-        p = p.parent().unwrap().to_path_buf();
-    }
-    Ok(p)
 }
 
 
@@ -144,15 +184,17 @@ fn main() {
             let mut developer = String::from("");
             let mut description = String::from("");
             let mut buffer = loc.absolutize().unwrap().to_str().unwrap().to_string();
+            let mut init_git = String::from("");
 
             let mut rl = Editor::<()>::new();
 
             let mut prompts = [
-                ("Mod name", &mut project_name, Color::Green),
-                ("Developer", &mut developer, Color::Red),
-                ("Version", &mut version, Color::Blue),
-                ("Description", &mut description, Color::Yellow),
-                ("Where to", &mut buffer, Color::Magenta),
+                ("Mod name", &mut project_name, Color::Green, true),
+                ("Developer", &mut developer, Color::Green, true),
+                ("Version", &mut version, Color::Green, true),
+                ("Description", &mut description, Color::Green, true),
+                ("Location", &mut buffer, Color::Green, true),
+                ("Initialize git repository? (Y,n)", &mut init_git, Color::Green, false),
             ];
             
             let mut ix = 0;
@@ -160,13 +202,13 @@ fn main() {
                 if ix > prompts.len() - 1 {
                     break;
                 }
-                let (prompt, ref mut var, _) = prompts[ix];
+                let (prompt, ref mut var, _, required) = prompts[ix];
                 let text = format!("{}: ", prompt);
                 let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
                 match readline {
                     Ok(line) => {
                         rl.add_history_entry(line.as_str());
-                        if line.is_empty() {
+                        if line.is_empty() && required {
                             println!("{}", "Please enter a value".red());
                             continue;
                         }
@@ -184,6 +226,7 @@ fn main() {
             developer = developer.trim().to_string();
             project_name = project_name.trim().to_string();
             description = description.trim().to_string();
+            init_git = init_git.trim().to_string();
 
             let project_location = Path::new(&buffer).join(&project_name);
 
@@ -194,11 +237,11 @@ fn main() {
             
             println!(
                 "Creating mod with ID {} named {} by {} version {} in {}",
-                id.cyan(),
+                id.green(),
                 project_name.green(),
-                developer.red(),
-                version.yellow(),
-                project_location.parent().unwrap().to_str().unwrap().purple()
+                developer.green(),
+                version.green(),
+                project_location.parent().unwrap().to_str().unwrap().green()
             );
 
             if project_location.exists() {
@@ -222,20 +265,47 @@ fn main() {
                 }
             }
 
-            let tmp_sdk = std::env::temp_dir().join("sdk");
+            
 
-            if tmp_sdk.exists() {
-                fs_dir::remove(&tmp_sdk).unwrap();
+            if init_git.is_empty() || init_git.to_lowercase() == "y" {
+                let repo = match Repository::init(&project_location) {
+                    Ok(r) => r,
+                    Err(e) => panic!("failed to init git repo: {}", e),
+                };
+
+                let mut sm = match repo.submodule("https://github.com/geode-sdk/sdk", Path::new("sdk"), true) {
+                    Ok(r) => r,
+                    Err(e) => panic!("failed to add sdk as a submodule: {}", e),
+                };
+
+                match sm.clone(None) {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to clone sdk: {}", e)
+                };
+                
+
+                match sm.add_finalize() {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to finalize submodule creation: {}", e)
+                };
+            } else {
+                let tmp_sdk = std::env::temp_dir().join("sdk");
+
+                if tmp_sdk.exists() {
+                    fs_dir::remove(&tmp_sdk).unwrap();
+                }
+
+                match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to clone sdk: {}", e),
+                };
+
+                let options = fs_dir::CopyOptions::new();
+                fs_dir::copy(&tmp_sdk, &project_location, &options).unwrap();
+                fs_dir::remove(tmp_sdk).unwrap();
             }
 
-            match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
-                Ok(_) => (),
-                Err(e) => panic!("failed to clone sdk: {}", e),
-            };
-
-            let options = fs_dir::CopyOptions::new();
-            fs_dir::copy(&tmp_sdk.join("SDK"), &project_location, &options).unwrap();
-            fs_dir::remove(tmp_sdk).unwrap();
+            
 
             let mod_json = json!({
                 "geode":        GEODE_VERSION,
