@@ -10,7 +10,6 @@ use std::fs::{self, *};
 use std::io::{self, *};
 use git2::Repository;
 use fs_extra::dir as fs_dir;
-
 use sysinfo::{System, SystemExt};
 
 const GEODE_VERSION: i32 = 1;
@@ -33,6 +32,11 @@ struct Configuration {
 enum Commands {
     /// List information about Geode
     About {},
+    /// Modify Geode configuration
+    Config {
+        #[clap(long)]
+        path: PathBuf,
+    },
     /// Create a new Geode project
     New {
         /// Mod name
@@ -77,7 +81,7 @@ fn figure_out_gd_path() -> Result<PathBuf> {
     let gd_procs = sys.get_process_by_name("Geometry Dash");
 
     if gd_procs.is_empty() {
-        return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open"));
+        return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open. If you're using a version of GD with a different executable name, you may need to set the path manually using `geode config --path <value>`"));
     }
 
     if gd_procs.len() > 1 {
@@ -173,23 +177,28 @@ fn main() {
         }
     }
 
-    if config.geode_install_path.as_os_str().is_empty() {
-        match figure_out_gd_path() {
-            Ok(install_path) => {
-                config.geode_install_path = install_path;
-                println!("Loaded default GD path automatically: {:?}", config.geode_install_path);
-            },
-            Err(err) => {
-                println!("Unable to figure out GD path: {}", err);
-                exit(1);
-            },
-        }
+    let args = Cli::parse();
+
+    match args.command {
+        Commands::Config { path: _ } => {
+            if config.geode_install_path.as_os_str().is_empty() {
+                match figure_out_gd_path() {
+                    Ok(install_path) => {
+                        config.geode_install_path = install_path;
+                        println!("Loaded default GD path automatically: {:?}", config.geode_install_path);
+                    },
+                    Err(err) => {
+                        println!("Unable to figure out GD path: {}", err);
+                        exit(1);
+                    },
+                }
+            }
+        },
     }
 
     let raw = serde_json::to_string(&config).unwrap();
     fs::write(save_file, raw).unwrap();
 
-    let args = Cli::parse();
     match args.command {
         Commands::New { location, name } => {
             let loc = match location {
@@ -344,6 +353,10 @@ fn main() {
 
 
             println!("binary name: {}", binary);
+        },
+
+        Commands::Config { path } => {
+            config.geode_install_path = path;
         },
     }
 }
