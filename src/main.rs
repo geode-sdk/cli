@@ -294,7 +294,7 @@ fn main() {
                 }
             }         
 
-            if init_git.is_empty() || init_git.to_lowercase() == "y" {
+            if init_git.is_empty() || init_git.to_lowercase() != "n" {
                 let repo = match Repository::init(&project_location) {
                     Ok(r) => r,
                     Err(e) => panic!("failed to init git repo: {}", e),
