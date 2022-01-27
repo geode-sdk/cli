@@ -45,12 +45,10 @@ enum Commands {
     /// into a .geode file
     Pkg {
         /// Path to the mod's mod.json file
-        mod_json_path: String,
+        build_path: String,
         /// Path to the directory containing the mod's 
-        /// platform binary. If omitted, will recursively 
-        /// look for a platform binary file starting from 
-        /// the current folder
-        build_dir: Option<PathBuf>,
+        /// platform binary.
+        build_dir: PathBuf,
         /// Whether to copy the created .geode file in 
         /// <geode_install_dir>/geode/mods
         #[clap(short, long)]
@@ -58,7 +56,15 @@ enum Commands {
     },
 }
 
-fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
+macro_rules! print_error {
+    ($x:expr $(, $more:expr)*) => {{
+        println!("{}", format!($x, $($more),*).red());
+        ::std::process::exit(1);
+    }}
+}
+
+
+fn _read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where P: AsRef<Path>, {
     let file = File::open(filename)?;
     Ok(io::BufReader::new(file).lines())
@@ -91,14 +97,66 @@ fn remove_whitespace(s: &mut String) {
     s.retain(|c| !c.is_whitespace());
 }
 
-fn add_platform_extension(s: &mut String) {
+fn platform_extension() -> &'static str {
     if cfg!(windows) {
-        s.push_str(".dll");
-    } else if cfg!(mac) || cfg!(ios) {
-        s.push_str(".dylib");
-    } else if cfg!(android) {
-        s.push_str(".so");
+        return ".dll";
+    } else if cfg!(target_os = "macos") || cfg!(target_os = "ios") {
+        return ".dylib";
+    } else if cfg!(target_os = "android") {
+        return ".so";
+    } else {
+        print_error!("You are not on a supported platform :(");
     }
+}
+
+fn platform_string() -> &'static str {
+    if cfg!(windows) || cfg!(target_os = "linux") {
+        return "windows";
+    } else if cfg!(target_os = "macos") {
+        return "macos";
+    } else if cfg!(target_os = "ios") {
+        return "ios";
+    } else if cfg!(target_os = "android") {
+        return "android";
+    } else {
+        print_error!("You are not on a supported platform :(");
+    }
+}
+
+fn extract_binary_name(mod_json: &Value) -> String {
+    let bin_val: serde_json::value::Value;
+    let mut has_extension = true;
+
+    if mod_json["binary"].is_string() {
+        bin_val = mod_json["binary"].clone();
+    } else if mod_json["binary"].is_object() {
+        let bin_object = &mod_json["binary"];
+
+        bin_val = match &bin_object[platform_string()] {
+            Value::Null => bin_object["*"].clone(),
+            Value::String(s) => Value::String(s.to_string()),
+            a => a.clone()
+        };
+
+        has_extension = match bin_object["auto"].as_bool() {
+            Some(v) => v,
+            None => true,
+        };
+    } else {
+        print_error!("[mod.json].binary is not a string nor an object!");
+    }
+
+    let mut binary_name = match bin_val {
+        Value::String(s) => s,
+        Value::Null => print_error!("[mod.json].binary is empty!"),
+        a => a.to_string()
+    };
+
+    if has_extension {
+        binary_name.push_str(platform_extension());
+    }
+
+    binary_name
 }
 
 fn main() {
@@ -174,7 +232,7 @@ fn main() {
                         ix += 1;
                     },
                     Err(err) => {
-                        panic!("Error: {}", err);
+                        print_error!("Error: {}", err);
                     }
                 }
             }
@@ -208,7 +266,7 @@ fn main() {
 
             match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
                 Ok(_) => (),
-                Err(e) => panic!("failed to clone template: {}", e),
+                Err(e) => print_error!("failed to clone template: {}", e),
             };
 
             fs::remove_dir_all(&project_location.join(".git")).unwrap();
@@ -230,7 +288,7 @@ fn main() {
 
             match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
                 Ok(_) => (),
-                Err(e) => panic!("failed to clone sdk: {}", e),
+                Err(e) => print_error!("failed to clone sdk: {}", e),
             };
 
             let options = fs_dir::CopyOptions::new();
@@ -275,40 +333,16 @@ fn main() {
             );
         },
 
-        Commands::Pkg { mod_json_path, build_dir: _, install: _ } => {
-            let raw = fs::read_to_string(mod_json_path).unwrap();
+        Commands::Pkg { build_path, build_dir: _, install: _ } => {
+            let raw = fs::read_to_string(build_path).unwrap();
             let mod_json: Value = match serde_json::from_str(&raw) {
                 Ok(p) => p,
-                Err(_) => panic!("mod.json is not a valid JSON file!")
+                Err(_) => print_error!("mod.json is not a valid JSON file!")
             };
-            // how do i check if a key exists in a json?!?!?!?
-            let mut binary: String;
-            if mod_json["binary"].is_string() {
-                binary = mod_json["binary"].to_string();
-                add_platform_extension(&mut binary);
-            } else if mod_json["binary"].is_object() {
-                let bin = &mod_json["binary"];
-                if cfg!(windows) || cfg!(linux) {
-                    binary = bin["windows"].to_string();
-                } else if cfg!(mac) {
-                    binary = bin["macos"].to_string();
-                } else if cfg!(ios) {
-                    binary = bin["ios"].to_string();
-                } else if cfg!(android) {
-                    binary = bin["android"].to_string();
-                } else {
-                    panic!("You are not on a supported platform :(");
-                }
-                if binary.is_empty() {
-                    binary = bin["*"].to_string();
-                }
-                match bin["auto"].as_bool() {
-                    Some(v) => if v { add_platform_extension(&mut binary); },
-                    None => add_platform_extension(&mut binary),
-                }
-            } else {
-                panic!("[mod.json].binary is not a string nor an object!");
-            }
+
+            let binary = extract_binary_name(&mod_json);
+
+
             println!("binary name: {}", binary);
         },
     }
