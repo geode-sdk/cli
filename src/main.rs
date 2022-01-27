@@ -215,11 +215,12 @@ fn main() {
             let mut rl = Editor::<()>::new();
 
             let mut prompts = [
-                ("Mod name", &mut project_name, Color::Green),
-                ("Developer", &mut developer, Color::Red),
-                ("Version", &mut version, Color::Blue),
-                ("Description", &mut description, Color::Yellow),
-                ("Where to", &mut buffer, Color::Magenta),
+                ("Mod name", &mut project_name, Color::Green, true),
+                ("Developer", &mut developer, Color::Green, true),
+                ("Version", &mut version, Color::Green, true),
+                ("Description", &mut description, Color::Green, true),
+                ("Location", &mut buffer, Color::Green, true),
+                ("Initialize git repository? (Y,n)", &mut init_git, Color::Green, false),
             ];
             
             let mut ix = 0;
@@ -227,13 +228,13 @@ fn main() {
                 if ix > prompts.len() - 1 {
                     break;
                 }
-                let (prompt, ref mut var, _) = prompts[ix];
+                let (prompt, ref mut var, _, required) = prompts[ix];
                 let text = format!("{}: ", prompt);
                 let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
                 match readline {
                     Ok(line) => {
                         rl.add_history_entry(line.as_str());
-                        if line.is_empty() {
+                        if line.is_empty() && required {
                             println!("{}", "Please enter a value".red());
                             continue;
                         }
@@ -241,7 +242,7 @@ fn main() {
                         ix += 1;
                     },
                     Err(err) => {
-                        print_error!("Error: {}", err);
+                        panic!("Error: {}", err);
                     }
                 }
             }
@@ -251,6 +252,7 @@ fn main() {
             developer = developer.trim().to_string();
             project_name = project_name.trim().to_string();
             description = description.trim().to_string();
+            init_git = init_git.trim().to_string();
 
             let project_location = Path::new(&buffer).join(&project_name);
 
@@ -261,11 +263,11 @@ fn main() {
             
             println!(
                 "Creating mod with ID {} named {} by {} version {} in {}",
-                id.cyan(),
+                id.green(),
                 project_name.green(),
-                developer.red(),
-                version.yellow(),
-                project_location.parent().unwrap().to_str().unwrap().purple()
+                developer.green(),
+                version.green(),
+                project_location.parent().unwrap().to_str().unwrap().green()
             );
 
             if project_location.exists() {
@@ -275,7 +277,7 @@ fn main() {
 
             match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
                 Ok(_) => (),
-                Err(e) => print_error!("failed to clone template: {}", e),
+                Err(e) => panic!("failed to clone template: {}", e),
             };
 
             fs::remove_dir_all(&project_location.join(".git")).unwrap();
@@ -287,23 +289,45 @@ fn main() {
 
                     fs::write(file, contents).unwrap();
                 }
+            }         
+
+            if init_git.is_empty() || init_git.to_lowercase() == "y" {
+                let repo = match Repository::init(&project_location) {
+                    Ok(r) => r,
+                    Err(e) => panic!("failed to init git repo: {}", e),
+                };
+
+                let mut sm = match repo.submodule("https://github.com/geode-sdk/sdk", Path::new("sdk"), true) {
+                    Ok(r) => r,
+                    Err(e) => panic!("failed to add sdk as a submodule: {}", e),
+                };
+
+                match sm.clone(None) {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to clone sdk: {}", e)
+                };
+                
+                match sm.add_finalize() {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to finalize submodule creation: {}", e)
+                };
+            } else {
+                let tmp_sdk = std::env::temp_dir().join("sdk");
+
+                if tmp_sdk.exists() {
+                    fs_dir::remove(&tmp_sdk).unwrap();
+                }
+
+                match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
+                    Ok(_) => (),
+                    Err(e) => panic!("failed to clone sdk: {}", e),
+                };
+
+                let options = fs_dir::CopyOptions::new();
+                fs_dir::copy(&tmp_sdk, &project_location, &options).unwrap();
+                fs_dir::remove(tmp_sdk).unwrap();
             }
-
-            let tmp_sdk = std::env::temp_dir().join("sdk");
-
-            if tmp_sdk.exists() {
-                fs_dir::remove(&tmp_sdk).unwrap();
-            }
-
-            match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
-                Ok(_) => (),
-                Err(e) => print_error!("failed to clone sdk: {}", e),
-            };
-
-            let options = fs_dir::CopyOptions::new();
-            fs_dir::copy(&tmp_sdk.join("SDK"), &project_location, &options).unwrap();
-            fs_dir::remove(tmp_sdk).unwrap();
-
+            
             let mod_json = json!({
                 "geode":        GEODE_VERSION,
                 "version":      version,
