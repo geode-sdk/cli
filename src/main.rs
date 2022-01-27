@@ -90,7 +90,7 @@ fn figure_out_gd_path() -> Result<PathBuf> {
         None => (),
     }
 
-    let mut p = gd_proc.exe().parent().unwrap().to_path_buf();
+    let mut p = PathBuf::from(gd_proc.exe().clone()).parent().unwrap().to_path_buf();
 
     if cfg!(target_os = "macos") {
         p = p.parent().unwrap().to_path_buf();
