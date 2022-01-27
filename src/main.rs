@@ -10,7 +10,7 @@ use std::fs::{self, *};
 use std::io::{self, *};
 use git2::Repository;
 use fs_extra::dir as fs_dir;
-use sysinfo::{System, SystemExt};
+use sysinfo::{System, SystemExt, ProcessExt};
 
 const GEODE_VERSION: i32 = 1;
 const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -78,16 +78,19 @@ fn figure_out_gd_path() -> Result<PathBuf> {
     let mut sys = System::new();
     sys.refresh_processes();
 
-    let gd_procs = sys.get_process_by_name("Geometry Dash");
+    let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
 
-    if gd_procs.is_empty() {
-        return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open. If you're using a version of GD with a different executable name, you may need to set the path manually using `geode config --path <value>`"));
+    let gd_proc = match gd_procs.next() {
+        Some(e) => e,
+        None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
+    };
+
+    match gd_procs.next() {
+        Some(_) => return Err(Error::new(ErrorKind::Other, "It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance.")),
+        None => (),
     }
 
-    if gd_procs.len() > 1 {
-        return Err(Error::new(ErrorKind::Other, "It seems there are two instances of Geometry Dash open. Please re-run with only one instance."));
-    }
-    let mut p = PathBuf::from(gd_procs[0].exe.clone()).parent().unwrap().to_path_buf();
+    let mut p = gd_proc.exe().parent().unwrap().to_path_buf();
 
     if cfg!(target_os = "macos") {
         p = p.parent().unwrap().to_path_buf();
