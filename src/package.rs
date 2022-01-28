@@ -4,7 +4,7 @@ use crate::print_error;
 use std::fs;
 
 pub fn platform_extension() -> &'static str {
-    if cfg!(windows) {
+    if cfg!(windows) || cfg!(target_os = "linux") {
         ".dll"
     } else if cfg!(target_os = "macos") || cfg!(target_os = "ios") {
         ".dylib"

@@ -14,7 +14,15 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
     let mut sys = System::new();
     sys.refresh_processes();
 
-    let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
+    let mut gd_procs;
+
+    if cfg!(windows) {
+    	gd_procs = sys.processes_by_exact_name("GeometryDash.exe");
+    } else {
+    	// TODO: Check if in other systems can detect it like this.
+    	gd_procs = sys.processes_by_exact_name("Geometry Dash");
+    }
+
 
     let gd_proc = match gd_procs.next() {
         Some(e) => e,
