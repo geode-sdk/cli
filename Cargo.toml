@@ -20,3 +20,4 @@ serde = { version = "1.0.136", features = ["derive"] }
 sysinfo = "0.23.0"
 git2 = "0.13.25"
 fs_extra = "1.2.0"
+sha256 = "1.0.3"

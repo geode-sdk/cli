@@ -1,31 +1,30 @@
-use std::process::exit;
 use std::path::{PathBuf, Path};
 use colored::*;
 use clap::{Parser, Subcommand};
-use path_absolutize::*;
-use rustyline::Editor;
-use serde::{Serialize, Deserialize};
-use serde_json::{json, to_string_pretty, Value};
-use std::fs::{self, *};
-use std::io::{self, *};
-use git2::Repository;
-use fs_extra::dir as fs_dir;
-use sysinfo::{System, SystemExt, ProcessExt};
 
-const GEODE_VERSION: i32 = 1;
-const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
-const GEODE_CLI_NAME: &str = env!("CARGO_PKG_NAME");
+use std::fs::File;
+use std::io::{self, *};
+
+
+
+pub mod util;
+pub mod package;
+pub mod install;
+pub mod template;
+pub mod config;
+
+use crate::config::Configuration;
+
+pub const GEODE_VERSION: i32 = 1;
+pub const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const GEODE_CLI_NAME: &str = env!("CARGO_PKG_NAME");
+
 
 #[derive(Parser)]
 #[clap(version, long_about = None)]
 struct Cli {
     #[clap(subcommand)]
     command: Commands,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Configuration {
-    geode_install_path: PathBuf,
 }
 
 #[derive(Subcommand)]
@@ -58,13 +57,8 @@ enum Commands {
         #[clap(short, long)]
         install: bool,
     },
-}
 
-macro_rules! print_error {
-    ($x:expr $(, $more:expr)*) => {{
-        println!("{}", format!($x, $($more),*).red());
-        ::std::process::exit(1);
-    }}
+    Update {}
 }
 
 
@@ -74,290 +68,13 @@ where P: AsRef<Path>, {
     Ok(io::BufReader::new(file).lines())
 }
 
-fn figure_out_gd_path() -> Result<PathBuf> {
-    let mut sys = System::new();
-    sys.refresh_processes();
-
-    let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
-
-    let gd_proc = match gd_procs.next() {
-        Some(e) => e,
-        None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
-    };
-
-    match gd_procs.next() {
-        Some(_) => return Err(Error::new(ErrorKind::Other, "It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance.")),
-        None => (),
-    }
-
-    let mut p = PathBuf::from(gd_proc.exe().clone()).parent().unwrap().to_path_buf();
-
-    if cfg!(target_os = "macos") {
-        p = p.parent().unwrap().to_path_buf();
-    }
-    Ok(p)
-}
-
-
-
-fn remove_whitespace(s: &mut String) {
-    s.retain(|c| !c.is_whitespace());
-}
-
-fn platform_extension() -> &'static str {
-    if cfg!(windows) {
-        return ".dll";
-    } else if cfg!(target_os = "macos") || cfg!(target_os = "ios") {
-        return ".dylib";
-    } else if cfg!(target_os = "android") {
-        return ".so";
-    } else {
-        print_error!("You are not on a supported platform :(");
-    }
-}
-
-fn platform_string() -> &'static str {
-    if cfg!(windows) || cfg!(target_os = "linux") {
-        return "windows";
-    } else if cfg!(target_os = "macos") {
-        return "macos";
-    } else if cfg!(target_os = "ios") {
-        return "ios";
-    } else if cfg!(target_os = "android") {
-        return "android";
-    } else {
-        print_error!("You are not on a supported platform :(");
-    }
-}
-
-fn extract_binary_name(mod_json: &Value) -> String {
-    let bin_val: serde_json::value::Value;
-    let mut has_extension = true;
-
-    if mod_json["binary"].is_string() {
-        bin_val = mod_json["binary"].clone();
-    } else if mod_json["binary"].is_object() {
-        let bin_object = &mod_json["binary"];
-
-        bin_val = match &bin_object[platform_string()] {
-            Value::Null => bin_object["*"].clone(),
-            Value::String(s) => Value::String(s.to_string()),
-            a => a.clone()
-        };
-
-        has_extension = match bin_object["auto"].as_bool() {
-            Some(v) => v,
-            None => true,
-        };
-    } else {
-        print_error!("[mod.json].binary is not a string nor an object!");
-    }
-
-    let mut binary_name = match bin_val {
-        Value::String(s) => s,
-        Value::Null => print_error!("[mod.json].binary is empty!"),
-        a => a.to_string()
-    };
-
-    if has_extension {
-        binary_name.push_str(platform_extension());
-    }
-
-    binary_name
-}
-
 fn main() {
-    let mut config = Configuration { geode_install_path: PathBuf::new() };
-    let exe_path = std::env::current_exe().unwrap();
-    let save_dir = exe_path.parent().unwrap();
-    let save_file = save_dir.join("config.json");
-
-    if save_file.exists() {
-        let raw = fs::read_to_string(&save_file).unwrap();
-        config = match serde_json::from_str(&raw) {
-            Ok(p) => p,
-            Err(_) => config
-        }
-    }
+    Configuration::get();
 
     let args = Cli::parse();
 
     match args.command {
-        Commands::Config { path: _ } => {
-            if config.geode_install_path.as_os_str().is_empty() {
-                match figure_out_gd_path() {
-                    Ok(install_path) => {
-                        config.geode_install_path = install_path;
-                        println!("Loaded default GD path automatically: {:?}", config.geode_install_path);
-                    },
-                    Err(err) => {
-                        println!("Unable to figure out GD path: {}", err);
-                        exit(1);
-                    },
-                }
-            }
-        },
-    }
-
-    let raw = serde_json::to_string(&config).unwrap();
-    fs::write(save_file, raw).unwrap();
-
-    match args.command {
-        Commands::New { location, name } => {
-            let loc = match location {
-                Some(s) => s,
-                None => std::env::current_dir().unwrap()
-            };
-            let mut project_name = name;
-
-            let mut version = String::from("v1.0.0");
-            let mut developer = String::from("");
-            let mut description = String::from("");
-            let mut buffer = loc.absolutize().unwrap().to_str().unwrap().to_string();
-
-            let mut rl = Editor::<()>::new();
-
-            let mut prompts = [
-                ("Mod name", &mut project_name, Color::Green, true),
-                ("Developer", &mut developer, Color::Green, true),
-                ("Version", &mut version, Color::Green, true),
-                ("Description", &mut description, Color::Green, true),
-                ("Location", &mut buffer, Color::Green, true),
-                ("Initialize git repository? (Y,n)", &mut init_git, Color::Green, false),
-            ];
-            
-            let mut ix = 0;
-            loop {
-                if ix > prompts.len() - 1 {
-                    break;
-                }
-                let (prompt, ref mut var, _, required) = prompts[ix];
-                let text = format!("{}: ", prompt);
-                let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
-                match readline {
-                    Ok(line) => {
-                        rl.add_history_entry(line.as_str());
-                        if line.is_empty() && required {
-                            println!("{}", "Please enter a value".red());
-                            continue;
-                        }
-                        **var = line;
-                        ix += 1;
-                    },
-                    Err(err) => {
-                        panic!("Error: {}", err);
-                    }
-                }
-            }
-            
-            buffer = buffer.trim().to_string();
-            version = version.trim().to_string();
-            developer = developer.trim().to_string();
-            project_name = project_name.trim().to_string();
-            description = description.trim().to_string();
-            init_git = init_git.trim().to_string();
-
-            let project_location = Path::new(&buffer).join(&project_name);
-
-            let id = format!("com.{}.{}", developer.to_lowercase(), project_name.to_lowercase());
-
-            let mut binary_name = project_name.to_lowercase();
-            remove_whitespace(&mut binary_name);
-            
-            println!(
-                "Creating mod with ID {} named {} by {} version {} in {}",
-                id.green(),
-                project_name.green(),
-                developer.green(),
-                version.green(),
-                project_location.parent().unwrap().to_str().unwrap().green()
-            );
-
-            if project_location.exists() {
-                println!("{}", "Unable to create project in existing directory".red());
-                exit(1);
-            }
-
-            match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
-                Ok(_) => (),
-                Err(e) => panic!("failed to clone template: {}", e),
-            };
-
-            fs::remove_dir_all(&project_location.join(".git")).unwrap();
-
-            for thing in fs::read_dir(&project_location).unwrap() {
-                if !thing.as_ref().unwrap().metadata().unwrap().is_dir() {
-                    let file = thing.unwrap().path();
-                    let contents = fs::read_to_string(&file).unwrap().replace("$Template", &project_name);
-
-                    fs::write(file, contents).unwrap();
-                }
-            }         
-
-            if init_git.is_empty() || init_git.to_lowercase() != "n" {
-                let repo = match Repository::init(&project_location) {
-                    Ok(r) => r,
-                    Err(e) => panic!("failed to init git repo: {}", e),
-                };
-
-                let mut sm = match repo.submodule("https://github.com/geode-sdk/sdk", Path::new("sdk"), true) {
-                    Ok(r) => r,
-                    Err(e) => panic!("failed to add sdk as a submodule: {}", e),
-                };
-
-                match sm.clone(None) {
-                    Ok(_) => (),
-                    Err(e) => panic!("failed to clone sdk: {}", e)
-                };
-                
-                match sm.add_finalize() {
-                    Ok(_) => (),
-                    Err(e) => panic!("failed to finalize submodule creation: {}", e)
-                };
-            } else {
-                let tmp_sdk = std::env::temp_dir().join("sdk");
-
-                if tmp_sdk.exists() {
-                    fs_dir::remove(&tmp_sdk).unwrap();
-                }
-
-                match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
-                    Ok(_) => (),
-                    Err(e) => panic!("failed to clone sdk: {}", e),
-                };
-
-                let options = fs_dir::CopyOptions::new();
-                fs_dir::copy(&tmp_sdk, &project_location, &options).unwrap();
-                fs_dir::remove(tmp_sdk).unwrap();
-            }
-            
-            let mod_json = json!({
-                "geode":        GEODE_VERSION,
-                "version":      version,
-                "id":           id,
-                "name":         project_name,
-                "developer":    developer,
-                "description":  description,
-                "details":      null,
-                "credits":      null,
-                "binary": {
-                    "*": binary_name
-                },
-                "dependencies": [
-                    {
-                        "id": "com.geode.api",
-                        "required": true
-                    }
-                ]
-            });
-
-            fs::write(
-                &project_location.join("mod.json"),
-                to_string_pretty(&mod_json).unwrap()
-            ).expect("Unable to write to specified project");
-
-
-        },
+        Commands::New { location, name } => template::create_template(name, location),
 
         Commands::About {} => {
             println!(
@@ -365,25 +82,14 @@ fn main() {
                 GEODE_CLI_NAME.green(),
                 GEODE_VERSION.to_string().red(),
                 GEODE_CLI_VERSION.yellow(),
-                config.geode_install_path.to_str().unwrap().purple()
+                Configuration::install_path().to_str().unwrap().purple()
             );
         },
 
-        Commands::Pkg { build_path, build_dir: _, install: _ } => {
-            let raw = fs::read_to_string(build_path).unwrap();
-            let mod_json: Value = match serde_json::from_str(&raw) {
-                Ok(p) => p,
-                Err(_) => print_error!("mod.json is not a valid JSON file!")
-            };
+        Commands::Pkg { build_path, build_dir: _, install: _ } => package::create_geode(build_path),
 
-            let binary = extract_binary_name(&mod_json);
+        Commands::Config { path } => Configuration::set_install_path(path),
 
-
-            println!("binary name: {}", binary);
-        },
-
-        Commands::Config { path } => {
-            config.geode_install_path = path;
-        },
+        Commands::Update {} => install::update_geode()
     }
 }
