@@ -1,3 +1,5 @@
+extern crate colored;
+
 use std::path::{PathBuf, Path};
 use colored::*;
 use clap::{Parser, Subcommand};
@@ -12,7 +14,9 @@ pub mod package;
 pub mod install;
 pub mod template;
 pub mod config;
+pub mod windowsAnsi;
 
+use crate::windowsAnsi::enable_ansi_support;
 use crate::config::Configuration;
 
 pub const GEODE_VERSION: i32 = 1;
@@ -69,6 +73,11 @@ where P: AsRef<Path>, {
 }
 
 fn main() {
+    if cfg!(windows)
+    {
+        enable_ansi_support();
+    }
+
     Configuration::get();
 
     let args = Cli::parse();
@@ -79,9 +88,9 @@ fn main() {
         Commands::About {} => {
             println!(
                 " == {} == \nGeode Version: {}\nCLI Version: {}\nGeode Installation: {}",
-                GEODE_CLI_NAME.green(),
+                GEODE_CLI_NAME.to_string().green(),
                 GEODE_VERSION.to_string().red(),
-                GEODE_CLI_VERSION.yellow(),
+                GEODE_CLI_VERSION.to_string().yellow(),
                 Configuration::install_path().to_str().unwrap().purple()
             );
         },

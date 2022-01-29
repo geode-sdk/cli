@@ -10,6 +10,9 @@ path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser"] }
+
 [dependencies]
 colored = "2"
 clap = { version = "3.0.12", features = ["derive"] }
