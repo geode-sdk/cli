@@ -11,8 +11,6 @@ use std::process::Command;
 use std::env;
 use std::process;
 
-use crate::projectManagement;
-
 use fs_extra::dir as fs_dir;
 
 pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
@@ -143,46 +141,44 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    to_string_pretty(&mod_json).unwrap()
 	).expect("Unable to write to specified project");
 
-	let mut locationString = project_location.parent().unwrap().to_str().unwrap();
-	projectManagement::add_new_project_to_list(project_name.to_string(), locationString.to_string());
-
 	if cfg!(windows)
 	{
-		let mut setUpProject = String::new();
+		let mut set_up_project = String::new();
 		println!("Would you like to set up and open the project? (y/n):");
-		let answer = std::io::stdin().read_line(&mut setUpProject).unwrap();
+		let _answer = std::io::stdin().read_line(&mut set_up_project).unwrap();
 
-		let mut modFolder = format!("{}/{}", &locationString, project_name);
+		let location_str = project_location.parent().unwrap().to_str().unwrap();
+		let mod_folder = format!("{}/{}", location_str, project_name);
 	
-		if setUpProject.trim() == "y"
+		if set_up_project.trim() == "y"
 		{
 			let mut ide = String::new();
 			println!("Select Compatible IDE: \n1. Visual Studio\n2. VS Code.");
-			let ideAnswer = std::io::stdin().read_line(&mut ide).unwrap();
+			let _ide_answer = std::io::stdin().read_line(&mut ide).unwrap();
 	
-			let mut buildFolderInMod = format!("{}/build", &modFolder);
+			let build_folder_in_mod = format!("{}/build", &mod_folder);
 	
 			if ide.trim() == "1"
 			{
-				std::fs::create_dir(&buildFolderInMod);
-				assert!(env::set_current_dir(&buildFolderInMod).is_ok());
+				std::fs::create_dir(&build_folder_in_mod).unwrap();
+				assert!(env::set_current_dir(&build_folder_in_mod).is_ok());
 				//println!("Successfully changed working directory to {}!", env::current_dir().unwrap().into_os_string().into_string().unwrap());
 	
 				let mut cmake = Command::new("cmake").arg("..").arg("-A").arg("Win32").spawn().expect("Uh oh!");
-				let end = cmake.wait().unwrap();
-				let slnFile = format!("{}.sln", project_name);
+				let _end = cmake.wait().unwrap();
+				let sln_file = format!("{}.sln", project_name);
 				println!("Opening Visual Studio Solution...");
-				Command::new("cmd").arg("/c").arg(slnFile).spawn().expect("Uh oh!");
+				Command::new("cmd").arg("/c").arg(sln_file).spawn().expect("Uh oh!");
 			}
 			else if ide.trim() == "2"
 			{
-				assert!(env::set_current_dir(&modFolder).is_ok());
+				assert!(env::set_current_dir(&mod_folder).is_ok());
 				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
 			}
 		}
-		else if setUpProject.trim() == "n"
+		else if set_up_project.trim() == "n"
 		{
-			assert!(env::set_current_dir(&modFolder).is_ok());
+			assert!(env::set_current_dir(&mod_folder).is_ok());
 			Command::new("explorer").arg(".").spawn().expect("Uh oh!");
 		}
 	}
