@@ -7,6 +7,9 @@ use rustyline::Editor;
 use serde_json::{json, to_string_pretty};
 use std::path::PathBuf;
 use std::{fs, path::Path, process::exit};
+use std::process::Command;
+use std::env;
+use std::process;
 
 use fs_extra::dir as fs_dir;
 
@@ -137,4 +140,48 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    &project_location.join("mod.json"),
 	    to_string_pretty(&mod_json).unwrap()
 	).expect("Unable to write to specified project");
+
+	if cfg!(windows)
+	{
+		let mut setUpProject = String::new();
+		println!("Would you like to set up and open the project? (y/n):");
+		let answer = std::io::stdin().read_line(&mut setUpProject).unwrap();
+
+		let locationString = project_location.parent().unwrap().to_str().unwrap();
+		let mut modFolder = format!("{}/{}", locationString, project_name);
+	
+		if setUpProject.trim() == "y"
+		{
+			let mut ide = String::new();
+			println!("Select Compatible IDE: \n1. Visual Studio\n2. VS Code.");
+			let ideAnswer = std::io::stdin().read_line(&mut ide).unwrap();
+	
+			let mut buildFolderInMod = format!("{}/build", &modFolder);
+	
+			if ide.trim() == "1"
+			{
+				std::fs::create_dir(&buildFolderInMod);
+				assert!(env::set_current_dir(&buildFolderInMod).is_ok());
+				//println!("Successfully changed working directory to {}!", env::current_dir().unwrap().into_os_string().into_string().unwrap());
+	
+				let mut cmake = Command::new("cmake").arg("..").arg("-A").arg("Win32").spawn().expect("Uh oh!");
+				let end = cmake.wait().unwrap();
+				let slnFile = format!("{}.sln", project_name);
+				println!("Opening Visual Studio Solution...");
+				Command::new("cmd").arg("/c").arg(slnFile).spawn().expect("Uh oh!");
+			}
+			else if ide.trim() == "2"
+			{
+				assert!(env::set_current_dir(&modFolder).is_ok());
+				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
+			}
+		}
+		else if setUpProject.trim() == "n"
+		{
+			assert!(env::set_current_dir(&modFolder).is_ok());
+			Command::new("explorer").arg(".").spawn().expect("Uh oh!");
+		}
+	}
+
+	process::exit(0);
 }
