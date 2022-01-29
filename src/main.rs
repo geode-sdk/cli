@@ -13,10 +13,11 @@ pub mod util;
 pub mod package;
 pub mod install;
 pub mod template;
+pub mod resources;
 pub mod config;
-pub mod windowsAnsi;
+pub mod windows_ansi;
 
-use crate::windowsAnsi::enable_ansi_support;
+use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
 
 pub const GEODE_VERSION: i32 = 1;
@@ -62,6 +63,19 @@ enum Commands {
         install: bool,
     },
 
+    /// Resize a set of UHD textures into 
+    /// HD and low variants
+    Resize {
+        /// Directory containing resources to 
+        /// resize
+        src: PathBuf,
+        /// Where to place the resized files.
+        /// Default is the same directory as 
+        /// src
+        dest: Option<PathBuf>
+    },
+
+    /// Update Geode
     Update {}
 }
 
@@ -73,9 +87,11 @@ where P: AsRef<Path>, {
 }
 
 fn main() {
-    if cfg!(windows)
-    {
-        enable_ansi_support();
+    if cfg!(windows) {
+        match enable_ansi_support() {
+            Ok(_) => {},
+            Err(e) => println!("Unable to enable ANSI support: {}", e)
+        }
     }
 
     Configuration::get();
@@ -98,6 +114,8 @@ fn main() {
         Commands::Pkg { build_path, build_dir: _, install: _ } => package::create_geode(build_path),
 
         Commands::Config { path } => Configuration::set_install_path(path),
+
+        Commands::Resize { src, dest } => resources::process_resources(src, dest),
 
         Commands::Update {} => install::update_geode()
     }

@@ -1,7 +1,6 @@
 use colored::Colorize;
 use crate::print_error;
 use git2::Repository;
-use std::fs;
 use std::io::{Result, Error, ErrorKind};
 use std::path::PathBuf;
 use sysinfo::{ProcessExt, System, SystemExt};
