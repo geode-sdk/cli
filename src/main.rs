@@ -16,6 +16,7 @@ pub mod template;
 pub mod resources;
 pub mod config;
 pub mod windows_ansi;
+pub mod projectManagement;
 
 use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
@@ -75,6 +76,10 @@ enum Commands {
         dest: Option<PathBuf>
     },
 
+    Info {
+        name: String,
+    },
+
     /// Update Geode
     Update {}
 }
@@ -116,6 +121,8 @@ fn main() {
         Commands::Config { path } => Configuration::set_install_path(path),
 
         Commands::Resize { src, dest } => resources::process_resources(src, dest),
+
+        Commands::Info { name } => {println!("{}", projectManagement::get_project_info(name))}
 
         Commands::Update {} => install::update_geode()
     }
