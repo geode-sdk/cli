@@ -15,6 +15,7 @@ pub mod install;
 pub mod template;
 pub mod config;
 pub mod windowsAnsi;
+pub mod projectManagement;
 
 use crate::windowsAnsi::enable_ansi_support;
 use crate::config::Configuration;
@@ -61,6 +62,10 @@ enum Commands {
         #[clap(short, long)]
         install: bool,
     },
+    /// Get Info about an existing Geode Project
+    Info {
+        name: String,
+    },
 
     Update {}
 }
@@ -73,6 +78,7 @@ where P: AsRef<Path>, {
 }
 
 fn main() {
+
     if cfg!(windows)
     {
         enable_ansi_support();
@@ -98,6 +104,12 @@ fn main() {
         Commands::Pkg { build_path, build_dir: _, install: _ } => package::create_geode(build_path),
 
         Commands::Config { path } => Configuration::set_install_path(path),
+
+        Commands::Info { name } => {
+            println!(
+                "{}", projectManagement::get_project_info(name) 
+                );
+        }
 
         Commands::Update {} => install::update_geode()
     }
