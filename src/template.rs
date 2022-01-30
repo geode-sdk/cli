@@ -157,12 +157,17 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 		if set_up_project.trim() == "y"
 		{
 			let mut ide = String::new();
-			println!("Select Compatible IDE: \n1. Visual Studio\n2. VS Code.");
+			println!("Select Compatible IDE: \n1. VS Code.\n2. Visual Studio.");
 			let _ide_answer = std::io::stdin().read_line(&mut ide).unwrap();
 	
 			let build_folder_in_mod = format!("{}/build", &mod_folder);
-	
-			if ide.trim() == "1"
+			
+			if ide.trim() == "1" // Open VS Code
+			{
+				assert!(env::set_current_dir(&mod_folder).is_ok());
+				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
+			}
+			else if ide.trim() == "2" // Open and Set Up Visual Studio
 			{
 				std::fs::create_dir(&build_folder_in_mod).unwrap();
 				assert!(env::set_current_dir(&build_folder_in_mod).is_ok());
@@ -173,11 +178,6 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 				let sln_file = format!("{}.sln", project_name);
 				println!("Opening Visual Studio Solution...");
 				Command::new("cmd").arg("/c").arg(sln_file).spawn().expect("Uh oh!");
-			}
-			else if ide.trim() == "2"
-			{
-				assert!(env::set_current_dir(&mod_folder).is_ok());
-				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
 			}
 		}
 		else if set_up_project.trim() == "n"

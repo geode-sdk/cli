@@ -17,6 +17,7 @@ pub mod resources;
 pub mod config;
 pub mod windows_ansi;
 pub mod project_management;
+pub mod compiler;
 
 use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
@@ -80,6 +81,11 @@ enum Commands {
         name: String,
     },
 
+    Run {
+        name: String,
+        ide: String,
+    },
+
     /// Update Geode
     Update {}
 }
@@ -122,7 +128,9 @@ fn main() {
 
         Commands::Resize { src, dest } => resources::process_resources(src, dest),
 
-        Commands::Info { name } => {println!("{}", project_management::get_project_info(name))}
+        Commands::Info { name } => {println!("{}", project_management::get_project_info(name))},
+
+        Commands::Run { name, ide } => compiler::run_project(name, ide),
 
         Commands::Update {} => install::update_geode()
     }
