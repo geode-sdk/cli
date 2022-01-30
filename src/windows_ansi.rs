@@ -6,6 +6,7 @@
 /// https://msdn.microsoft.com/en-us/library/windows/desktop/mt638032(v=vs.85).aspx
 ///
 /// Returns a `Result` with the Windows error code if unsuccessful.
+
 #[cfg(windows)]
 pub fn enable_ansi_support() -> Result<(), u32> {
     // ref: https://docs.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#EXAMPLE_OF_ENABLING_VIRTUAL_TERMINAL_PROCESSING @@ https://archive.is/L7wRJ#76%

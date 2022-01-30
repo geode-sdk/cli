@@ -3,6 +3,7 @@ use crate::print_error;
 use git2::Repository;
 use std::io::{Result, Error, ErrorKind};
 use std::path::PathBuf;
+use std::fs;
 use sysinfo::{ProcessExt, System, SystemExt};
 use crate::package;
 
@@ -96,6 +97,13 @@ fn check_update_needed(specific_version: Option<String>) -> Option<PathBuf> {
 
 pub fn update_geode() {
 	let b = check_update_needed(None);
-	println!("\nwell its right here you figure it out {:?}", b);
+	match b {
+		Some(p) => {
+			fs::copy(p, geode_library()).expect("Unable to copy geode to correct directory");
+			println!("{}", "Sucessfully updated Geode".bold());
+		},
+
+		None => print_error!("Geode has no pending updates")
+	}
 	//unimplemented!("the");
 }
