@@ -130,7 +130,7 @@ fn main() {
 
         Commands::Info { name } => {println!("{}", project_management::get_project_info(name))},
 
-        Commands::Run { name, ide } => compiler::run_project(name, ide),
+        Commands::Run { name, ide } => compiler::run_project(name, ide, Configuration::install_path().to_str().unwrap().to_string()),
 
         Commands::Update {} => install::update_geode()
     }

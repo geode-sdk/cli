@@ -4,13 +4,27 @@ use std::process::Stdio;
 use std::fs;
 use std::env;
 
-pub fn run_project(name: String, ide: String)
+pub fn run_project(name: String, ide: String, gameLoc: String)
 {
 	let mut location = project_management::get_project_info(name.clone());
 
 	if location == "" { println!("{} not found in Geode's list.", name); return; }
 
-	println!("MSBuild Result: {}", windows_find_visual_studio_ms_build());
+	if ide == "visualstudio"
+	{
+		let projectSlnFinal = format!("{}/build/{}.sln", location, name);
+		win_vs_msb_build(projectSlnFinal);
+
+		if path_exists(format!("{}/build/Release/{}.dll", location, name).as_str())
+		{
+			// TODO: 
+			// - If there's not a .geode file, make it.
+			// - If there's a .geode file/Once there's a .geode file, put it in the geode/mods directory.
+		}
+		let id = 322170;
+		let cmd = format!("steam://rungameid/{}", id.to_string());
+		Command::new("cmd").arg("/c").arg("start").arg(cmd).spawn().expect("Uh oh!");
+	}
 }
 
 pub fn windows_find_visual_studio_ms_build() -> String
@@ -59,7 +73,9 @@ pub fn win_vs_msb_create_bat_file() -> String
 pub fn win_vs_mbs_get_from_txt() -> String
 {
 	let mut txt_url = format!("{}/msbuild_output.txt", env::current_dir().unwrap().into_os_string().into_string().unwrap());
-	return fs::read_to_string(txt_url).expect("Oops!");
+	let txt = fs::read_to_string(txt_url).expect("Oops!");
+	let finalTxt = txt.replace("\n", "");
+	return finalTxt;
 }
 
 pub fn win_vs_msb_delete_bat_file()
@@ -69,4 +85,23 @@ pub fn win_vs_msb_delete_bat_file()
 
 	let txt_url = format!("{}/msbuild_output.txt", env::current_dir().unwrap().into_os_string().into_string().unwrap());
 	fs::remove_file(txt_url);
+}
+
+pub fn path_exists(path: &str) -> bool {
+    fs::metadata(path).is_ok()
+}
+
+pub fn win_vs_msb_build(project_sln: String)
+{
+	let bat_string = format!("\"{}\" \"{}\" /p:Configuration=\"Release\" /p:Platform=\"Win32\"", windows_find_visual_studio_ms_build(), project_sln);
+	let mut bat_url = format!("{}/msbuild_project_comp.bat", env::current_dir().unwrap().into_os_string().into_string().unwrap());
+
+	fs::write(&bat_url, bat_string).expect(".bat file not created");
+
+	let command = Command::new(&bat_url)
+		.spawn()
+		.expect("Uh oh, looks like Misocroft's compiler wasn't happy enough, probably the motherfucker needs even more arguments.")
+		.wait();
+
+	fs::remove_file(bat_url);
 }
