@@ -11,7 +11,7 @@ use std::process::Command;
 use std::env;
 use std::process;
 
-use crate::projectManagement;
+use crate::project_management;
 use fs_extra::dir as fs_dir;
 
 pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
@@ -142,9 +142,9 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    to_string_pretty(&mod_json).unwrap()
 	).expect("Unable to write to specified project");
 	
-	let mut location_str = project_location.parent().unwrap().to_str().unwrap();
+	let location_str = project_location.parent().unwrap().to_str().unwrap();
 
-	projectManagement::add_new_project_to_list(project_name.clone(), location_str.to_string());
+	project_management::add_new_project_to_list(project_name.clone(), location_str.to_string());
 
 	if cfg!(windows)
 	{

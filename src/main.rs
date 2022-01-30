@@ -16,7 +16,7 @@ pub mod template;
 pub mod resources;
 pub mod config;
 pub mod windows_ansi;
-pub mod projectManagement;
+pub mod project_management;
 
 use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
@@ -122,7 +122,7 @@ fn main() {
 
         Commands::Resize { src, dest } => resources::process_resources(src, dest),
 
-        Commands::Info { name } => {println!("{}", projectManagement::get_project_info(name))}
+        Commands::Info { name } => {println!("{}", project_management::get_project_info(name))}
 
         Commands::Update {} => install::update_geode()
     }

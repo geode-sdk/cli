@@ -1,5 +1,4 @@
 use serde::*;
-use serde_json::*;
 use std::fs;
 use std::env;
 use std::io;
@@ -8,7 +7,7 @@ use std::path::*;
 #[derive(Serialize, Deserialize)]
 struct ModInfo 
 {
-    modName: String,
+    mod_name: String,
     location: String,
 }
 
@@ -22,16 +21,16 @@ pub fn exists(path: &str) -> bool {
     fs::metadata(path).is_ok()
 }
 
-pub fn add_new_project_to_list(nameP: String, locationP: String)
+pub fn add_new_project_to_list(name: String, location: String)
 {
 	if !exists(get_list_location().as_str()) { create_project_list(); }
 
-	let modString = fs::read_to_string(get_list_location()).expect("Oops!");
-	let finalLocation = format!("{}/{}", locationP, nameP);
+	let mod_str = fs::read_to_string(get_list_location()).expect("Oops!");
+	let final_location = format!("{}/{}", location, name);
 
-	let mut m : Mods = serde_json::from_str(&modString).unwrap();
-	let newMod = ModInfo { modName: nameP, location: finalLocation };
-	m.mods.push(newMod);
+	let mut m : Mods = serde_json::from_str(&mod_str).unwrap();
+	let new_mod = ModInfo { mod_name: name, location: final_location };
+	m.mods.push(new_mod);
 
 	fs::write(get_list_location(), serde_json::to_string(&m).unwrap()).expect("Unable to rewrite list");
 }
@@ -59,8 +58,8 @@ pub fn get_project_info(name: String) -> String
 {
 	let mut count = 0usize;
 
-	let modString = fs::read_to_string(get_list_location()).expect("Oops!");
-	let mut m : Mods = serde_json::from_str(&modString).unwrap();
+	let mod_str = fs::read_to_string(get_list_location()).expect("Oops!");
+	let m : Mods = serde_json::from_str(&mod_str).unwrap();
 
 	loop 
 	{
@@ -69,10 +68,10 @@ pub fn get_project_info(name: String) -> String
 			return "".to_string();
 		}
 
-		if m.mods[count].modName == name
+		if m.mods[count].mod_name == name
 		{
-			let finalStr = &m.mods[count];
-			return finalStr.location.clone();
+			let final_str = &m.mods[count];
+			return final_str.location.clone();
 		}
 
 		count += 1;
