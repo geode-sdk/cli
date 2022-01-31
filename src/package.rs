@@ -41,7 +41,7 @@ pub fn platform_extension() -> &'static str {
     get_extension(platform_string())
 }
 
-fn extract_binary_names(mod_json: &Value) -> Vec<String> {
+fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>) {
     let mut bin_list = Vec::new();
 
     if mod_json["binary"].is_string() {
@@ -86,7 +86,13 @@ fn extract_binary_names(mod_json: &Value) -> Vec<String> {
         print_error!("[mod.json].binary is empty!");
     }
 
-    bin_list
+    let name = match &mod_json["name"] {
+        Value::String(n) => n,
+        Value::Null => print_error!("[mod.json].name is empty!"),
+        _ => print_error!("[mod.json].name is not a string!")
+    };
+
+    (name.to_string(), bin_list)
 }
 
 pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
@@ -104,8 +110,12 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
 
     fs::create_dir(tmp_pkg).unwrap();
 
-    let try_copy = || -> Result<(), Box<dyn std::error::Error>> {
-        for ref f in extract_binary_names(&mod_json) {
+    let mut output_name = String::new();
+
+    let mut try_copy = || -> Result<(), Box<dyn std::error::Error>> {
+        let modinfo = extract_mod_info(&mod_json);
+        output_name = modinfo.0;
+        for ref f in modinfo.1 {
             if !exec_dir.join(f).exists() {
                 print_error!("Unable to find binary {}, defined in [mod.json].binary", f);
             }

@@ -46,9 +46,9 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
 
 fn geode_library() -> PathBuf {
 	if cfg!(target_os = "macos") {
-		Configuration::install_path().join("Frameworks").join("geode".to_string() + package::platform_extension())
+		Configuration::install_path().join("Frameworks")
 	} else {
-		unimplemented!("add other OS's please");
+		Configuration::install_path().to_path_buf()
 	}
 }
 
@@ -82,8 +82,8 @@ fn check_update_needed(specific_version: Option<String>) -> Option<(String, Path
 	bin_repo.set_head(&last_name).unwrap();
 
 
-	let new_library_path = tmp_update.join(package::platform_string().to_string() + package::platform_extension());
-	let old_library_path = geode_library();
+	let new_library_path = tmp_update.join(package::platform_string().to_string()).join("geode".to_string() + package::platform_extension());
+	let old_library_path = geode_library().join("geode".to_string() + package::platform_extension());
 
 	if 
 		!old_library_path.exists()
