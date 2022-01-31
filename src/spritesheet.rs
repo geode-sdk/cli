@@ -84,6 +84,8 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
         ..Default::default()
     };
 
+    let mut heights = Vec::new();
+
     let mut frames = Vec::<(PathBuf, String)>::new();
 
     let mut suffix_removals = 0u32;
@@ -114,11 +116,10 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
         }
 
         config.max_width += dim.0;
-        if config.max_height < dim.1 {
-            config.max_height = dim.1;
-        }
+        heights.push(dim.1 as f64);
     }
-    config.max_width = (config.max_width as f64 * config.max_height as f64).sqrt() as u32;
+    let av = heights.iter().sum::<f64>() / heights.len() as f64 + heights.len() as f64;
+    config.max_width = (config.max_width as f64 * av).sqrt() as u32;
     config.max_height = u32::MAX;
 
     let mut packer = TexturePacker::new_skyline(config);
