@@ -1,7 +1,7 @@
 use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
-
+use indicatif::{ProgressBar, ProgressStyle};
 
 pub mod util;
 pub mod package;
@@ -62,6 +62,21 @@ enum Commands {
         install: bool
     },
 
+    /// Create a sprite sheet out of a bunch of sprites
+    Sheet {
+        /// Path to directory containing the sprites
+        src: PathBuf,
+        /// Path to directory where to put the resulting sheet
+        dest: PathBuf,
+        /// Create variants (High, Medium, Low). Note that 
+        /// the source textures are assumed to be UHD
+        #[clap(short, long)]
+        variants: bool,
+        /// Spritesheet name
+        #[clap(short, long)]
+        name: Option<String>,
+    },
+
     Info {
         #[clap(long)]
         modpath: bool
@@ -110,6 +125,37 @@ fn main() {
                 println!("{}", Configuration::install_path().join("geode").join("mods").display());
             } else {
                 print_error!("Please specify thing you want information from");
+            }
+        },
+
+        Commands::Sheet { src, dest, variants, name } => {
+            let bar = ProgressBar::new_spinner();
+            bar.enable_steady_tick(120);
+            bar.set_style(
+                ProgressStyle::default_spinner()
+                    .tick_strings(&[
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[ done ]",
+                    ])
+                    .template("{spinner:.cyan} {msg}"),
+            );
+            bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
+            let res = spritesheet::pack_sprites(&src, &dest, variants, name).unwrap();
+            bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
+            for file in res.created_files {
+                println!("{} -> {}", "[ info ]".bright_yellow(), file);
+            }
+            if res.suffix_removals > 0 {
+                println!("{} Removed -uhd / -hd suffix from {} sprites",
+                    "[ info ]".bright_yellow(),
+                    res.suffix_removals.to_string().bright_green()
+                );
             }
         },
 

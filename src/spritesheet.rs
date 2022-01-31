@@ -1,5 +1,6 @@
-use std::fs::File;
+use std::fs::{File, create_dir_all};
 use colored::Colorize;
+use std::vec;
 
 use crate::print_error;
 
@@ -8,6 +9,8 @@ use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use image::{self, GenericImageView};
+use image::imageops::FilterType;
 
 use texture_packer::importer::ImageImporter;
 use texture_packer::exporter::ImageExporter;
@@ -28,16 +31,51 @@ struct GameSheetData {
     texture_rect: String
 }
 
-
 #[derive(Serialize)]
 struct GameSheet {
     frames: HashMap<String, GameSheetData>,
     metadata: GameSheetMeta
 }
 
-pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub struct PackResult {
+    pub suffix_removals: u32,
+    pub created_files: Vec<String>,
+}
+
+impl PackResult {
+    fn merge(&mut self, other: &PackResult) {
+        self.created_files.append(&mut other.created_files.clone());
+    }
+}
+
+fn update_suffix(name: &mut String, suffix: &str) -> bool {
+    if name.ends_with("-uhd") {
+        name.pop();
+        name.pop();
+        name.pop();
+        name.pop();
+        name.push_str(suffix);
+        name.push_str(".png");
+        return true;
+    }
+    if name.ends_with("-hd") {
+        name.pop();
+        name.pop();
+        name.pop();
+        name.push_str(suffix);
+        name.push_str(".png");
+        return true;
+    }
+    name.push_str(suffix);
+    name.push_str(".png");
+    false
+}
+
+fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
+    Result<PackResult, Box<dyn std::error::Error>>
+{
     let config = TexturePackerConfig {
-        max_width: u32::MAX,
+        max_width: 3434, // this number was chosen as the result of the equation ceil(0xb00b5 / 0x69) / 2
         max_height: u32::MAX,
         allow_rotation: true,
         texture_outlines: false,
@@ -49,6 +87,8 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
 
     let mut frames = Vec::new();
 
+    let mut suffix_removals = 0u32;
+
     for walk in walkdir::WalkDir::new(in_dir) {
         let s = walk?;
 
@@ -57,7 +97,11 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         }
 
         let sprite = PathBuf::from(s.path());
-        let framename = sprite.file_name().unwrap().to_str().unwrap_or("").to_string();
+        let mut framename = sprite.file_stem().unwrap().to_str().unwrap_or("").to_string();
+
+        if update_suffix(&mut framename, "") {
+            suffix_removals += 1;
+        }
 
         if frames.contains(&framename) {
             print_error!("Duplicate sprite name found: {}", framename);
@@ -87,10 +131,81 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         });
     }
 
-    plist::to_file_xml(out_dir.join("spritesheet.plist"), &sheet)?;
+    create_dir_all(out_dir).unwrap();
+
+    plist::to_file_xml(out_dir.join(format!("{}.plist", name)), &sheet)?;
 
     let exporter = ImageExporter::export(&packer).unwrap();
-    let mut f = File::create(out_dir.join("spritesheet.png")).unwrap();
+    let mut f = File::create(out_dir.join(format!("{}.png", name))).unwrap();
     exporter.write_to(&mut f, image::ImageFormat::Png)?;
+    Ok(PackResult {
+        suffix_removals: suffix_removals,
+        created_files: vec!(format!("{}.plist", name))
+    })
+}
+
+fn pack_sprites_with_suffix(in_dir: &Path, out_dir: &Path, name: &Option<String>, suffix: &str) -> 
+    Result<PackResult, Box<dyn std::error::Error>> 
+{
+    let mut actual_name = match name {
+        Some(s) => s.clone(),
+        None => "spritesheet".to_string()
+    };
+    actual_name.push_str(suffix);
+    return pack_sprites_to_file(in_dir, out_dir, &actual_name);
+}
+
+fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix: &str) -> Result<(), Box<dyn std::error::Error>> {
+    create_dir_all(out_dir).unwrap();
+
+    for walk in walkdir::WalkDir::new(in_dir) {
+        let s = walk?;
+
+        if s.metadata()?.is_dir() {
+            continue;
+        }
+
+        let sprite = PathBuf::from(s.path());
+        let mut framename = sprite.file_stem().unwrap().to_str().unwrap_or("").to_string();
+
+        update_suffix(&mut framename, suffix);
+
+        let mut out_file = out_dir.to_path_buf();
+        out_file.push(framename);
+
+        let img = match image::io::Reader::open(s.path()) {
+            Ok(i) => match i.decode() {
+                Ok(im) => im,
+                Err(err) => print_error!("Error decoding {}: {}", s.path().to_str().unwrap(), err)
+            },
+            Err(err) => print_error!("Error resizing {}: {}", s.path().to_str().unwrap(), err)
+        };
+
+        let resized = image::imageops::resize(
+            &img,
+            img.width() / downscale, img.height() / downscale,
+            FilterType::Gaussian
+        );
+
+        resized.save(&out_file).unwrap();
+    }
+
     Ok(())
+}
+
+pub fn pack_sprites(in_dir: &Path, out_dir: &Path, create_variants: bool, name: Option<String>) -> 
+    Result<PackResult, Box<dyn std::error::Error>>
+{
+    if create_variants {
+        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_hd")), 2, "-hd").unwrap();
+        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_low")), 4, "").unwrap();
+
+        let mut res = pack_sprites_with_suffix(in_dir, out_dir, &name, "-uhd").unwrap();
+        res.merge(&pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_hd")), out_dir, &name, "-hd").unwrap());
+        res.merge(&pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_low")), out_dir, &name, "").unwrap());
+        
+        Ok(res)
+    } else {
+        pack_sprites_with_suffix(in_dir, out_dir, &name, "")
+    }
 }

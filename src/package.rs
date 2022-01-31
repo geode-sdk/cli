@@ -146,7 +146,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
             fs_dir::copy(resource_dir.join("resources"), tmp_pkg, &options)?;
         }
         if resource_dir.join("sprites").exists() {
-            spritesheet::pack_sprites(&resource_dir.join("sprites"), tmp_pkg)?;
+            spritesheet::pack_sprites(&resource_dir.join("sprites"), tmp_pkg, false, None)?;
         }
 
         Ok(())
