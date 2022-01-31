@@ -221,6 +221,7 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path, create_variants: bool, name: 
         
         Ok(res)
     } else {
-        pack_sprites_with_suffix(in_dir, out_dir, &name, "")
+        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_uhd")), out_dir, &name, "")
     }
 }

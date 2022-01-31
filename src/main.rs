@@ -152,12 +152,6 @@ fn main() {
             for file in res.created_files {
                 println!("{} -> {}", "[ info ]".bright_yellow(), file);
             }
-            if res.suffix_removals > 0 {
-                println!("{} Removed -uhd / -hd suffix from {} sprites",
-                    "[ info ]".bright_yellow(),
-                    res.suffix_removals.to_string().bright_green()
-                );
-            }
             println!("{} You might want to delete the tmp dirs",
                 "[ info ]".bright_yellow()
             );
