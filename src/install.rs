@@ -52,7 +52,7 @@ fn geode_library() -> PathBuf {
 	}
 }
 
-fn check_update_needed(specific_version: Option<String>) -> Option<PathBuf> {
+fn check_update_needed(specific_version: Option<String>) -> Option<(String, PathBuf)> {
 	let tmp_update = std::env::temp_dir().join("geode_update");
 
 	if tmp_update.exists() {
@@ -89,16 +89,28 @@ fn check_update_needed(specific_version: Option<String>) -> Option<PathBuf> {
 		!old_library_path.exists()
 		|| (sha256::digest_file(&new_library_path).unwrap() != sha256::digest_file(&old_library_path).unwrap())
 	{
-		println!("{} {}", "Downloading update ".bright_cyan(), last_name.green().bold());
-		return Some(new_library_path);
+		return Some((last_name, new_library_path));
 	}
 	None
 }
 
-pub fn update_geode() {
-	let b = check_update_needed(None);
+pub fn check_update(version: Option<String>) {
+	let b = check_update_needed(version);
+
 	match b {
-		Some(p) => {
+		Some((name, _)) => {
+			println!("{} {}", "Update available: ".bright_magenta().bold(), name.blue().bold());
+		}
+		None => print_error!("No update found.")
+	}
+}
+
+pub fn update_geode(version: Option<String>) {
+	let b = check_update_needed(version);
+
+	match b {
+		Some((n, p)) => {
+			println!("{} {}", "Downloaded update ".bright_cyan(), n.green().bold());
 			fs::copy(p, geode_library()).expect("Unable to copy geode to correct directory");
 			println!("{}", "Sucessfully updated Geode".bold());
 		},

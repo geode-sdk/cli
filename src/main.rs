@@ -1,12 +1,6 @@
-extern crate colored;
-
-use std::path::{PathBuf, Path};
+use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
-
-use std::fs::File;
-use std::io::{self, *};
-
 
 
 pub mod util;
@@ -15,6 +9,7 @@ pub mod install;
 pub mod template;
 pub mod config;
 pub mod windows_ansi;
+pub mod spritesheet;
 
 #[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
@@ -53,14 +48,13 @@ enum Commands {
     /// into a .geode file
     Pkg {
         /// Path to the mod's mod.json file
-        build_path: String,
+        resource_dir: PathBuf,
         /// Path to the directory containing the mod's 
         /// platform binary.
-        build_dir: PathBuf,
-        /// Whether to copy the created .geode file in 
-        /// <geode_install_dir>/geode/mods
-        #[clap(short, long)]
-        install: bool,
+        exec_dir: PathBuf,
+
+        /// Path to put the generated .geode file
+        out_file: PathBuf
     },
 
     Info {
@@ -69,17 +63,14 @@ enum Commands {
     },
 
     /// Update Geode
-    Update {}
+    Update {
+        // if you want to switch to a certain version
+        version: Option<String>,
+
+        #[clap(long)]
+        check: bool
+    }
 }
-
-
-fn _read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
-where P: AsRef<Path>, {
-    let file = File::open(filename)?;
-    Ok(io::BufReader::new(file).lines())
-}
-
-
 
 fn main() {
     #[cfg(windows)]
@@ -105,7 +96,7 @@ fn main() {
             );
         },
 
-        Commands::Pkg { build_path, build_dir: _, install: _ } => package::create_geode(build_path),
+        Commands::Pkg { resource_dir, exec_dir, out_file } => package::create_geode(&resource_dir, &exec_dir, &out_file),
 
         Commands::Config { path } => Configuration::set_install_path(path),
 
@@ -117,6 +108,12 @@ fn main() {
             }
         },
 
-        Commands::Update {} => install::update_geode()
+        Commands::Update { version, check } => {
+            if check {
+                install::check_update(version);
+            } else {
+                install::update_geode(version)
+            }
+        }
     }
 }

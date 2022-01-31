@@ -1,14 +1,22 @@
+use std::io::Write;
+use std::fs::File;
 use colored::Colorize;
-use serde_json::Value;
-use crate::print_error;
-use std::fs;
 
-pub fn platform_extension() -> &'static str {
-    if cfg!(windows) || cfg!(target_os = "linux") {
+use crate::{print_error, spritesheet};
+
+use fs_extra::dir as fs_dir;
+
+use serde_json::Value;
+
+use std::fs;
+use std::path::Path;
+
+fn get_extension(platform: &str) -> &'static str {
+    if platform == "windows" {
         ".dll"
-    } else if cfg!(target_os = "macos") || cfg!(target_os = "ios") {
+    } else if platform == "macos" || platform == "ios" {
         ".dylib"
-    } else if cfg!(target_os = "android") {
+    } else if platform == "android" {
         ".so"
     } else {
         print_error!("You are not on a supported platform :(");
@@ -29,47 +37,121 @@ pub fn platform_string() -> &'static str {
     }
 }
 
-fn extract_binary_name(mod_json: &Value) -> String {
-    let bin_val: serde_json::value::Value;
-    let mut has_extension = true;
+pub fn platform_extension() -> &'static str {
+    get_extension(platform_string())
+}
+
+fn extract_binary_names(mod_json: &Value) -> Vec<String> {
+    let mut bin_list = Vec::new();
 
     if mod_json["binary"].is_string() {
-        bin_val = mod_json["binary"].clone();
+        match mod_json["binary"].clone() {
+            Value::String(s) => {
+                let mut filename = s.to_string();
+                if !filename.ends_with(platform_extension()) {
+                    filename += platform_extension();
+                }
+                bin_list.push(filename);
+            },
+            _ => unreachable!()
+        }
     } else if mod_json["binary"].is_object() {
         let bin_object = &mod_json["binary"];
 
-        bin_val = match &bin_object[platform_string()] {
-            Value::Null => bin_object["*"].clone(),
-            Value::String(s) => Value::String(s.to_string()),
-            a => a.clone()
-        };
+        for i in ["windows", "macos", "android", "ios"] {
+            match &bin_object[i] {
+                Value::Null => (),
+                Value::String(s) => {
+                    let mut filename = s.to_string();
+                    if !filename.ends_with(get_extension(i)) {
+                        filename += get_extension(i);
+                    }
+                    bin_list.push(filename);
+                },
+                _ => print_error!("[mod.json].binary.{} is not a string!", i)
+            }
+        }
 
-        has_extension = bin_object["auto"].as_bool().unwrap_or(true);
+        if bin_list.is_empty() && !bin_object["*"].is_null() {
+            match bin_object["*"].clone() {
+                Value::String(s) => bin_list.push(s),
+                _ => print_error!("[mod.json].binary.* is not a string!")
+            }
+        }
     } else {
         print_error!("[mod.json].binary is not a string nor an object!");
     }
 
-    let mut binary_name = match bin_val {
-        Value::String(s) => s,
-        Value::Null => print_error!("[mod.json].binary is empty!"),
-        a => a.to_string()
-    };
-
-    if has_extension {
-        binary_name.push_str(platform_extension());
+    if bin_list.is_empty() {
+        print_error!("[mod.json].binary is empty!");
     }
 
-    binary_name
+    bin_list
 }
 
-pub fn create_geode(build_path: String) {
-	let raw = fs::read_to_string(build_path).unwrap();
+pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
+	let raw = fs::read_to_string(resource_dir.join("mod.json")).unwrap();
 	let mod_json: Value = match serde_json::from_str(&raw) {
 	    Ok(p) => p,
 	    Err(_) => print_error!("mod.json is not a valid JSON file!")
 	};
 
-	let binary = extract_binary_name(&mod_json);
+    let tmp_pkg = &std::env::temp_dir().join("geode_pkg");
 
-	println!("binary name: {}", binary);
+    if tmp_pkg.exists() {
+        fs_dir::remove(tmp_pkg).unwrap();
+    }
+
+    fs::create_dir(tmp_pkg).unwrap();
+
+    let try_copy = || -> Result<(), Box<dyn std::error::Error>> {
+        for ref f in extract_binary_names(&mod_json) {
+            if !exec_dir.join(f).exists() {
+                print_error!("Unable to find binary {}, defined in [mod.json].binary", f);
+            }
+
+            fs::copy(exec_dir.join(f), tmp_pkg.join(f))?;
+        }
+
+        fs::copy(resource_dir.join("mod.json"), tmp_pkg.join("mod.json"))?;
+
+        let options = fs_dir::CopyOptions::new();
+
+        if resource_dir.join("resources").exists() {
+
+            fs_dir::copy(resource_dir.join("resources"), tmp_pkg, &options)?;
+        }
+        if resource_dir.join("sprites").exists() {
+            spritesheet::pack_sprites(&resource_dir.join("sprites"), tmp_pkg)?;
+        }
+
+        Ok(())
+    };
+
+    try_copy().expect("Unable to copy files");
+
+    let outfile = File::create(out_file).unwrap();
+    let mut zip = zip::ZipWriter::new(outfile);
+
+
+    let cwd = std::env::current_dir().unwrap();
+    std::env::set_current_dir(tmp_pkg).unwrap();
+
+    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    for walk in walkdir::WalkDir::new(".") {
+        let item = walk.unwrap();
+        if !item.metadata().unwrap().is_dir() {
+            zip.start_file(item.path().as_os_str().to_str().unwrap(), zopts).unwrap();
+            zip.write(&fs::read(item.path()).unwrap()).unwrap();
+        }
+    }
+
+    zip.finish().expect("Unable to package .geode file");
+    std::env::set_current_dir(cwd).unwrap();
+
+    println!("{}", 
+        format!("Successfully packaged {}", 
+            out_file.file_name().unwrap().to_str().unwrap()
+        ).yellow().bold()
+    );
 }
