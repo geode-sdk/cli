@@ -184,7 +184,7 @@ fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix:
         let mut out_file = out_dir.to_path_buf();
         out_file.push(framename);
 
-        let img = match image::io::Reader::open(s.path()) {
+        let mut img = match image::io::Reader::open(s.path()) {
             Ok(i) => match i.decode() {
                 Ok(im) => im,
                 Err(err) => print_error!("Error decoding {}: {}", s.path().to_str().unwrap(), err)
@@ -192,11 +192,9 @@ fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix:
             Err(err) => print_error!("Error resizing {}: {}", s.path().to_str().unwrap(), err)
         };
 
-        let mut resized = img.resize(img.width() / downscale, img.height() / downscale, FilterType::Lanczos3).to_luma8();
+        img = img.resize(img.width() / downscale, img.height() / downscale, FilterType::Lanczos3);
 
-        image::imageops::dither(&mut resized, &image::imageops::colorops::BiLevel);
-
-        resized.save(&out_file).unwrap();
+        img.save(&out_file).unwrap();
     }
 
     Ok(())
