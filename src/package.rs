@@ -74,7 +74,13 @@ fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>) {
 
         if bin_list.is_empty() && !bin_object["*"].is_null() {
             match bin_object["*"].clone() {
-                Value::String(s) => bin_list.push(s),
+                Value::String(s) => {
+                    let mut filename = s.to_string();
+                    if !filename.ends_with(platform_extension()) {
+                        filename += platform_extension();
+                    }
+                    bin_list.push(filename);
+                },
                 _ => print_error!("[mod.json].binary.* is not a string!")
             }
         }
