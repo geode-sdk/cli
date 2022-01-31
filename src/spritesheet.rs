@@ -1,3 +1,4 @@
+use image::GenericImageView;
 use std::fs::File;
 use colored::Colorize;
 
@@ -36,8 +37,8 @@ struct GameSheet {
 }
 
 pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let config = TexturePackerConfig {
-        max_width: u32::MAX,
+    let mut config = TexturePackerConfig {
+        max_width: 0,
         max_height: u32::MAX,
         allow_rotation: true,
         texture_outlines: false,
@@ -45,9 +46,7 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         ..Default::default()
     };
 
-    let mut packer = TexturePacker::new_skyline(config);
-
-    let mut frames = Vec::new();
+    let mut frames = Vec::<(PathBuf, String)>::new();
 
     for walk in walkdir::WalkDir::new(in_dir) {
         let s = walk?;
@@ -59,18 +58,31 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         let sprite = PathBuf::from(s.path());
         let framename = sprite.file_name().unwrap().to_str().unwrap_or("").to_string();
 
-        if frames.contains(&framename) {
+        let dim = match image::open(&sprite) {
+            Ok(x) => x.dimensions(),
+            Err(_) => continue
+        };
+
+        if frames.iter().filter(|x| x.1 == framename).collect::<Vec<_>>().len() > 0 {
             print_error!("Duplicate sprite name found: {}", framename);
         } else {
-            frames.push(framename.clone());
+            frames.push((sprite, framename));
         }
 
-        let texture = match ImageImporter::import_from_file(&sprite) {
+        config.max_width += dim.0;
+    }
+
+    config.max_width /= (frames.len()/5) as u32;
+
+    let mut packer = TexturePacker::new_skyline(config);
+
+    for (fpath, frame) in frames {
+        let texture = match ImageImporter::import_from_file(&fpath) {
             Ok(t) => t,
             Err(_) => continue
         };
 
-        packer.pack_own(framename, texture).expect("Internal error packing files");
+        packer.pack_own(frame, texture).expect("Internal error packing files");
     }
 
     let mut sheet = GameSheet {
@@ -92,5 +104,6 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
     let exporter = ImageExporter::export(&packer).unwrap();
     let mut f = File::create(out_dir.join("spritesheet.png")).unwrap();
     exporter.write_to(&mut f, image::ImageFormat::Png)?;
+
     Ok(())
 }
