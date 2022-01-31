@@ -161,7 +161,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     let cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(tmp_pkg).unwrap();
 
-    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Bzip2);
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
         if !item.metadata().unwrap().is_dir() {

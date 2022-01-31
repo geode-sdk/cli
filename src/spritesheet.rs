@@ -74,8 +74,8 @@ fn update_suffix(name: &mut String, suffix: &str) -> bool {
 fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
     Result<PackResult, Box<dyn std::error::Error>>
 {
-    let config = TexturePackerConfig {
-        max_width: 3434, // this number was chosen as the result of the equation ceil(0xb00b5 / 0x69) / 2
+    let mut config = TexturePackerConfig {
+        max_width: 0,
         max_height: u32::MAX,
         allow_rotation: true,
         texture_outlines: false,
@@ -83,9 +83,7 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
         ..Default::default()
     };
 
-    let mut packer = TexturePacker::new_skyline(config);
-
-    let mut frames = Vec::new();
+    let mut frames = Vec::<(PathBuf, String)>::new();
 
     let mut suffix_removals = 0u32;
 
@@ -103,18 +101,31 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
             suffix_removals += 1;
         }
 
-        if frames.contains(&framename) {
+        let dim = match image::open(&sprite) {
+            Ok(x) => x.dimensions(),
+            Err(_) => continue
+        };
+
+        if frames.iter().filter(|x| x.1 == framename).collect::<Vec<_>>().len() > 0 {
             print_error!("Duplicate sprite name found: {}", framename);
         } else {
-            frames.push(framename.clone());
+            frames.push((sprite, framename));
         }
 
-        let texture = match ImageImporter::import_from_file(&sprite) {
+        config.max_width += dim.0;
+    }
+
+    config.max_width /= (frames.len()/5) as u32;
+
+    let mut packer = TexturePacker::new_skyline(config);
+
+    for (fpath, frame) in frames {
+        let texture = match ImageImporter::import_from_file(&fpath) {
             Ok(t) => t,
             Err(_) => continue
         };
 
-        packer.pack_own(framename, texture).expect("Internal error packing files");
+        packer.pack_own(frame, texture).expect("Internal error packing files");
     }
 
     let mut sheet = GameSheet {
