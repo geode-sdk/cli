@@ -2,7 +2,7 @@ use std::io::Write;
 use std::fs::File;
 use colored::Colorize;
 
-use crate::{print_error, spritesheet};
+use crate::{print_error, spritesheet, Configuration};
 
 use fs_extra::dir as fs_dir;
 
@@ -41,7 +41,7 @@ pub fn platform_extension() -> &'static str {
     get_extension(platform_string())
 }
 
-fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>) {
+fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>, String) {
     let mut bin_list = Vec::new();
 
     if mod_json["binary"].is_string() {
@@ -98,17 +98,26 @@ fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>) {
         _ => print_error!("[mod.json].name is not a string!")
     };
 
-    (name.to_string(), bin_list)
+    let id = match &mod_json["id"] {
+        Value::String(n) => n,
+        Value::Null => print_error!("[mod.json].id is empty!"),
+        _ => print_error!("[mod.json].id is not a string!")
+    };
+
+    (name.to_string(), bin_list, id.clone())
 }
 
-pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
+pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool) {
 	let raw = fs::read_to_string(resource_dir.join("mod.json")).unwrap();
 	let mod_json: Value = match serde_json::from_str(&raw) {
 	    Ok(p) => p,
 	    Err(_) => print_error!("mod.json is not a valid JSON file!")
 	};
 
-    let tmp_pkg = &std::env::temp_dir().join("geode_pkg");
+    let modinfo = extract_mod_info(&mod_json);
+
+    let tmp_pkg_name = format!("geode_pkg_{}", modinfo.2);
+    let tmp_pkg = &std::env::temp_dir().join(tmp_pkg_name);
 
     if tmp_pkg.exists() {
         fs_dir::remove(tmp_pkg).unwrap();
@@ -118,8 +127,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
 
     let mut output_name = String::new();
 
-    let mut try_copy = || -> Result<(), Box<dyn std::error::Error>> {
-        let modinfo = extract_mod_info(&mod_json);
+    let try_copy = || -> Result<(), Box<dyn std::error::Error>> {
         output_name = modinfo.0;
         for ref f in modinfo.1 {
             if !exec_dir.join(f).exists() {
@@ -170,4 +178,14 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path) {
             out_file.file_name().unwrap().to_str().unwrap()
         ).yellow().bold()
     );
+
+    if install {
+        let target_path = Configuration::install_path().join("geode").join("mods").join(out_file.to_path_buf().file_name().unwrap());
+        fs::copy(out_file, target_path).unwrap();
+        println!("{}", 
+            format!("Succesfully installed {}", 
+                out_file.file_name().unwrap().to_str().unwrap()
+            ).cyan().bold()
+        );
+    }
 }

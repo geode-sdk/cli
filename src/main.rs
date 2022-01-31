@@ -54,7 +54,12 @@ enum Commands {
         exec_dir: PathBuf,
 
         /// Path to put the generated .geode file
-        out_file: PathBuf
+        out_file: PathBuf,
+
+        /// Automatically copy the generated .geode 
+        /// file to the Geode mods directory
+        #[clap(short, long)]
+        install: bool
     },
 
     Info {
@@ -96,7 +101,7 @@ fn main() {
             );
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file } => package::create_geode(&resource_dir, &exec_dir, &out_file),
+        Commands::Pkg { resource_dir, exec_dir, out_file, install } => package::create_geode(&resource_dir, &exec_dir, &out_file, install),
 
         Commands::Config { path } => Configuration::set_install_path(path),
 
