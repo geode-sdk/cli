@@ -76,7 +76,7 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
 {
     let mut config = TexturePackerConfig {
         max_width: 0,
-        max_height: u32::MAX,
+        max_height: 0,
         allow_rotation: true,
         texture_outlines: false,
         border_padding: 1,
@@ -113,9 +113,12 @@ fn pack_sprites_to_file(in_dir: &Path, out_dir: &Path, name: &String) ->
         }
 
         config.max_width += dim.0;
+        if config.max_height < dim.1 {
+            config.max_height = dim.1;
+        }
     }
-
-    config.max_width /= (frames.len()/5) as u32;
+    config.max_width = (config.max_width as f64 * config.max_height as f64).sqrt() as u32;
+    config.max_height = u32::MAX;
 
     let mut packer = TexturePacker::new_skyline(config);
 
