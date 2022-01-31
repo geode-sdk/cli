@@ -89,7 +89,7 @@ fn check_update_needed(specific_version: Option<String>) -> Option<(String, Path
 		!old_library_path.exists()
 		|| (sha256::digest_file(&new_library_path).unwrap() != sha256::digest_file(&old_library_path).unwrap())
 	{
-		return Some((last_name, new_library_path));
+		return Some((last_name, new_library_path.parent().unwrap().to_path_buf()));
 	}
 	None
 }
@@ -109,9 +109,12 @@ pub fn update_geode(version: Option<String>) {
 	let b = check_update_needed(version);
 
 	match b {
-		Some((n, p)) => {
+		Some((n, ref p)) => {
 			println!("{} {}", "Downloaded update ".bright_cyan(), n.green().bold());
-			fs::copy(p, geode_library()).expect("Unable to copy geode to correct directory");
+			for file in fs::read_dir(p).unwrap() {
+				let fname = file.unwrap().file_name().clone().to_str().unwrap().to_string();
+				fs::copy(p.join(&fname), geode_library().join(&fname)).expect("Unable to copy geode to correct directory");
+			}
 			println!("{}", "Sucessfully updated Geode".bold());
 		},
 
