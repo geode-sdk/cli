@@ -10,6 +10,7 @@ pub mod template;
 pub mod config;
 pub mod windows_ansi;
 pub mod spritesheet;
+pub mod dither;
 
 #[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
@@ -141,6 +142,41 @@ fn main() {
                         "[   ###]",
                         "[    ##]",
                         "[#    #]",
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[h    #]",
+                        "[uh    ]",
+                        "[ruh   ]",
+                        "[bruh  ]",
+                        "[ bruh ]",
+                        "[   bru]",
+                        "[    br]",
+                        "[#    b]",
                         "[ done ]",
                     ])
                     .template("{spinner:.cyan} {msg}"),

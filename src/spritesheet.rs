@@ -3,6 +3,7 @@ use colored::Colorize;
 use std::vec;
 
 use crate::print_error;
+use crate::dither::RGBA4444;
 
 use serde::Serialize;
 
@@ -187,7 +188,7 @@ fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix:
         let mut out_file = out_dir.to_path_buf();
         out_file.push(framename);
 
-        let mut img = match image::io::Reader::open(s.path()) {
+        let img = match image::io::Reader::open(s.path()) {
             Ok(i) => match i.decode() {
                 Ok(im) => im,
                 Err(err) => print_error!("Error decoding {}: {}", s.path().to_str().unwrap(), err)
@@ -195,9 +196,11 @@ fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix:
             Err(err) => print_error!("Error resizing {}: {}", s.path().to_str().unwrap(), err)
         };
 
-        img = img.resize(img.width() / downscale, img.height() / downscale, FilterType::Lanczos3);
+        let mut resized = img.resize(img.width() / downscale, img.height() / downscale, FilterType::Lanczos3).to_rgba8();
 
-        img.save(&out_file).unwrap();
+        image::imageops::dither(&mut resized, &RGBA4444);
+
+        resized.save(&out_file).unwrap();
     }
 
     Ok(())
@@ -207,10 +210,11 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path, create_variants: bool, name: 
     Result<PackResult, Box<dyn std::error::Error>>
 {
     if create_variants {
-        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_hd")), 2, "-hd").unwrap();
+        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_hd")),  2, "-hd").unwrap();
         create_resized_sprites(in_dir, Path::new(&out_dir.join("tmp_low")), 4, "").unwrap();
 
-        let mut res = pack_sprites_with_suffix(in_dir, out_dir, &name, "-uhd").unwrap();
+        let mut res = pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_uhd")), out_dir, &name, "-uhd").unwrap();
         res.merge(&pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_hd")), out_dir, &name, "-hd").unwrap());
         res.merge(&pack_sprites_with_suffix(Path::new(&out_dir.join("tmp_low")), out_dir, &name, "").unwrap());
         
