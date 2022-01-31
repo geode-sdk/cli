@@ -181,11 +181,9 @@ fn create_resized_sprites(in_dir: &Path, out_dir: &Path, downscale: u32, suffix:
             Err(err) => print_error!("Error resizing {}: {}", s.path().to_str().unwrap(), err)
         };
 
-        let resized = image::imageops::resize(
-            &img,
-            img.width() / downscale, img.height() / downscale,
-            FilterType::Gaussian
-        );
+        let mut resized = img.resize(img.width() / downscale, img.height() / downscale, FilterType::Lanczos3).to_luma8();
+
+        image::imageops::dither(&mut resized, &image::imageops::colorops::BiLevel);
 
         resized.save(&out_file).unwrap();
     }
