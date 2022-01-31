@@ -46,6 +46,8 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         ..Default::default()
     };
 
+    let mut heights = Vec::new();
+
     let mut frames = Vec::<(PathBuf, String)>::new();
     for walk in walkdir::WalkDir::new(in_dir) {
         let s = walk?;
@@ -69,11 +71,10 @@ pub fn pack_sprites(in_dir: &Path, out_dir: &Path) -> Result<(), Box<dyn std::er
         }
 
         config.max_width += dim.0;
-        if config.max_height < dim.1 {
-            config.max_height = dim.1;
-        }
+        heights.push(dim.1 as f64);
     }
-    config.max_width = (config.max_width as f64 * config.max_height as f64).sqrt() as u32;
+    let av = heights.iter().sum::<f64>() / heights.len() as f64 + heights.len() as f64;
+    config.max_width = (config.max_width as f64 * av).sqrt() as u32;
     config.max_height = u32::MAX;
 
     let mut packer = TexturePacker::new_skyline(config);
