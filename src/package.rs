@@ -166,7 +166,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
         let item = walk.unwrap();
         if !item.metadata().unwrap().is_dir() {
             zip.start_file(item.path().strip_prefix("./").unwrap().as_os_str().to_str().unwrap(), zopts).unwrap();
-            zip.write(&fs::read(item.path()).unwrap()).unwrap();
+            zip.write_all(&fs::read(item.path()).unwrap()).unwrap();
         }
     }
 
