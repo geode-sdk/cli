@@ -56,11 +56,16 @@ enum Commands {
 
         /// Path to put the generated .geode file
         out_file: PathBuf,
-
+        
         /// Automatically copy the generated .geode 
         /// file to the Geode mods directory
         #[clap(short, long)]
-        install: bool
+        install: bool,
+
+        /// Copy the generated .geode file in the 
+        /// API directory instead of mods
+        #[clap(long)]
+        api: bool
     },
 
     /// Create a sprite sheet out of a bunch of sprites
@@ -117,7 +122,8 @@ fn main() {
             );
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file, install } => package::create_geode(&resource_dir, &exec_dir, &out_file, install),
+        Commands::Pkg { resource_dir, exec_dir, out_file, install, api } => 
+            package::create_geode(&resource_dir, &exec_dir, &out_file, install, api),
 
         Commands::Config { path } => Configuration::set_install_path(path),
 

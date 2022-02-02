@@ -107,7 +107,7 @@ fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>, String) {
     (name.to_string(), bin_list, id.clone())
 }
 
-pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool) {
+pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool, api: bool) {
 	let raw = fs::read_to_string(resource_dir.join("mod.json")).unwrap();
 	let mod_json: Value = match serde_json::from_str(&raw) {
 	    Ok(p) => p,
@@ -161,7 +161,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     let cwd = std::env::current_dir().unwrap();
     std::env::set_current_dir(tmp_pkg).unwrap();
 
-    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Bzip2);
+    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
         if !item.metadata().unwrap().is_dir() {
@@ -180,7 +180,9 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     );
 
     if install {
-        let target_path = Configuration::install_path().join("geode").join("mods").join(out_file.to_path_buf().file_name().unwrap());
+        let mut target_path = Configuration::install_path().join("geode");
+        target_path = if api { target_path.join("api") } else { target_path.join("mods") };
+        target_path =target_path.join(out_file.to_path_buf().file_name().unwrap());
         fs::copy(out_file, target_path).unwrap();
         println!("{}", 
             format!("Succesfully installed {}", 
