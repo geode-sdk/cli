@@ -1,6 +1,7 @@
 use std::io::Write;
 use std::fs::File;
 use colored::Colorize;
+use glob::glob;
 
 use crate::{print_error, spritesheet, Configuration};
 
@@ -9,7 +10,25 @@ use fs_extra::dir as fs_dir;
 use serde_json::Value;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use path_slash::*;
+
+struct GameSheet {
+    name: String,
+    files: Vec<PathBuf>,
+}
+
+struct ModResources {
+    files: Vec<PathBuf>,
+    sheets: Vec<GameSheet>,
+}
+
+struct ModInfo {
+    name: String,
+    bin_list: Vec<String>,
+    id: String,
+    resources: ModResources,
+}
 
 fn get_extension(platform: &str) -> &'static str {
     if platform == "windows" {
@@ -41,7 +60,7 @@ pub fn platform_extension() -> &'static str {
     get_extension(platform_string())
 }
 
-fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>, String) {
+fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
     let mut bin_list = Vec::new();
 
     if mod_json["binary"].is_string() {
@@ -104,7 +123,74 @@ fn extract_mod_info(mod_json: &Value) -> (String, Vec<String>, String) {
         _ => print_error!("[mod.json].id is not a string!")
     };
 
-    (name.to_string(), bin_list, id.clone())
+    let resources: ModResources;
+    
+    if mod_json["resources"].is_object() {
+        let res_object = mod_json["resources"].as_object().unwrap();
+        
+        let mut files: Vec<PathBuf> = vec!();
+        let mut sheets: Vec<GameSheet> = vec!();
+        for (key, value) in res_object {
+            match key.as_str() {
+                "*" => {
+                    for path in value.as_array().expect("[mod.json].resources.* is not an array!") {
+                        if path.is_string() {
+                            let mut a_path = Path::new(&path.as_str().unwrap()).to_path_buf();
+                            if a_path.is_relative() {
+                                a_path = mod_json_location.join(a_path);
+                            }
+                            files.append(
+                                &mut glob(a_path.to_str().unwrap())
+                                    .unwrap().map(|x| x.unwrap())
+                                    .collect()
+                            );
+                        } else {
+                            print_error!("[mod.json].resources.*: Expected item to be 'string', but it was not");
+                        }
+                    }
+                },
+                _ => {
+                    let mut sheet_files: Vec<PathBuf> = vec!();
+                    for path in value.as_array().expect("[mod.json].resources.* is not an array!") {
+                        if path.is_string() {
+                            let mut a_path = Path::new(&path.as_str().unwrap()).to_path_buf();
+                            if a_path.is_relative() {
+                                a_path = mod_json_location.join(a_path);
+                            }
+                            sheet_files.append(
+                                &mut glob(a_path.to_str().unwrap())
+                                    .unwrap().map(|x| x.unwrap())
+                                    .collect()
+                            );
+                        } else {
+                            print_error!("[mod.json].resources.*: Expected item to be 'string', but it was not");
+                        }
+                    }
+                    sheets.push(GameSheet {
+                        name: key.clone(),
+                        files: sheet_files,
+                    });
+                },
+            }
+        }
+
+        resources = ModResources {
+            files: files,
+            sheets: sheets,
+        };
+    } else {
+        resources = ModResources {
+            files: vec!(),
+            sheets: vec!(),
+        };
+    }
+
+    ModInfo {
+        name: name.to_string(),
+        bin_list: bin_list,
+        id: id.clone(),
+        resources: resources
+    }
 }
 
 pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool, api: bool) {
@@ -114,9 +200,9 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
 	    Err(_) => print_error!("mod.json is not a valid JSON file!")
 	};
 
-    let modinfo = extract_mod_info(&mod_json);
+    let modinfo = extract_mod_info(&mod_json, &resource_dir.to_path_buf());
 
-    let tmp_pkg_name = format!("geode_pkg_{}", modinfo.2);
+    let tmp_pkg_name = format!("geode_pkg_{}", modinfo.id);
     let tmp_pkg = &std::env::temp_dir().join(tmp_pkg_name);
 
     if tmp_pkg.exists() {
@@ -128,8 +214,8 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     let mut output_name = String::new();
 
     let try_copy = || -> Result<(), Box<dyn std::error::Error>> {
-        output_name = modinfo.0;
-        for ref f in modinfo.1 {
+        output_name = modinfo.name;
+        for ref f in modinfo.bin_list {
             if !exec_dir.join(f).exists() {
                 print_error!("Unable to find binary {}, defined in [mod.json].binary", f);
             }
@@ -139,14 +225,14 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
 
         fs::copy(resource_dir.join("mod.json"), tmp_pkg.join("mod.json"))?;
 
-        let options = fs_dir::CopyOptions::new();
+        fs::create_dir_all(tmp_pkg.join("resources")).unwrap();
 
-        if resource_dir.join("resources").exists() {
-
-            fs_dir::copy(resource_dir.join("resources"), tmp_pkg, &options)?;
+        for file in modinfo.resources.files {
+            fs::copy(&file, tmp_pkg.join("resources").join(file.file_name().unwrap())).unwrap();
         }
-        if resource_dir.join("sprites").exists() {
-            spritesheet::pack_sprites(&resource_dir.join("sprites"), tmp_pkg, false, None)?;
+
+        for sheet in modinfo.resources.sheets {
+            spritesheet::pack_sprites(&sheet.files, &tmp_pkg.join("resources"), false, Some(sheet.name))?;
         }
 
         Ok(())
@@ -165,7 +251,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
         if !item.metadata().unwrap().is_dir() {
-            zip.start_file(item.path().strip_prefix("./").unwrap().as_os_str().to_str().unwrap(), zopts).unwrap();
+            zip.start_file(item.path().strip_prefix("./").unwrap().to_slash().unwrap().as_str(), zopts).unwrap();
             zip.write_all(&fs::read(item.path()).unwrap()).unwrap();
         }
     }

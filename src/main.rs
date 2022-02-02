@@ -153,7 +153,7 @@ fn main() {
                     .template("{spinner:.cyan} {msg}"),
             );
             bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
-            let res = spritesheet::pack_sprites(&src, &dest, variants, name).unwrap();
+            let res = spritesheet::pack_sprites_in_dir(&src, &dest, variants, name).unwrap();
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
             for file in res.created_files {
                 println!("{} -> {}", "[ info ]".bright_yellow(), file);
