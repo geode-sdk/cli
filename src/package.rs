@@ -132,8 +132,8 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
         let mut sheets: Vec<GameSheet> = vec!();
         for (key, value) in res_object {
             match key.as_str() {
-                "*" => {
-                    for path in value.as_array().expect("[mod.json].resources.* is not an array!") {
+                "files" => {
+                    for path in value.as_array().expect("[mod.json].resources.files is not an array!") {
                         if path.is_string() {
                             let mut a_path = Path::new(&path.as_str().unwrap()).to_path_buf();
                             if a_path.is_relative() {
@@ -145,32 +145,37 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
                                     .collect()
                             );
                         } else {
-                            print_error!("[mod.json].resources.*: Expected item to be 'string', but it was not");
+                            print_error!("[mod.json].resources.files: Expected item to be 'string', but it was not");
                         }
+                    }
+                },
+                "spritesheets" => {
+                    for (sheet_name, sfiles) in value.as_object().unwrap() {
+                        let mut sheet_files: Vec<PathBuf> = vec!();
+                        for path in sfiles.as_array().expect(format!("[mod.json].resources.spritesheets.{} is not an array!", sheet_name).as_str()) {
+                            if path.is_string() {
+                                let mut a_path = Path::new(&path.as_str().unwrap()).to_path_buf();
+                                if a_path.is_relative() {
+                                    a_path = mod_json_location.join(a_path);
+                                }
+                                sheet_files.append(
+                                    &mut glob(a_path.to_str().unwrap())
+                                        .unwrap().map(|x| x.unwrap())
+                                        .collect()
+                                );
+                            } else {
+                                print_error!("[mod.json].resources.spritesheets.{}: Expected item to be 'string', but it was not", sheet_name);
+                            }
+                        }
+                        sheets.push(GameSheet {
+                            name: sheet_name.clone(),
+                            files: sheet_files,
+                        });
                     }
                 },
                 _ => {
-                    let mut sheet_files: Vec<PathBuf> = vec!();
-                    for path in value.as_array().expect("[mod.json].resources.* is not an array!") {
-                        if path.is_string() {
-                            let mut a_path = Path::new(&path.as_str().unwrap()).to_path_buf();
-                            if a_path.is_relative() {
-                                a_path = mod_json_location.join(a_path);
-                            }
-                            sheet_files.append(
-                                &mut glob(a_path.to_str().unwrap())
-                                    .unwrap().map(|x| x.unwrap())
-                                    .collect()
-                            );
-                        } else {
-                            print_error!("[mod.json].resources.*: Expected item to be 'string', but it was not");
-                        }
-                    }
-                    sheets.push(GameSheet {
-                        name: key.clone(),
-                        files: sheet_files,
-                    });
-                },
+                    print_error!("[mod.json].resources: Unknown key {}", key);
+                }
             }
         }
 
@@ -193,7 +198,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
     }
 }
 
-pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool, api: bool) {
+pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool, api: bool, log: bool) {
 	let raw = fs::read_to_string(resource_dir.join("mod.json")).unwrap();
 	let mod_json: Value = match serde_json::from_str(&raw) {
 	    Ok(p) => p,
@@ -201,6 +206,12 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
 	};
 
     let modinfo = extract_mod_info(&mod_json, &resource_dir.to_path_buf());
+
+    println!("{}", 
+        format!("Packaging {}", 
+            modinfo.id
+        ).yellow().bold()
+    );
 
     let tmp_pkg_name = format!("geode_pkg_{}", modinfo.id);
     let tmp_pkg = &std::env::temp_dir().join(tmp_pkg_name);
@@ -232,7 +243,12 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
         }
 
         for sheet in modinfo.resources.sheets {
-            spritesheet::pack_sprites(&sheet.files, &tmp_pkg.join("resources"), false, Some(sheet.name))?;
+            if log {
+                println!("Packing {}", sheet.name.yellow().bold());
+            }
+            spritesheet::pack_sprites(&sheet.files, &tmp_pkg.join("resources"), true, Some(sheet.name),
+                if log { Some(|s: &str| println!("{}", s.yellow().bold())) } else { None }
+            )?;
         }
 
         Ok(())

@@ -123,7 +123,14 @@ fn main() {
         },
 
         Commands::Pkg { resource_dir, exec_dir, out_file, install, api } => 
-            package::create_geode(&resource_dir, &exec_dir, &out_file, install, api),
+            package::create_geode(
+                &resource_dir,
+                &exec_dir,
+                &out_file,
+                install,
+                api,
+                true
+            ),
 
         Commands::Config { path } => Configuration::set_install_path(path),
 
@@ -153,7 +160,9 @@ fn main() {
                     .template("{spinner:.cyan} {msg}"),
             );
             bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
-            let res = spritesheet::pack_sprites_in_dir(&src, &dest, variants, name).unwrap();
+            let res = spritesheet::pack_sprites_in_dir(&src, &dest, variants, name, 
+                Some(|s: &str| println!("{}", s.yellow().bold()))
+            ).unwrap();
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
             for file in res.created_files {
                 println!("{} -> {}", "[ info ]".bright_yellow(), file);

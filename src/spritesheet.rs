@@ -80,7 +80,7 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
     let mut config = TexturePackerConfig {
         max_width: 0,
         max_height: 0,
-        allow_rotation: true,
+        allow_rotation: false,
         texture_outlines: false,
         border_padding: 1,
         ..Default::default()
@@ -209,16 +209,27 @@ fn read_sprites(in_dir: &Path) -> Vec<PathBuf> {
     fs::read_dir(in_dir).unwrap().map(|x| x.unwrap().path().to_path_buf()).collect::<Vec<PathBuf>>()
 }
 
-pub fn pack_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, create_variants: bool, name: Option<String>) -> 
-    Result<PackResult, Box<dyn std::error::Error>>
+pub fn pack_sprites(
+    in_files: &Vec<PathBuf>,
+    out_dir: &Path,
+    create_variants: bool,
+    name: Option<String>,
+    progress_callback: Option<fn(&str)>
+) -> Result<PackResult, Box<dyn std::error::Error>>
 {
     if create_variants {
+        match progress_callback { Some(f) => f(" -> Creating UHD Textures"), None => {} }
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        match progress_callback { Some(f) => f(" -> Creating HD Textures"), None => {} }
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_hd")),  2, "-hd").unwrap();
+        match progress_callback { Some(f) => f(" -> Creating Low Textures"), None => {} }
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_low")), 4, "").unwrap();
-
+        
+        match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
         let mut res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "-uhd").unwrap();
+        match progress_callback { Some(f) => f(" -> Creating HD Spritesheet"), None => {} }
         res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_hd")), out_dir, &name, "-hd").unwrap());
+        match progress_callback { Some(f) => f(" -> Creating Low Spritesheet"), None => {} }
         res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_low")), out_dir, &name, "").unwrap());
 
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
@@ -227,15 +238,22 @@ pub fn pack_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, create_variants: bo
         
         Ok(res)
     } else {
+        match progress_callback { Some(f) => f(" -> Creating UHD Textures"), None => {} }
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
         let res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "");
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
         return res;
     }
 }
 
-pub fn pack_sprites_in_dir(in_dir: &Path, out_dir: &Path, create_variants: bool, name: Option<String>) ->
-    Result<PackResult, Box<dyn std::error::Error>>
+pub fn pack_sprites_in_dir(
+    in_dir: &Path,
+    out_dir: &Path,
+    create_variants: bool,
+    name: Option<String>,
+    progress_callback: Option<fn(&str)>
+) -> Result<PackResult, Box<dyn std::error::Error>>
 {
-    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name)
+    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, progress_callback)
 }
