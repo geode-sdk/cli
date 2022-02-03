@@ -2,16 +2,19 @@ use std::io::Write;
 use std::fs::File;
 use colored::Colorize;
 use glob::glob;
+use std::time::{Duration, SystemTime};
 
 use crate::{print_error, spritesheet, Configuration};
 
 use fs_extra::dir as fs_dir;
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use path_slash::*;
+
+use std::collections::HashMap;
 
 struct GameSheet {
     name: String,
@@ -28,6 +31,50 @@ struct ModInfo {
     bin_list: Vec<String>,
     id: String,
     resources: ModResources,
+}
+
+struct CacheData {
+    latest_gamesheet_file: HashMap<String, Duration>,
+}
+
+impl CacheData {
+    fn parse_json(&mut self, file: &PathBuf) {
+        let raw = fs::read_to_string(file).unwrap();
+        let json: Value = match serde_json::from_str(&raw) {
+            Ok(p) => p,
+            Err(_) => print_error!("cache_data.json is not a valid JSON file!")
+        };
+        for (k, v) in json.as_object().unwrap() {
+            let vu64 = v.as_u64().unwrap();
+            let time = Duration::from_secs(vu64);
+            self.latest_gamesheet_file.insert(k.to_string(), time);
+        }
+    }
+
+    fn to_json_string(&self) -> String {
+        let mut json = json!({});
+        for (k, v) in &self.latest_gamesheet_file {
+            json[k] = serde_json::to_value(v.as_secs()).unwrap();
+        }
+        json.to_string()
+    }
+
+    fn are_any_of_these_later(&mut self, sheet: &String, files: &Vec<PathBuf>) -> bool {
+        if files.len() == 0 {
+            return true;
+        }
+        let mut res = false;
+        for file in files {
+            let modified_date = fs::metadata(file).unwrap().modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            if !self.latest_gamesheet_file.contains_key(sheet) ||
+                modified_date.as_secs() > self.latest_gamesheet_file[sheet].as_secs()
+            {
+                self.latest_gamesheet_file.insert(sheet.to_string(), modified_date);
+                res = true;
+            }
+        }
+        res
+    }
 }
 
 fn get_extension(platform: &str) -> &'static str {
@@ -198,7 +245,15 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
     }
 }
 
-pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, install: bool, api: bool, log: bool) {
+pub fn create_geode(
+    resource_dir: &Path,
+    exec_dir: &Path,
+    out_file: &Path,
+    install: bool,
+    api: bool,
+    log: bool,
+    use_cached_resources: bool
+) {
 	let raw = fs::read_to_string(resource_dir.join("mod.json")).unwrap();
 	let mod_json: Value = match serde_json::from_str(&raw) {
 	    Ok(p) => p,
@@ -216,11 +271,32 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     let tmp_pkg_name = format!("geode_pkg_{}", modinfo.id);
     let tmp_pkg = &std::env::temp_dir().join(tmp_pkg_name);
 
-    if tmp_pkg.exists() {
-        fs_dir::remove(tmp_pkg).unwrap();
-    }
+    let mut cache_data = CacheData {
+        latest_gamesheet_file: HashMap::new()
+    };
 
-    fs::create_dir(tmp_pkg).unwrap();
+    if tmp_pkg.exists() {
+        if use_cached_resources {
+            for r_entry in fs::read_dir(tmp_pkg).unwrap() {
+                let entry = r_entry.unwrap();
+                if entry.path().is_dir() {
+                    if 
+                        entry.path().file_name().unwrap() == "resources" &&
+                        entry.path().join("cache_data.json").exists()
+                    {
+                        cache_data.parse_json(&entry.path().join("cache_data.json"));
+                        continue;
+                    }
+                    fs_dir::remove(entry.path()).unwrap();
+                } else {
+                    fs::remove_file(entry.path()).unwrap();
+                }
+            }
+        } else {
+            fs_dir::remove(tmp_pkg).unwrap();
+            fs::create_dir(tmp_pkg).unwrap();
+        }
+    }
 
     let mut output_name = String::new();
 
@@ -236,13 +312,19 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
 
         fs::copy(resource_dir.join("mod.json"), tmp_pkg.join("mod.json"))?;
 
-        fs::create_dir_all(tmp_pkg.join("resources")).unwrap();
+        if !tmp_pkg.join("resources").exists() {
+            fs::create_dir_all(tmp_pkg.join("resources")).unwrap();
+        }
 
         for file in modinfo.resources.files {
             fs::copy(&file, tmp_pkg.join("resources").join(file.file_name().unwrap())).unwrap();
         }
 
         for sheet in modinfo.resources.sheets {
+            if !cache_data.are_any_of_these_later(&sheet.name, &sheet.files) {
+                println!("Skipping packing {} as it has no changes", sheet.name.yellow().bold());
+                continue;
+            }
             if log {
                 println!("Packing {}", sheet.name.yellow().bold());
             }
@@ -266,7 +348,7 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
     let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
-        if !item.metadata().unwrap().is_dir() {
+        if !item.metadata().unwrap().is_dir() && item.file_name() != "cache_data.json" {
             zip.start_file(item.path().strip_prefix("./").unwrap().to_slash().unwrap().as_str(), zopts).unwrap();
             zip.write_all(&fs::read(item.path()).unwrap()).unwrap();
         }
@@ -274,6 +356,11 @@ pub fn create_geode(resource_dir: &Path, exec_dir: &Path, out_file: &Path, insta
 
     zip.finish().expect("Unable to package .geode file");
     std::env::set_current_dir(cwd).unwrap();
+
+    if use_cached_resources {
+        let cache_path = tmp_pkg.join("resources").join("cache_data.json");
+        fs::write(cache_path, cache_data.to_json_string()).unwrap();
+    }
 
     println!("{}", 
         format!("Successfully packaged {}", 

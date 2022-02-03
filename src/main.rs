@@ -65,7 +65,10 @@ enum Commands {
         /// Copy the generated .geode file in the 
         /// API directory instead of mods
         #[clap(long)]
-        api: bool
+        api: bool,
+
+        #[clap(long)]
+        cached: bool,
     },
 
     /// Create a sprite sheet out of a bunch of sprites
@@ -122,14 +125,15 @@ fn main() {
             );
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file, install, api } => 
+        Commands::Pkg { resource_dir, exec_dir, out_file, install, api, cached } => 
             package::create_geode(
                 &resource_dir,
                 &exec_dir,
                 &out_file,
                 install,
                 api,
-                true
+                true,
+                cached
             ),
 
         Commands::Config { path } => Configuration::set_install_path(path),
