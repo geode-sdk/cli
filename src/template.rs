@@ -72,13 +72,12 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	binary_name.retain(|c| !c.is_whitespace());
 	
 	println!(
-	    "Creating mod with ID {} named {} by {} version {} in {}. {}",
+	    "Creating mod with ID {} named {} by {} version {} in {}",
 	    id.green(),
 	    project_name.green(),
 	    developer.green(),
 	    version.green(),
-	    project_location.parent().unwrap().to_str().unwrap().green(),
-		binary_name
+	    project_location.parent().unwrap().to_str().unwrap().green()
 	);
 
 	if project_location.exists() {
