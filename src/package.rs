@@ -296,6 +296,8 @@ pub fn create_geode(
             fs_dir::remove(tmp_pkg).unwrap();
             fs::create_dir(tmp_pkg).unwrap();
         }
+    } else {
+        fs::create_dir(tmp_pkg).unwrap();
     }
 
     let mut output_name = String::new();
