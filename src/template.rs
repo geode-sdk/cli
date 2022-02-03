@@ -68,15 +68,17 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 
 	let id = format!("com.{}.{}", developer.to_lowercase(), project_name.to_lowercase());
 
-	let binary_name = project_name.to_lowercase().retain(|c| !c.is_whitespace());
+	let mut binary_name = project_name.to_lowercase();
+	binary_name.retain(|c| !c.is_whitespace());
 	
 	println!(
-	    "Creating mod with ID {} named {} by {} version {} in {}",
+	    "Creating mod with ID {} named {} by {} version {} in {}. {}",
 	    id.green(),
 	    project_name.green(),
 	    developer.green(),
 	    version.green(),
-	    project_location.parent().unwrap().to_str().unwrap().green()
+	    project_location.parent().unwrap().to_str().unwrap().green(),
+		binary_name
 	);
 
 	if project_location.exists() {
