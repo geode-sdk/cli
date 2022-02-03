@@ -163,7 +163,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 			if ide.trim() == "1" // Open VS Code
 			{
 				assert!(env::set_current_dir(&mod_folder).is_ok());
-				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
+				Command::new("cmd").arg("/c").arg("code").arg(".").spawn().expect("Uh oh!");
 			}
 			else if ide.trim() == "2" // Open and Set Up Visual Studio
 			{
