@@ -257,3 +257,11 @@ pub fn pack_sprites_in_dir(
 {
     pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, progress_callback)
 }
+
+pub fn create_variants_of_sprite(file: &PathBuf, out_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    let in_files = vec!(file.clone());
+    create_resized_sprites(&in_files, Path::new(&out_dir), 1, "-uhd").unwrap();
+    create_resized_sprites(&in_files, Path::new(&out_dir),  2, "-hd").unwrap();
+    create_resized_sprites(&in_files, Path::new(&out_dir), 4, "").unwrap();
+    Ok(())
+}
