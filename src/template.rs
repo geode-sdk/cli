@@ -112,8 +112,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    Err(e) => print_error!("failed to clone sdk: {}", e),
 	};
 
-	let options = fs_dir::CopyOptions::new();
-	fs_dir::copy(&tmp_sdk, &project_location, &options).unwrap();
+	copy_dir::copy_dir(&tmp_sdk, project_location.join("sdk")).unwrap();
 	fs_dir::remove(tmp_sdk).unwrap();
 
 	
