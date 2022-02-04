@@ -68,7 +68,8 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 
 	let id = format!("com.{}.{}", developer.to_lowercase(), project_name.to_lowercase());
 
-	let binary_name = project_name.to_lowercase().retain(|c| !c.is_whitespace());
+	let mut binary_name = project_name.to_lowercase();
+	binary_name.retain(|c| !c.is_whitespace());
 	
 	println!(
 	    "Creating mod with ID {} named {} by {} version {} in {}",
@@ -162,7 +163,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 			if ide.trim() == "1" // Open VS Code
 			{
 				assert!(env::set_current_dir(&mod_folder).is_ok());
-				Command::new("cmd").arg("/c").arg("code").arg("-a").arg(".").spawn().expect("Uh oh!");
+				Command::new("cmd").arg("/c").arg("code").arg(".").spawn().expect("Uh oh!");
 			}
 			else if ide.trim() == "2" // Open and Set Up Visual Studio
 			{
