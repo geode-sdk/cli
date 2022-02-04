@@ -317,12 +317,18 @@ pub fn create_geode(
         }
 
         for file in modinfo.resources.files {
-            fs::copy(&file, tmp_pkg.join("resources").join(file.file_name().unwrap())).unwrap();
+            let file_name = &file.file_name().unwrap().to_str().unwrap();
+            if !cache_data.are_any_of_these_later(&file_name.to_string(), &vec!(file.clone())) {
+                println!("Skipping {} as no changes were detected", file_name.yellow().bold());
+                continue;
+            }
+            println!("Creating variants of {}", &file_name);
+            spritesheet::create_variants_of_sprite(&file, &tmp_pkg.join("resources")).unwrap();
         }
 
         for sheet in modinfo.resources.sheets {
             if !cache_data.are_any_of_these_later(&sheet.name, &sheet.files) {
-                println!("Skipping packing {} as it has no changes", sheet.name.yellow().bold());
+                println!("Skipping packing {} as no changes were detected", sheet.name.yellow().bold());
                 continue;
             }
             if log {
