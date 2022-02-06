@@ -36,17 +36,14 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    ("Location", &mut buffer, Color::Green, true),
 	];
 	
-	let mut i = 0;
-	loop {
-	    if i > prompts.len() - 1 {
-	        break;
-	    }
-	    let (prompt, ref mut var, _, required) = prompts[i];
+	for (i, (prompt, ref mut var, _, required)) in prompts.iter_mut().enumerate() {
 	    let text = format!("{}: ", prompt);
+
 		// this is so unbelievably dumb
 		if i == 1 {
 			project_name = var.clone();
 		}
+
 		if i == 3 && is_location_default {
 			**var = loc.absolutize().unwrap().join(&project_name).to_str().unwrap().to_string();
 		}
@@ -54,12 +51,11 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    match readline {
 	        Ok(line) => {
 	            rl.add_history_entry(line.as_str());
-	            if line.is_empty() && required {
+	            if line.is_empty() && *required {
 	                println!("{}", "Please enter a value".red());
 	                continue;
 	            }
 	            **var = line;
-	            i += 1;
 	        },
 	        Err(err) => {
 	            print_error!("Error: {}", err);
