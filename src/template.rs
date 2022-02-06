@@ -14,6 +14,7 @@ use std::process;
 use fs_extra::dir as fs_dir;
 
 pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
+	let is_location_default = location.is_none();
 	let loc = match location {
 	    Some(s) => s,
 	    None => std::env::current_dir().unwrap()
@@ -22,7 +23,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	let mut version = String::from("v1.0.0");
 	let mut developer = String::from("");
 	let mut description = String::from("");
-	let mut buffer = loc.absolutize().unwrap().to_str().unwrap().to_string();
+	let mut buffer = if !is_location_default { loc.absolutize().unwrap().to_str().unwrap().to_string() } else { String::from("") };
 
 	let mut rl = Editor::<()>::new();
 
@@ -34,13 +35,17 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    ("Location", &mut buffer, Color::Green, true),
 	];
 	
-	let mut ix = 0;
+	let mut i = 0;
 	loop {
-	    if ix > prompts.len() - 1 {
+	    if i > prompts.len() - 1 {
 	        break;
 	    }
-	    let (prompt, ref mut var, _, required) = prompts[ix];
+	    let (prompt, ref mut var, _, required) = prompts[i];
 	    let text = format!("{}: ", prompt);
+		// this is so unbelievably dumb
+		if i == 3 && is_location_default {
+			**var = loc.absolutize().unwrap().join(project_name.clone()).to_str().unwrap().to_string();
+		}
 	    let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
 	    match readline {
 	        Ok(line) => {
@@ -50,7 +55,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	                continue;
 	            }
 	            **var = line;
-	            ix += 1;
+	            i += 1;
 	        },
 	        Err(err) => {
 	            print_error!("Error: {}", err);
@@ -64,7 +69,7 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	project_name = project_name.trim().to_string();
 	description = description.trim().to_string();
 
-	let project_location = Path::new(&buffer).join(&project_name);
+	let project_location = Path::new(&buffer);
 
 	let id = format!("com.{}.{}", developer.to_lowercase(), project_name.to_lowercase());
 
@@ -77,12 +82,22 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    project_name.green(),
 	    developer.green(),
 	    version.green(),
-	    project_location.parent().unwrap().to_str().unwrap().green()
+	    project_location.to_str().unwrap().green()
 	);
+
+	println!("project_location is {}", project_location.to_str().unwrap());
+
+	exit(1);
 
 	if project_location.exists() {
 	    println!("{}", "Unable to create project in existing directory".red());
 	    exit(1);
+	} else {
+		let result = fs::create_dir_all(&project_location);
+		if result.is_err() {
+			println!("{}", "Unable to create directory for project".red());
+			exit(1);
+		}
 	}
 
 	match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
