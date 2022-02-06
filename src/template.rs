@@ -27,8 +27,9 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 
 	let mut rl = Editor::<()>::new();
 
+	let mut project_name_ref = project_name.clone();
 	let mut prompts = [
-	    ("Mod name", &mut project_name, Color::Green, true),
+	    ("Mod name", &mut project_name_ref, Color::Green, true),
 	    ("Developer", &mut developer, Color::Green, true),
 	    ("Version", &mut version, Color::Green, true),
 	    ("Description", &mut description, Color::Green, true),
@@ -43,8 +44,11 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    let (prompt, ref mut var, _, required) = prompts[i];
 	    let text = format!("{}: ", prompt);
 		// this is so unbelievably dumb
+		if i == 1 {
+			project_name = var.clone();
+		}
 		if i == 3 && is_location_default {
-			**var = loc.absolutize().unwrap().join(project_name.clone()).to_str().unwrap().to_string();
+			**var = loc.absolutize().unwrap().join(&project_name).to_str().unwrap().to_string();
 		}
 	    let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
 	    match readline {
@@ -86,8 +90,6 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	);
 
 	println!("project_location is {}", project_location.to_str().unwrap());
-
-	exit(1);
 
 	if project_location.exists() {
 	    println!("{}", "Unable to create project in existing directory".red());
