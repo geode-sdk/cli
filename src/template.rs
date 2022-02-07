@@ -23,44 +23,41 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	let mut version = String::from("v1.0.0");
 	let mut developer = String::from("");
 	let mut description = String::from("");
-	let mut buffer = if !is_location_default { loc.absolutize().unwrap().to_str().unwrap().to_string() } else { String::from("") };
+	let mut buffer = if is_location_default {
+		loc.absolutize().unwrap().join(&project_name).to_str().unwrap().to_string()
+	} else {
+		loc.absolutize().unwrap().to_str().unwrap().to_string()
+	};
 
 	let mut rl = Editor::<()>::new();
 
-	let mut project_name_ref = project_name.clone();
 	let mut prompts = [
-	    ("Mod name", &mut project_name_ref, Color::Green, true),
-	    ("Developer", &mut developer, Color::Green, true),
-	    ("Version", &mut version, Color::Green, true),
-	    ("Description", &mut description, Color::Green, true),
-	    ("Location", &mut buffer, Color::Green, true),
+	    ("Developer", &mut developer, true),
+	    ("Version", &mut version, true),
+	    ("Description", &mut description, true),
+	    ("Location", &mut buffer, true),
 	];
 	
-	for (i, (prompt, ref mut var, _, required)) in prompts.iter_mut().enumerate() {
+	for (prompt, ref mut var, required) in prompts.iter_mut() {
 	    let text = format!("{}: ", prompt);
 
-		// this is so unbelievably dumb
-		if i == 1 {
-			project_name = var.clone();
+		loop {
+			let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
+			match readline {
+				Ok(line) => {
+					rl.add_history_entry(line.as_str());
+					if line.is_empty() && *required {
+						println!("{}", "Please enter a value".red());
+					} else {
+						**var = line;
+						break;
+					}
+				},
+				Err(err) => {
+					print_error!("Error: {}", err);
+				}
+			}
 		}
-
-		if i == 3 && is_location_default {
-			**var = loc.absolutize().unwrap().join(&project_name).to_str().unwrap().to_string();
-		}
-	    let readline = rl.readline_with_initial(text.as_str(), (var.as_str(), ""));
-	    match readline {
-	        Ok(line) => {
-	            rl.add_history_entry(line.as_str());
-	            if line.is_empty() && *required {
-	                println!("{}", "Please enter a value".red());
-	                continue;
-	            }
-	            **var = line;
-	        },
-	        Err(err) => {
-	            print_error!("Error: {}", err);
-	        }
-	    }
 	}
 	
 	buffer = buffer.trim().to_string();
@@ -84,8 +81,6 @@ pub fn create_template(mut project_name: String, location: Option<PathBuf>) {
 	    version.green(),
 	    project_location.to_str().unwrap().green()
 	);
-
-	println!("project_location is {}", project_location.to_str().unwrap());
 
 	if project_location.exists() {
 	    println!("{}", "Unable to create project in existing directory".red());
