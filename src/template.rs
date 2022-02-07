@@ -102,20 +102,10 @@ pub fn create_template(project_name: String, location: Option<PathBuf>) {
 	    }
 	}
 
-	let tmp_sdk = std::env::temp_dir().join("sdk");
-
-	if tmp_sdk.exists() {
-	    fs_dir::remove(&tmp_sdk).unwrap();
-	}
-
-	match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &tmp_sdk) {
+	match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &project_location.join("sdk")) {
 	    Ok(_) => (),
 	    Err(e) => print_error!("Failed to clone sdk: {}", e),
 	};
-
-	copy_dir::copy_dir(&tmp_sdk, project_location.join("sdk")).unwrap();
-	fs_dir::remove(tmp_sdk).unwrap();
-
 	
 	let mod_json = json!({
 	    "geode":        GEODE_VERSION,
