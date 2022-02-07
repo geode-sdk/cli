@@ -8,8 +8,6 @@ use serde_json::{json, to_string_pretty};
 use std::path::PathBuf;
 use std::{fs, path::Path};
 
-use fs_extra::dir as fs_dir;
-
 pub fn create_template(project_name: String, location: Option<PathBuf>) {
 	let is_location_default = location.is_none();
 	let loc = match location {
