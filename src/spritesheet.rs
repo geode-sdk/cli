@@ -29,7 +29,8 @@ struct GameSheetData {
     texture_rotated: bool,
     sprite_size: String,
     sprite_source_size: String,
-    texture_rect: String
+    texture_rect: String,
+    sprite_offset: String
 }
 
 #[derive(Serialize)]
@@ -144,6 +145,7 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
             sprite_source_size: format!("{{{}, {}}}", frame.source.w, frame.source.h),
             sprite_size: format!("{{{}, {}}}", frame.frame.w, frame.frame.h),
             texture_rect: format!("{{{{{}, {}}}, {{{}, {}}}}}", frame.frame.x, frame.frame.y, frame.frame.w, frame.frame.h),
+            sprite_offset: format!("{{{}, {}}}", frame.source.x, -(frame.source.y as i32)),
         });
     }
 
