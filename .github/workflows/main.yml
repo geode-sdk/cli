@@ -12,7 +12,7 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          path: build/geode.exe
+          path: build/release/geode.exe
 #        - name: "macOS"
 #          os: macos-latest
     name: ${{ matrix.config.name }}
@@ -29,7 +29,7 @@ jobs:
 
     - name: Build
       run: |
-        cargo build --release --out-dir ${{ github.workspace }}/build     
+        cargo build --release --target-dir ${{ github.workspace }}/build     
       
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
