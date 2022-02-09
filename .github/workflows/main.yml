@@ -2,7 +2,8 @@ name: Build Binaries
 
 on:
   push:
-    branches: [ main ]
+    tags:
+    - '*'
 
 jobs:
   build:
@@ -13,8 +14,9 @@ jobs:
         - name: "Windows"
           os: windows-latest
           path: build/release/geode.exe
-#        - name: "macOS"
-#          os: macos-latest
+        - name: "macOS"
+          os: macos-latest
+          path: build/release/geode
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
