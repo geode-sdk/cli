@@ -13,10 +13,10 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          path: build/release/geode.exe
+          zip: "7z a -tzip ${{ github.workspace }}/Windows.zip ${{ github.workspace }}/build/release/geode.exe"
         - name: "macOS"
           os: macos-latest
-          path: build/release/geode
+          zip: "zip ${{ github.workspace }}/macOS.zip ${{ github.workspace }}/build/release/geode"
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -32,19 +32,15 @@ jobs:
     - name: Build
       run: |
         cargo build --release --target-dir ${{ github.workspace }}/build     
-      
+    
     - name: Archive Release
-      uses: thedoctor0/zip-release@master
-      with:
-        type: 'zip'
-        filename: '${{ matrix.config.name }}.zip'
-        path: ${{ github.workspace }}/${{ matrix.config.path }}
-        directory: ${{ github.workspace }}
+      run: |
+        cd . &&
+        ${{ matrix.config.zip }}
     
     - name: Publish Release
       uses: ncipollo/release-action@v1
       with:
         allowUpdates: true
-        artifacts: "${{ matrix.config.name }}.zip"
-        body: "body.md"
+        artifacts: "${{ github.workspace }}/${{ matrix.config.name }}.zip"
         token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
