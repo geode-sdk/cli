@@ -13,10 +13,10 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          zip: "7z a -tzip ${{ github.workspace }}/Windows.zip ${{ github.workspace }}/build/release/geode.exe"
+          zip: "7z a -tzip Windows.zip build/release/geode.exe"
         - name: "macOS"
           os: macos-latest
-          zip: "zip ${{ github.workspace }}/macOS.zip ${{ github.workspace }}/build/release/geode"
+          zip: "zip macOS.zip build/release/geode"
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -35,7 +35,7 @@ jobs:
     
     - name: Archive Release
       run: |
-        cd . &&
+        cd ${{ github.workspace }} &&
         ${{ matrix.config.zip }}
     
     - name: Publish Release
