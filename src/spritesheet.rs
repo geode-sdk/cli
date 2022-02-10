@@ -93,6 +93,7 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
 
     let mut suffix_removals = 0u32;
 
+    let mut largest_width = 0;
     for path in in_files {
         if fs::metadata(path)?.is_dir() {
             continue;
@@ -116,12 +117,23 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
             frames.push((sprite, framename));
         }
 
+        if dim.0 > largest_width {
+            largest_width = dim.0 + 10;
+        }
+
         config.max_width += dim.0;
         heights.push(dim.1 as f64);
     }
     let av = heights.iter().sum::<f64>() / heights.len() as f64 + heights.len() as f64;
     config.max_width = (config.max_width as f64 * av).sqrt() as u32;
     config.max_height = u32::MAX;
+
+    // make sure the texture is large enough to 
+    // fit the largest input file
+    if config.max_width < largest_width {
+        // todo: make it create a power of 2
+        config.max_width = largest_width;
+    }
 
     let mut packer = TexturePacker::new_skyline(config);
 
