@@ -5,12 +5,13 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 pub mod util;
 pub mod package;
-pub mod install;
+pub mod update;
 pub mod template;
 pub mod config;
 pub mod windows_ansi;
 pub mod spritesheet;
 pub mod dither;
+pub mod install;
 
 #[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
@@ -109,11 +110,18 @@ enum Commands {
 
         #[clap(long)]
         check: bool
+    },
+
+    Setup {},
+
+    Install {
+        /// Path to .geode file to install
+        path: PathBuf
     }
 }
 
 fn main() {
-    #[cfg(windows)]
+    #[cfg(windows)] 
     match enable_ansi_support() {
         Ok(_) => {},
         Err(e) => println!("Unable to enable ANSI support: {}", e)
@@ -212,10 +220,25 @@ fn main() {
 
         Commands::Update { version, check } => {
             if check {
-                install::check_update(version);
+                update::check_update(version);
             } else {
-                install::update_geode(version)
+                update::update_geode(version)
             }
+        },
+
+        Commands::Setup {} => {
+            match Configuration::install_file_associations() {
+                Ok(_) => (
+                    println!("File association for .geode files created!")
+                ),
+                Err(e) => {
+                    print_error!("File association failed: {}", e)
+                }
+            }
+        },
+
+        Commands::Install {path} => {
+            install::install(&path)
         }
     }
 }
