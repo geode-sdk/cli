@@ -22,7 +22,6 @@ serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0.136", features = ["derive"] }
 sysinfo = "0.23.0"
 git2 = "0.13.25"
-fs_extra = "1.2.0"
 sha256 = "1.0.3"
 texture_packer = "0.23.1"
 walkdir = "2"
@@ -32,4 +31,3 @@ zip = "0.5.13"
 indicatif = "0.16.2"
 glob = "0.3.0"
 path-slash = "0.1.4"
-copy_dir = "0.1.2"

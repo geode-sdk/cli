@@ -6,13 +6,10 @@ use std::time::{Duration, SystemTime};
 
 use crate::{print_error, spritesheet, Configuration};
 
-use fs_extra::dir as fs_dir;
-
 use serde_json::{Value, json};
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use path_slash::*;
 
 use std::collections::HashMap;
 
@@ -287,13 +284,13 @@ pub fn create_geode(
                         cache_data.parse_json(&entry.path().join("cache_data.json"));
                         continue;
                     }
-                    fs_dir::remove(entry.path()).unwrap();
+                    fs::remove_dir_all(entry.path()).unwrap();
                 } else {
                     fs::remove_file(entry.path()).unwrap();
                 }
             }
         } else {
-            fs_dir::remove(tmp_pkg).unwrap();
+            fs::remove_dir_all(tmp_pkg).unwrap();
             fs::create_dir(tmp_pkg).unwrap();
         }
     } else {
@@ -364,7 +361,11 @@ pub fn create_geode(
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
         if !item.metadata().unwrap().is_dir() && item.file_name() != "cache_data.json" {
-            zip.start_file(item.path().strip_prefix("./").unwrap().to_slash().unwrap().as_str(), zopts).unwrap();
+            let mut file_path = item.path().strip_prefix("./").unwrap().to_str().unwrap().to_string();
+            if cfg!(windows) {
+                file_path = file_path.replace("/", "\\");
+            }
+            zip.start_file(file_path, zopts).unwrap();
             zip.write_all(&fs::read(item.path()).unwrap()).unwrap();
         }
     }
