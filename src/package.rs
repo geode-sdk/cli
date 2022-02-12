@@ -318,6 +318,12 @@ pub fn create_geode(
             fs::create_dir_all(tmp_pkg.join("resources")).unwrap();
         }
 
+        if resource_dir.join("logo.png").exists() {
+            println!("Creating variants of logo.png");
+            fs::copy(resource_dir.join("logo.png"), tmp_pkg.join(modinfo.id.clone() + ".png"))?;
+            spritesheet::create_variants_of_sprite(&tmp_pkg.join(modinfo.id.clone() + ".png"), &tmp_pkg).unwrap();
+        }
+
         for file in modinfo.resources.files {
             let file_name = &file.file_name().unwrap().to_str().unwrap();
             if !cache_data.are_any_of_these_later(&file_name.to_string(), &vec!(file.clone())) {
@@ -336,7 +342,8 @@ pub fn create_geode(
             if log {
                 println!("Packing {}", sheet.name.yellow().bold());
             }
-            spritesheet::pack_sprites(&sheet.files, &tmp_pkg.join("resources"), true, Some(sheet.name),
+            spritesheet::pack_sprites(
+                &sheet.files, &tmp_pkg.join("resources"), true, Some(sheet.name), Some(modinfo.id.clone() + "_"),
                 if log { Some(|s: &str| println!("{}", s.yellow().bold())) } else { None }
             )?;
         }

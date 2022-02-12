@@ -185,7 +185,7 @@ fn pack_sprites_with_suffix(in_files: &Vec<PathBuf>, out_dir: &Path, name: &Opti
     return pack_sprites_to_file(in_files, out_dir, &actual_name);
 }
 
-fn create_resized_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, downscale: u32, suffix: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn create_resized_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, downscale: u32, prefix: &Option<String>, suffix: &str) -> Result<(), Box<dyn std::error::Error>> {
     create_dir_all(out_dir).unwrap();
 
     for path in in_files {
@@ -197,6 +197,14 @@ fn create_resized_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, downscale: u3
         let mut framename = sprite.file_stem().unwrap().to_str().unwrap_or("").to_string();
 
         update_suffix(&mut framename, suffix);
+        match prefix {
+            Some(p) => {
+                let mut s = p.clone();
+                s.push_str(&framename);
+                framename = s;
+            },
+            None => {}
+        }
 
         let mut out_file = out_dir.to_path_buf();
         out_file.push(framename);
@@ -228,16 +236,17 @@ pub fn pack_sprites(
     out_dir: &Path,
     create_variants: bool,
     name: Option<String>,
+    prefix: Option<String>,
     progress_callback: Option<fn(&str)>
 ) -> Result<PackResult, Box<dyn std::error::Error>>
 {
     if create_variants {
         match progress_callback { Some(f) => f(" -> Creating UHD Textures"), None => {} }
-        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, &prefix, "-uhd").unwrap();
         match progress_callback { Some(f) => f(" -> Creating HD Textures"), None => {} }
-        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_hd")),  2, "-hd").unwrap();
+        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_hd")),  2, &prefix, "-hd").unwrap();
         match progress_callback { Some(f) => f(" -> Creating Low Textures"), None => {} }
-        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_low")), 4, "").unwrap();
+        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_low")), 4, &prefix, "").unwrap();
         
         match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
         let mut res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "-uhd").unwrap();
@@ -253,7 +262,7 @@ pub fn pack_sprites(
         Ok(res)
     } else {
         match progress_callback { Some(f) => f(" -> Creating UHD Textures"), None => {} }
-        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, "-uhd").unwrap();
+        create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, &prefix, "-uhd").unwrap();
         match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
         let res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "");
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
@@ -266,16 +275,17 @@ pub fn pack_sprites_in_dir(
     out_dir: &Path,
     create_variants: bool,
     name: Option<String>,
+    prefix: Option<String>,
     progress_callback: Option<fn(&str)>
 ) -> Result<PackResult, Box<dyn std::error::Error>>
 {
-    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, progress_callback)
+    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, prefix, progress_callback)
 }
 
 pub fn create_variants_of_sprite(file: &PathBuf, out_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let in_files = vec!(file.clone());
-    create_resized_sprites(&in_files, Path::new(&out_dir), 1, "-uhd").unwrap();
-    create_resized_sprites(&in_files, Path::new(&out_dir),  2, "-hd").unwrap();
-    create_resized_sprites(&in_files, Path::new(&out_dir), 4, "").unwrap();
+    create_resized_sprites(&in_files, Path::new(&out_dir), 1, &None, "-uhd").unwrap();
+    create_resized_sprites(&in_files, Path::new(&out_dir), 2, &None, "-hd").unwrap();
+    create_resized_sprites(&in_files, Path::new(&out_dir), 4, &None, "").unwrap();
     Ok(())
 }

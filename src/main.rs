@@ -84,6 +84,17 @@ enum Commands {
         /// Spritesheet name
         #[clap(short, long)]
         name: Option<String>,
+        /// Prefix
+        #[clap(long)]
+        prefix: Option<String>,
+    },
+
+    /// Create variants (High, Medium, Low) of a sprite
+    Sprite {
+        /// Path to the sprite
+        src: PathBuf,
+        /// Path to directory where to put the resulting sprites
+        dest: PathBuf,
     },
 
     Info {
@@ -146,7 +157,7 @@ fn main() {
             }
         },
 
-        Commands::Sheet { src, dest, variants, name } => {
+        Commands::Sheet { src, dest, variants, name, prefix } => {
             let bar = ProgressBar::new_spinner();
             bar.enable_steady_tick(120);
             bar.set_style(
@@ -164,7 +175,8 @@ fn main() {
                     .template("{spinner:.cyan} {msg}"),
             );
             bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
-            let res = spritesheet::pack_sprites_in_dir(&src, &dest, variants, name, 
+            let res = spritesheet::pack_sprites_in_dir(
+                &src, &dest, variants, name, prefix, 
                 Some(|s: &str| println!("{}", s.yellow().bold()))
             ).unwrap();
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
@@ -174,6 +186,28 @@ fn main() {
             println!("{} You might want to delete the tmp dirs",
                 "[ info ]".bright_yellow()
             );
+        },
+
+        Commands::Sprite { src, dest } => {
+            let bar = ProgressBar::new_spinner();
+            bar.enable_steady_tick(120);
+            bar.set_style(
+                ProgressStyle::default_spinner()
+                    .tick_strings(&[
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[ done ]",
+                    ])
+                    .template("{spinner:.cyan} {msg}"),
+            );
+            bar.set_message(format!("{}", "Creating variants...".bright_cyan()));
+            spritesheet::create_variants_of_sprite(&src, &dest).unwrap();
+            bar.finish_with_message(format!("{}", "Variants created!".bright_green()));
         },
 
         Commands::Update { version, check } => {
