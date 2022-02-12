@@ -8,7 +8,6 @@ use sysinfo::{ProcessExt, System, SystemExt};
 use crate::package;
 
 use crate::config::Configuration;
-use fs_extra::dir as fs_dir;
 
 pub fn figure_out_gd_path() -> Result<PathBuf> {
     let mut sys = System::new();
@@ -18,6 +17,13 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
 
     if cfg!(windows) {
     	gd_procs = sys.processes_by_exact_name("GeometryDash.exe");
+    } else if cfg!(target_os = "ios") {
+    	match std::env::var("HOME") {
+    		Ok(val) => {
+    			return Ok(PathBuf::from(val));
+    		},
+    		Err(_) => return Err(Error::new(ErrorKind::Other, "Could not fetch $HOME variable, please set it."))
+    	}
     } else {
     	// TODO: Check if in other systems can detect it like this.
     	gd_procs = sys.processes_by_exact_name("Geometry Dash");
@@ -56,7 +62,7 @@ fn check_update_needed(specific_version: Option<String>) -> Option<(String, Path
 	let tmp_update = std::env::temp_dir().join("geode_update");
 
 	if tmp_update.exists() {
-	    fs_dir::remove(&tmp_update).unwrap();
+	    fs::remove_dir_all(&tmp_update).unwrap();
 	}
 
 
