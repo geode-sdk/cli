@@ -387,6 +387,9 @@ pub fn create_geode(
     if install {
         let mut target_path = Configuration::install_path().join("geode");
         target_path = if api { target_path.join("api") } else { target_path.join("mods") };
+        if !target_path.exists() {
+            fs::create_dir_all(&target_path).unwrap();
+        }
         target_path =target_path.join(out_file.to_path_buf().file_name().unwrap());
         fs::copy(out_file, target_path).unwrap();
         println!("{}", 
