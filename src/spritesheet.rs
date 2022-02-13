@@ -289,3 +289,13 @@ pub fn create_variants_of_sprite(file: &PathBuf, out_dir: &PathBuf) -> Result<()
     create_resized_sprites(&in_files, Path::new(&out_dir), 4, &None, "").unwrap();
     Ok(())
 }
+
+pub fn is_image(file: &PathBuf) -> bool {
+    match image::io::Reader::open(file) {
+        Ok(i) => match i.decode() {
+            Ok(_) => true,
+            Err(_) => false
+        },
+        Err(_) => false
+    }
+}

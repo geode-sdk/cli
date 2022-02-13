@@ -327,8 +327,13 @@ pub fn create_geode(
                 println!("Skipping {} as no changes were detected", file_name.yellow().bold());
                 continue;
             }
-            println!("Creating variants of {}", &file_name);
-            spritesheet::create_variants_of_sprite(&file, &tmp_pkg.join("resources")).unwrap();
+
+            if spritesheet::is_image(&file) {
+                println!("Creating variants of {}", &file_name);
+                spritesheet::create_variants_of_sprite(&file, &tmp_pkg.join("resources")).unwrap();
+            } else {
+                fs::copy(&file, &tmp_pkg.join("resources").join(&file_name))?;
+            }
         }
 
         for sheet in modinfo.resources.sheets {
