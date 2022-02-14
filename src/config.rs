@@ -79,7 +79,7 @@ impl Configuration {
 	}
 
 	pub fn install_file_associations() -> io::Result<()> {
-		if cfg!(windows) {
+		#[cfg(windows)] {
 			use winreg::{enums::*, RegKey};
 			use windows::Win32::UI::Shell::{SHChangeNotify, SHCNE_ASSOCCHANGED, SHCNF_DWORD, SHCNF_FLUSH};
 	
@@ -121,9 +121,10 @@ impl Configuration {
 				);
 			}
 	
-			Ok(())
-		} else {
-			Err(io::Error::new(io::ErrorKind::Other, "Unimplemented file association command for os"))
+			return Ok(());
+		}
+		#[cfg(not(windows))] {
+			return Err(io::Error::new(io::ErrorKind::Other, "Unimplemented file association command for os"));
 		}
 	}
 }
