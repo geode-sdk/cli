@@ -1,0 +1,55 @@
+name: Update Bin
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+    - '*'
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:      
+    - uses: actions/checkout@v2
+      with:
+        repository: geode-sdk/bin
+        path: bin
+        submodules: recursive
+        token: '${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}'
+
+    - name: Download Windows artifact
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        github_token: ${{secrets.GEODE_BOT_PUSH_BIN_TOKEN}}
+        workflow: build.yml
+        workflow_conclusion: success
+        branch: main
+        name: "Windows CLI Binary"
+        path: '${{ github.workspace }}/windows'
+        
+    - name: Download MacOS artifact
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        github_token: ${{secrets.GEODE_BOT_PUSH_BIN_TOKEN}}
+        workflow: build.yml
+        workflow_conclusion: success
+        branch: main
+        name: "macOS CLI Binary"
+        path: '${{ github.workspace }}/macos'
+      
+    - name: Move files to bin
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        mv ./windows/geode.exe ./bin/windows
+        mv ./macos/geode ./bin/macos
+        
+    - name: Commit and push to bin
+      working-directory: ${{ github.workspace }}/bin
+      run: |
+        git config --local user.email "${{ secrets.GEODE_BOT_EMAIL }}"
+        git config --local user.name "GeodeBot"
+        git add -A
+        git commit -m "CLI update from ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+        git push "https://GeodeBot:${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN}}@github.com/geode-sdk/bin.git" main
