@@ -9,12 +9,14 @@ use serde::{Serialize, Deserialize};
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Configuration {
     pub install_path: Option<PathBuf>, // only option because i dont wanna deal with lazy_static
-    pub current_version: Option<String>
+    pub current_version: Option<String>,
+	pub default_developer: Option<String>,
 }
 
 static mut CONFIG: Configuration = Configuration {
 	install_path: None,
-	current_version: None
+	current_version: None,
+	default_developer: None,
 };
 static mut CONFIG_DONE: bool = false;
 
@@ -76,6 +78,15 @@ impl Configuration {
 
 	pub fn install_path() -> &'static Path {
 		&Configuration::get().install_path.as_ref().unwrap()
+	}
+
+	pub fn set_dev_name(f: String) {
+		Configuration::get().default_developer = Some(f);
+		Configuration::save_config();
+	}
+
+	pub fn dev_name() -> String {
+		Configuration::get().default_developer.clone().unwrap_or(String::new())
 	}
 
 	pub fn install_file_associations() -> io::Result<()> {
