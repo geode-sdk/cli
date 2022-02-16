@@ -36,12 +36,15 @@ enum Commands {
     /// Modify Geode configuration
     Config {
         #[clap(long)]
-        path: PathBuf,
+        path: Option<PathBuf>,
+
+        #[clap(long)]
+        dev: Option<String>,
     },
     /// Create a new Geode project
     New {
         /// Mod name
-        name: String,
+        name: Option<String>,
         /// Where to create the project, defaults
         /// to the current folder
         location: Option<PathBuf>,
@@ -155,7 +158,20 @@ fn main() {
                 cached
             ),
 
-        Commands::Config { path } => Configuration::set_install_path(path),
+        Commands::Config { path, dev } => {
+            let mut some_set = false;
+            if path.is_some() {
+                Configuration::set_install_path(path.unwrap());
+                some_set = true;
+            }
+            if dev.is_some() {
+                Configuration::set_dev_name(dev.unwrap());
+                some_set = true;
+            }
+            if !some_set {
+                print_error!("Please provide some setting to set the value of");
+            }
+        },
 
         Commands::Info { modpath } => {
             if modpath {

@@ -2,8 +2,7 @@ name: Build Binaries
 
 on:
   push:
-    tags:
-    - '*'
+    branches: [ main ]
 
 jobs:
   build:
@@ -13,10 +12,10 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          zip: "7z a -tzip Windows.zip build/release/geode.exe"
+          upload_path: "./build/release/geode.exe"
         - name: "macOS"
           os: macos-latest
-          zip: "zip macOS.zip build/release/geode"
+          upload_path: "./build/release/geode"
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -33,14 +32,8 @@ jobs:
       run: |
         cargo build --release --target-dir ${{ github.workspace }}/build     
     
-    - name: Archive Release
-      run: |
-        cd ${{ github.workspace }} &&
-        ${{ matrix.config.zip }}
-    
-    - name: Publish Release
-      uses: ncipollo/release-action@v1
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
       with:
-        allowUpdates: true
-        artifacts: "${{ github.workspace }}/${{ matrix.config.name }}.zip"
-        token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
+        name: ${{ matrix.config.name }} CLI Binary
+        path: ${{ matrix.config.upload_path }}
