@@ -66,11 +66,6 @@ enum Commands {
         #[clap(short, long)]
         install: bool,
 
-        /// Copy the generated .geode file in the 
-        /// API directory instead of mods
-        #[clap(long)]
-        api: bool,
-
         #[clap(long)]
         cached: bool,
     },
@@ -147,13 +142,12 @@ fn main() {
             );
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file, install, api, cached } => 
+        Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => 
             package::create_geode(
                 &resource_dir,
                 &exec_dir,
                 &out_file,
                 install,
-                api,
                 true,
                 cached
             ),

@@ -137,8 +137,6 @@ impl Configuration {
 		#[cfg(not(windows))] {
 			return Err(io::Error::new(io::ErrorKind::Other, "Unimplemented file association command for os"));
 		}
-		
-		Ok(())
 	}
 }
 

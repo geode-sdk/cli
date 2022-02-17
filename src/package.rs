@@ -247,7 +247,6 @@ pub fn create_geode(
     exec_dir: &Path,
     out_file: &Path,
     install: bool,
-    api: bool,
     log: bool,
     use_cached_resources: bool
 ) {
@@ -391,7 +390,7 @@ pub fn create_geode(
 
     if install {
         let mut target_path = Configuration::install_path().join("geode");
-        target_path = if api { target_path.join("api") } else { target_path.join("mods") };
+        target_path = target_path.join("mods");
         if !target_path.exists() {
             fs::create_dir_all(&target_path).unwrap();
         }
