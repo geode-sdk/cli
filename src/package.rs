@@ -63,6 +63,7 @@ impl CacheData {
         let mut res = false;
         for file in files {
             let modified_date = fs::metadata(file).unwrap().modified().unwrap().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+
             if !self.latest_gamesheet_file.contains_key(sheet) ||
                 modified_date.as_secs() > self.latest_gamesheet_file[sheet].as_secs()
             {
@@ -183,10 +184,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
                             if a_path.is_relative() {
                                 a_path = mod_json_location.join(a_path);
                             }
-                            files.append(
-                                &mut glob(a_path.to_str().unwrap())
-                                    .unwrap().map(|x| x.unwrap())
-                                    .collect()
+                            files.extend(
+                                glob(a_path.to_str().unwrap())
+                                .unwrap().map(|x| x.unwrap())
                             );
                         } else {
                             print_error!("[mod.json].resources.files: Expected item to be 'string', but it was not");
@@ -202,10 +202,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> ModInfo {
                                 if a_path.is_relative() {
                                     a_path = mod_json_location.join(a_path);
                                 }
-                                sheet_files.append(
-                                    &mut glob(a_path.to_str().unwrap())
-                                        .unwrap().map(|x| x.unwrap())
-                                        .collect()
+                                sheet_files.extend(
+                                    glob(a_path.to_str().unwrap())
+                                    .unwrap().map(|x| x.unwrap())
                                 );
                             } else {
                                 print_error!("[mod.json].resources.spritesheets.{}: Expected item to be 'string', but it was not", sheet_name);
@@ -364,6 +363,7 @@ pub fn create_geode(
     let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     for walk in walkdir::WalkDir::new(".") {
         let item = walk.unwrap();
+
         if !item.metadata().unwrap().is_dir() && item.file_name() != "cache_data.json" {
             let mut file_path = item.path().strip_prefix("./").unwrap().to_str().unwrap().to_string();
             if cfg!(windows) {
