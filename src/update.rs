@@ -1,6 +1,7 @@
 use colored::Colorize;
 use crate::print_error;
 use git2::Repository;
+use plist::Value;
 use std::io::{Result, Error, ErrorKind};
 use std::path::PathBuf;
 use std::fs;
@@ -13,41 +14,67 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
     let mut sys = System::new();
     sys.refresh_processes();
 
-    let mut gd_procs;
-
     if cfg!(windows) {
-    	gd_procs = sys.processes_by_exact_name("GeometryDash.exe");
+    	let mut gd_procs = sys.processes_by_exact_name("GeometryDash.exe");
+	    let gd_proc = match gd_procs.next() {
+	        Some(e) => e,
+	        None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
+	    };
+
+	    if gd_procs.next().is_some() { 
+	    	return Err(Error::new(
+	    		ErrorKind::Other,
+	    		"It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance."
+	    	));
+	    }
+
+		Ok(PathBuf::from(gd_proc.exe()).parent().unwrap().to_path_buf())
     } else if cfg!(target_os = "ios") {
     	match std::env::var("HOME") {
-    		Ok(val) => {
-    			return Ok(PathBuf::from(val));
-    		},
-    		Err(_) => return Err(Error::new(ErrorKind::Other, "Could not fetch $HOME variable, please set it."))
+    		Ok(val) => Ok(PathBuf::from(val)),
+    		Err(_) => Err(Error::new(ErrorKind::Other, "Could not fetch $HOME variable, please set it."))
     	}
+    } else if cfg!(target_os = "macos") {
+    	let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
+	    let gd_proc = match gd_procs.next() {
+	        Some(e) => e,
+	        None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
+	    };
+
+	    if gd_procs.next().is_some() { 
+	    	return Err(Error::new(
+	    		ErrorKind::Other,
+	    		"It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance."
+	    	));
+	    }
+
+	    let p = PathBuf::from(gd_proc.exe()).parent().unwrap().parent().unwrap().join("Info.plist").to_path_buf();
+
+	    if !p.exists() {
+	    	return Err(Error::new(
+	    		ErrorKind::Other,
+	    		"Malformed executable"
+	    	));
+	    }
+
+	    match Value::from_file(p) {
+	    	Ok(pl) => {
+	    		let bundle_id = pl.as_dictionary()
+				  .and_then(|dict| dict.get("CFBundleIdentifier"))
+				  .and_then(|title| title.as_string());
+
+				let pp = PathBuf::from(format!("{}/Documents/{}", std::env::var("HOME").unwrap(), bundle_id.unwrap()));
+				println!("{:?}", pp);
+				Ok(pp)
+	    	},
+	    	Err(_) => Err(Error::new(
+	    		ErrorKind::Other,
+	    		"Unable to read Info.plist"
+	    	))
+	    }
     } else {
-    	// TODO: Check if in other systems can detect it like this.
-    	gd_procs = sys.processes_by_exact_name("Geometry Dash");
+    	panic!("Unsupported");
     }
-
-
-    let gd_proc = match gd_procs.next() {
-        Some(e) => e,
-        None => return Err(Error::new(ErrorKind::Other, "Please re-run with Geometry Dash open")),
-    };
-
-    if gd_procs.next().is_some() { 
-    	return Err(Error::new(
-    		ErrorKind::Other,
-    		"It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance."
-    	));
-    }
-
-    let mut p = PathBuf::from(gd_proc.exe()).parent().unwrap().to_path_buf();
-
-    if cfg!(target_os = "macos") {
-        p = p.parent().unwrap().to_path_buf();
-    }
-    Ok(p)
 }
 
 fn geode_library() -> PathBuf {
