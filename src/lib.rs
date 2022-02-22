@@ -236,5 +236,11 @@ pub unsafe extern "C" fn geode_update(_location: *mut c_char, _version: *mut c_c
 		Some(CStr::from_ptr(_version).to_str().unwrap().to_string())	
 	};
 
-	crate::update::update_geode(version, Some(&location)).is_ok()
+	match crate::update::update_geode(version, Some(&location)) {
+		Ok(_) => true,
+		Err(b) => {
+			dbg!(b);
+			false
+		}
+	}
 }

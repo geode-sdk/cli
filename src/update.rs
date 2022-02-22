@@ -132,6 +132,23 @@ fn check_update_needed(specific_version: Option<String>, install_path: Option<&P
 	Ok(None)
 }
 
+fn copy_files(src_path: &Path, dest_path: &Path) -> Result<()> {
+
+	let geode_file = "Geode".to_string() + package::platform_extension();
+	fs::copy(src_path.join(&geode_file), dest_path.join(&geode_file))?;
+
+	let geode_injector = if cfg!(target_os = "macos") {
+		"libfmod.dylib"
+	} else if cfg!(windows) {
+		"XInput9_1_0.dll"
+	} else {
+		unimplemented!("injector file");
+	};
+
+	fs::copy(src_path.join(&geode_injector), dest_path.join(&geode_injector))?;
+	Ok(())
+}
+
 pub fn check_update(version: Option<String>, install_path: Option<&Path>) -> Result<()> {
 	let b = check_update_needed(version, install_path)?;
 
@@ -150,10 +167,9 @@ pub fn update_geode(version: Option<String>, install_path: Option<&Path>) -> Res
 	match b {
 		Some((n, ref p)) => {
 			println!("{} {}", "Downloaded update ".bright_cyan(), n.green().bold());
-			for file in fs::read_dir(p).unwrap() {
-				let fname = file.unwrap().file_name().clone().to_str().unwrap().to_string();
-				fs::copy(p.join(&fname), geode_library(install_path).join(&fname)).expect("Unable to copy geode to correct directory");
-			}
+
+			copy_files(p, &geode_library(install_path))?;
+
 			println!("{}", "Sucessfully updated Geode".bold());
 			Ok(())
 		},
