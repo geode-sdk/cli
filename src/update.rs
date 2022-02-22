@@ -2,7 +2,7 @@ use std::path::Path;
 use colored::Colorize;
 
 use git2::Repository;
-use plist::Value;
+
 use std::io::{Result, Error, ErrorKind};
 use std::path::PathBuf;
 use std::fs;
@@ -49,30 +49,7 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
 	    	));
 	    }
 
-	    let p = PathBuf::from(gd_proc.exe()).parent().unwrap().parent().unwrap().join("Info.plist").to_path_buf();
-
-	    if !p.exists() {
-	    	return Err(Error::new(
-	    		ErrorKind::Other,
-	    		"Malformed executable"
-	    	));
-	    }
-
-	    match Value::from_file(p) {
-	    	Ok(pl) => {
-	    		let bundle_id = pl.as_dictionary()
-				  .and_then(|dict| dict.get("CFBundleIdentifier"))
-				  .and_then(|title| title.as_string());
-
-				let pp = PathBuf::from(format!("{}/Documents/{}", std::env::var("HOME").unwrap(), bundle_id.unwrap()));
-				println!("{:?}", pp);
-				Ok(pp)
-	    	},
-	    	Err(_) => Err(Error::new(
-	    		ErrorKind::Other,
-	    		"Unable to read Info.plist"
-	    	))
-	    }
+		Ok(PathBuf::from(gd_proc.exe()).parent().unwrap().parent().unwrap().to_path_buf())
     } else {
     	panic!("Unsupported");
     }
