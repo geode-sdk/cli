@@ -230,9 +230,15 @@ fn main() {
 
         Commands::Update { version, check } => {
             if check {
-                update::check_update(version);
+                match update::check_update(version, None) {
+                    Ok(_) => (),
+                    Err(a) => print_error!("{}", a)
+                }
             } else {
-                update::update_geode(version)
+                match update::update_geode(version, None) {
+                    Ok(_) => (),
+                    Err(a) => print_error!("{}", a)
+                }
             }
         },
 

@@ -1,5 +1,6 @@
+use std::path::Path;
 use colored::Colorize;
-use crate::print_error;
+
 use git2::Repository;
 use plist::Value;
 use std::io::{Result, Error, ErrorKind};
@@ -77,15 +78,17 @@ pub fn figure_out_gd_path() -> Result<PathBuf> {
     }
 }
 
-fn geode_library() -> PathBuf {
+fn geode_library(install_path: Option<&Path>) -> PathBuf {
+	let ipth = install_path.unwrap_or_else(|| Configuration::install_path());
+
 	if cfg!(target_os = "macos") {
-		Configuration::install_path().join("Frameworks")
+		ipth.join("Frameworks")
 	} else {
-		Configuration::install_path().to_path_buf()
+		ipth.to_path_buf()
 	}
 }
 
-fn check_update_needed(specific_version: Option<String>) -> Option<(String, PathBuf)> {
+fn check_update_needed(specific_version: Option<String>, install_path: Option<&Path>) -> Result<Option<(String, PathBuf)>> {
 	let tmp_update = std::env::temp_dir().join("geode_update");
 
 	if tmp_update.exists() {
@@ -95,7 +98,9 @@ fn check_update_needed(specific_version: Option<String>) -> Option<(String, Path
 
 	let bin_repo = match Repository::clone("https://github.com/geode-sdk/bin", &tmp_update) {
 	    Ok(r) => r,
-	    Err(e) => print_error!("failed to fetch update: {}", e),
+	    Err(e) => {
+	    	return Err(Error::new(ErrorKind::Other, format!("failed to fetch update: {}", e)))
+	    },
 	};
 	
 	let mut last_name = String::new();
@@ -116,42 +121,44 @@ fn check_update_needed(specific_version: Option<String>) -> Option<(String, Path
 
 
 	let new_library_path = tmp_update.join(package::platform_string().to_string()).join("geode".to_string() + package::platform_extension());
-	let old_library_path = geode_library().join("geode".to_string() + package::platform_extension());
+	let old_library_path = geode_library(install_path).join("geode".to_string() + package::platform_extension());
 
 	if 
 		!old_library_path.exists()
 		|| (sha256::digest_file(&new_library_path).unwrap() != sha256::digest_file(&old_library_path).unwrap())
 	{
-		return Some((last_name, new_library_path.parent().unwrap().to_path_buf()));
+		return Ok(Some((last_name, new_library_path.parent().unwrap().to_path_buf())));
 	}
-	None
+	Ok(None)
 }
 
-pub fn check_update(version: Option<String>) {
-	let b = check_update_needed(version);
+pub fn check_update(version: Option<String>, install_path: Option<&Path>) -> Result<()> {
+	let b = check_update_needed(version, install_path)?;
 
 	match b {
 		Some((name, _)) => {
 			println!("{} {}", "Update available: ".bright_magenta().bold(), name.blue().bold());
+			Ok(())
 		}
-		None => print_error!("No update found.")
+		None => Err(Error::new(ErrorKind::Other, "No update found."))
 	}
 }
 
-pub fn update_geode(version: Option<String>) {
-	let b = check_update_needed(version);
+pub fn update_geode(version: Option<String>, install_path: Option<&Path>) -> Result<()> {
+	let b = check_update_needed(version, install_path)?;
 
 	match b {
 		Some((n, ref p)) => {
 			println!("{} {}", "Downloaded update ".bright_cyan(), n.green().bold());
 			for file in fs::read_dir(p).unwrap() {
 				let fname = file.unwrap().file_name().clone().to_str().unwrap().to_string();
-				fs::copy(p.join(&fname), geode_library().join(&fname)).expect("Unable to copy geode to correct directory");
+				fs::copy(p.join(&fname), geode_library(install_path).join(&fname)).expect("Unable to copy geode to correct directory");
 			}
 			println!("{}", "Sucessfully updated Geode".bold());
+			Ok(())
 		},
 
-		None => print_error!("Geode has no pending updates")
+		None => Err(Error::new(ErrorKind::Other, "Geode has no pending updates"))
 	}
 	//unimplemented!("the");
 }

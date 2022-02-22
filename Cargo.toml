@@ -9,6 +9,12 @@ build = "build.rs"
 name = "geode"
 path = "src/main.rs"
 
+[lib]
+name = "geode"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1" # for icon
@@ -36,3 +42,4 @@ image = "0.23.14"
 zip = "0.5.13"
 indicatif = "0.16.2"
 glob = "0.3.0"
+libc = "0.2.0"

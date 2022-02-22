@@ -26,7 +26,7 @@ impl Configuration {
 	pub fn get() -> &'static mut Configuration {
 		unsafe {
 			if !CONFIG_DONE {
-				let exe_path = std::env::current_exe().unwrap();
+				let exe_path = current_exe().unwrap();
 				let save_dir = exe_path.parent().unwrap();
 				let save_file = save_dir.join("config.json");
 
@@ -62,7 +62,7 @@ impl Configuration {
 
 	pub fn save_config() {
 		unsafe {
-			let exe_path = std::env::current_exe().unwrap();
+			let exe_path = current_exe().unwrap();
 			let save_dir = exe_path.parent().unwrap();
 			let save_file = save_dir.join("config.json");
 
