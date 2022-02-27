@@ -73,7 +73,7 @@ fn update_suffix(name: &mut String, suffix: &str) -> bool {
     false
 }
 
-fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) ->
+fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, no_trim: bool, name: &String) ->
     Result<PackResult, Box<dyn std::error::Error>>
 {
     assert_ne!(in_files.len(), 0, "No files provided to pack_sprites_to_file for {}", name);
@@ -84,6 +84,7 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
         allow_rotation: false,
         texture_outlines: false,
         border_padding: 1,
+        trim: !no_trim,
         ..Default::default()
     };
 
@@ -174,7 +175,7 @@ fn pack_sprites_to_file(in_files: &Vec<PathBuf>, out_dir: &Path, name: &String) 
     })
 }
 
-fn pack_sprites_with_suffix(in_files: &Vec<PathBuf>, out_dir: &Path, name: &Option<String>, suffix: &str) -> 
+fn pack_sprites_with_suffix(in_files: &Vec<PathBuf>, out_dir: &Path, name: &Option<String>, no_trim: bool, suffix: &str) -> 
     Result<PackResult, Box<dyn std::error::Error>> 
 {
     let mut actual_name = match name {
@@ -182,7 +183,7 @@ fn pack_sprites_with_suffix(in_files: &Vec<PathBuf>, out_dir: &Path, name: &Opti
         None => "spritesheet".to_string()
     };
     actual_name.push_str(suffix);
-    return pack_sprites_to_file(in_files, out_dir, &actual_name);
+    return pack_sprites_to_file(in_files, out_dir, no_trim, &actual_name);
 }
 
 fn create_resized_sprites(in_files: &Vec<PathBuf>, out_dir: &Path, downscale: u32, prefix: &Option<String>, suffix: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -237,6 +238,7 @@ pub fn pack_sprites(
     create_variants: bool,
     name: Option<String>,
     prefix: Option<String>,
+    no_trim: bool,
     progress_callback: Option<fn(&str)>
 ) -> Result<PackResult, Box<dyn std::error::Error>>
 {
@@ -249,11 +251,11 @@ pub fn pack_sprites(
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_low")), 4, &prefix, "").unwrap();
         
         match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
-        let mut res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "-uhd").unwrap();
+        let mut res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, no_trim, "-uhd").unwrap();
         match progress_callback { Some(f) => f(" -> Creating HD Spritesheet"), None => {} }
-        res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_hd")), out_dir, &name, "-hd").unwrap());
+        res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_hd")), out_dir, &name, no_trim, "-hd").unwrap());
         match progress_callback { Some(f) => f(" -> Creating Low Spritesheet"), None => {} }
-        res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_low")), out_dir, &name, "").unwrap());
+        res.merge(&pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_low")), out_dir, &name, no_trim, "").unwrap());
 
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
         fs::remove_dir_all(&out_dir.join("tmp_hd")).unwrap();
@@ -264,7 +266,7 @@ pub fn pack_sprites(
         match progress_callback { Some(f) => f(" -> Creating UHD Textures"), None => {} }
         create_resized_sprites(in_files, Path::new(&out_dir.join("tmp_uhd")), 1, &prefix, "-uhd").unwrap();
         match progress_callback { Some(f) => f(" -> Creating UHD Spritesheet"), None => {} }
-        let res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, "");
+        let res = pack_sprites_with_suffix(&read_sprites(&out_dir.join("tmp_uhd")), out_dir, &name, no_trim, "");
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
         return res;
     }
@@ -276,10 +278,11 @@ pub fn pack_sprites_in_dir(
     create_variants: bool,
     name: Option<String>,
     prefix: Option<String>,
+    no_trim: bool,
     progress_callback: Option<fn(&str)>
 ) -> Result<PackResult, Box<dyn std::error::Error>>
 {
-    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, prefix, progress_callback)
+    pack_sprites(&read_sprites(in_dir), out_dir, create_variants, name, prefix, no_trim, progress_callback)
 }
 
 pub fn create_variants_of_sprite(file: &PathBuf, out_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {

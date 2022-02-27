@@ -343,7 +343,7 @@ pub fn create_geode(
                 println!("Packing {}", sheet.name.yellow().bold());
             }
             spritesheet::pack_sprites(
-                &sheet.files, &tmp_pkg.join("resources"), true, Some(sheet.name), Some(modinfo.id.clone() + "_"),
+                &sheet.files, &tmp_pkg.join("resources"), true, Some(sheet.name), Some(modinfo.id.clone() + "_"), false,
                 if log { Some(|s: &str| println!("{}", s.yellow().bold())) } else { None }
             )?;
         }

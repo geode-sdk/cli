@@ -10,7 +10,7 @@ name = "geode"
 path = "src/main.rs"
 
 [lib]
-name = "geode"
+name = "geodelib"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

@@ -86,6 +86,9 @@ enum Commands {
         /// Prefix
         #[clap(long)]
         prefix: Option<String>,
+        /// Don't trim whitespace around the sprites
+        #[clap(long)]
+        no_trim: bool,
     },
 
     /// Create variants (High, Medium, Low) of a sprite
@@ -175,7 +178,7 @@ fn main() {
             }
         },
 
-        Commands::Sheet { src, dest, variants, name, prefix } => {
+        Commands::Sheet { src, dest, variants, name, prefix, no_trim } => {
             let bar = ProgressBar::new_spinner();
             bar.enable_steady_tick(120);
             bar.set_style(
@@ -194,8 +197,7 @@ fn main() {
             );
             bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
             let res = spritesheet::pack_sprites_in_dir(
-                &src, &dest, variants, name, prefix, 
-                Some(|s: &str| println!("{}", s.yellow().bold()))
+                &src, &dest, variants, name, prefix, no_trim, None
             ).unwrap();
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
             for file in res.created_files {
