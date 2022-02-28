@@ -1,16 +1,26 @@
-use colored::*;
-use crate::GEODE_VERSION;
-use crate::print_error;
-use git2::Repository;
-use path_absolutize::Absolutize;
-use rustyline::Editor;
-use serde_json::{json, to_string_pretty};
-use std::path::PathBuf;
-use std::{fs, path::Path};
-use std::io::{stdin,stdout,Write};
-use indicatif::{ProgressBar, ProgressStyle};
 
-use crate::{Configuration};
+use rustyline::Editor;
+use std::io::Write;
+use std::path::Path;
+use colored::Colorize;
+use std::path::PathBuf;
+use std::io::stdout;
+use std::io::stdin;
+use indicatif::ProgressBar;
+use indicatif::ProgressStyle;
+use crate::Configuration;
+use path_absolutize::Absolutize;
+use std::fs;
+use crate::call_extern;
+use crate::link::string2c;
+
+#[macro_export]
+macro_rules! print_error {
+    ($x:expr $(, $more:expr)*) => {{
+        println!("{}", format!($x, $($more),*).red());
+        ::std::process::exit(1);
+    }}
+}
 
 fn ask_value(prompt: &str, default: &str, required: bool) -> String {
 	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
@@ -39,7 +49,7 @@ fn ask_value(prompt: &str, default: &str, required: bool) -> String {
 	}
 }
 
-pub fn create_template(project_name: Option<String>, location: Option<PathBuf>) {
+pub fn cli_create_template(project_name: Option<String>, location: Option<PathBuf>) {
 	let is_location_default = location.is_none();
 	let loc = match location {
 	    Some(s) => s,
@@ -76,9 +86,6 @@ pub fn create_template(project_name: Option<String>, location: Option<PathBuf>) 
 	let project_location = Path::new(&locstr);
 
 	let id = format!("com.{}.{}", developer.to_lowercase(), name.to_lowercase());
-
-	let mut binary_name = name.to_lowercase();
-	binary_name.retain(|c| !c.is_whitespace());
 	
 	println!(
 	    "Creating mod with ID {} named {} by {} version {} in {}",
@@ -124,51 +131,14 @@ pub fn create_template(project_name: Option<String>, location: Option<PathBuf>) 
 	);
 	bar.set_message(format!("{}", "Creating...".bright_cyan()));
 
-	match Repository::clone("https://github.com/geode-sdk/example-mod", &project_location) {
-	    Ok(_) => (),
-	    Err(e) => print_error!("Failed to clone template: {}", e),
-	};
-
-	fs::remove_dir_all(&project_location.join(".git")).unwrap();
-
-	for thing in fs::read_dir(&project_location).unwrap() {
-	    if !thing.as_ref().unwrap().metadata().unwrap().is_dir() {
-	        let file = thing.unwrap().path();
-	        let contents = fs::read_to_string(&file).unwrap().replace("$Template", &name);
-
-	        fs::write(file, contents).unwrap();
-	    }
-	}
-
-	match Repository::clone_recurse("https://github.com/geode-sdk/sdk", &project_location.join("sdk")) {
-	    Ok(_) => (),
-	    Err(e) => print_error!("Failed to clone sdk: {}", e),
-	};
-	
-	let mod_json = json!({
-	    "geode":        GEODE_VERSION,
-	    "version":      version,
-	    "id":           id,
-	    "name":         name,
-	    "developer":    developer,
-	    "description":  description,
-	    "details":      null,
-	    "credits":      null,
-	    "binary": {
-	        "*": binary_name
-	    },
-	    "dependencies": [
-	        {
-	            "id": "com.geode.api",
-	            "required": true
-	        }
-	    ]
-	});
-
-	fs::write(
-	    &project_location.join("mod.json"),
-	    to_string_pretty(&mod_json).unwrap()
-	).expect("Unable to write to specified project");
+	call_extern!(crate::link::geode_create_template(
+		string2c(project_location.to_str().unwrap()),
+		string2c(name),
+		string2c(version),
+		string2c(id),
+		string2c(developer),
+		string2c(description)
+	));
 
 	bar.finish_with_message(format!("{}", "Succesfully initialized project! Happy modding :)".bright_cyan()));
 }

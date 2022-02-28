@@ -1,26 +1,19 @@
+use crate::link::{string2c, opt2c};
 use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
-pub mod util;
-pub mod package;
-pub mod update;
-pub mod template;
+pub mod template_ui;
 pub mod config;
-pub mod windows_ansi;
-pub mod spritesheet;
-pub mod dither;
-pub mod install;
+pub mod link;
 
 #[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
 
-pub const GEODE_VERSION: i32 = 1;
 pub const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GEODE_CLI_NAME: &str = env!("CARGO_PKG_NAME");
-
 
 #[derive(Parser)]
 #[clap(version, long_about = None)]
@@ -53,13 +46,13 @@ enum Commands {
     /// into a .geode file
     Pkg {
         /// Path to the mod's mod.json file
-        resource_dir: PathBuf,
+        resource_dir: String,
         /// Path to the directory containing the mod's 
         /// platform binary.
-        exec_dir: PathBuf,
+        exec_dir: String,
 
         /// Path to put the generated .geode file
-        out_file: PathBuf,
+        out_file: String,
         
         /// Automatically copy the generated .geode 
         /// file to the Geode mods directory
@@ -130,27 +123,34 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::New { location, name } => template::create_template(name, location),
+        Commands::New { location, name } => template_ui::cli_create_template(name, location),
 
         Commands::About {} => {
             println!(
                 " == {} == \nGeode Version: {}\nCLI Version: {}\nGeode Installation: {}",
                 GEODE_CLI_NAME.to_string().green(),
-                GEODE_VERSION.to_string().red(),
+                unsafe {link::geode_version()}.to_string().red(),
                 GEODE_CLI_VERSION.to_string().yellow(),
                 Configuration::install_path().to_str().unwrap().purple()
             );
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => 
-            package::create_geode(
-                &resource_dir,
-                &exec_dir,
-                &out_file,
-                install,
-                true,
-                cached
-            ),
+        Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => {
+                call_extern!(link::geode_package(
+                    string2c(resource_dir),
+                    string2c(exec_dir),
+                    string2c(&out_file),
+                    true,
+                    cached
+                ));
+
+                if install {
+                    call_extern!(link::geode_install_package(
+                        string2c(Configuration::install_path().to_str().unwrap()),
+                        string2c(out_file)
+                    ));
+                }
+            },
 
         Commands::Config { path, dev } => {
             let mut some_set = false;
@@ -193,14 +193,27 @@ fn main() {
                     .template("{spinner:.cyan} {msg}"),
             );
             bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
-            let res = spritesheet::pack_sprites_in_dir(
-                &src, &dest, variants, name, prefix, 
-                Some(|s: &str| println!("{}", s.yellow().bold()))
-            ).unwrap();
+
+            let mut res = link::CPackInfo {
+                suffix_removals: 0,
+                created_files: std::ptr::null_mut()
+            };
+
+            call_extern!(link::geode_sprite_sheet(
+                string2c(src.to_str().unwrap()),
+                string2c(dest.to_str().unwrap()),
+                variants,
+                opt2c(name),
+                opt2c(prefix),
+                (&mut res) as *mut link::CPackInfo
+            ));
+
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
-            for file in res.created_files {
+
+            for file in res.get_files() {
                 println!("{} -> {}", "[ info ]".bright_yellow(), file);
             }
+
             println!("{} You might want to delete the tmp dirs",
                 "[ info ]".bright_yellow()
             );
@@ -224,21 +237,28 @@ fn main() {
                     .template("{spinner:.cyan} {msg}"),
             );
             bar.set_message(format!("{}", "Creating variants...".bright_cyan()));
-            spritesheet::create_variants_of_sprite(&src, &dest).unwrap();
+
+            call_extern!(link::geode_sprite_variants(
+                string2c(src.to_str().unwrap()),
+                string2c(dest.to_str().unwrap())
+            ));
             bar.finish_with_message(format!("{}", "Variants created!".bright_green()));
         },
 
         Commands::Update { version, check } => {
             if check {
-                match update::check_update(version, None) {
-                    Ok(_) => (),
-                    Err(a) => print_error!("{}", a)
-                }
+                let mut has = false;
+
+                call_extern!(link::geode_update_check(
+                    string2c(Configuration::install_path().to_str().unwrap()),
+                    opt2c(version),
+                    (&mut has) as *mut bool
+                ));
             } else {
-                match update::update_geode(version, None) {
-                    Ok(_) => (),
-                    Err(a) => print_error!("{}", a)
-                }
+                call_extern!(link::geode_update(
+                    string2c(Configuration::install_path().to_str().unwrap()),
+                    opt2c(version)
+                ));
             }
         },
 
@@ -254,7 +274,10 @@ fn main() {
         },
 
         Commands::Install {path} => {
-            install::install(&path)
+            let mut target_path = Configuration::install_path().join("geode").join("mods");
+            target_path = target_path.join(path.file_name().unwrap());
+
+            std::fs::rename(path, target_path).unwrap();
         }
     }
 }

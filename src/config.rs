@@ -1,3 +1,4 @@
+use std::io::Error;
 use std::process::exit;
 use std::path::Path;
 use std::path::PathBuf;
@@ -5,6 +6,51 @@ use std::fs;
 use std::io;
 use std::env::current_exe;
 use serde::{Serialize, Deserialize};
+use sysinfo::{ProcessExt, System, SystemExt};
+
+pub fn figure_out_gd_path() -> io::Result<PathBuf> {
+    let mut sys = System::new();
+    sys.refresh_processes();
+
+    if cfg!(windows) {
+    	let mut gd_procs = sys.processes_by_exact_name("GeometryDash.exe");
+	    let gd_proc = match gd_procs.next() {
+	        Some(e) => e,
+	        None => return Err(Error::new(io::ErrorKind::Other, "Please re-run with Geometry Dash open")),
+	    };
+
+	    if gd_procs.next().is_some() { 
+	    	return Err(Error::new(
+	    		io::ErrorKind::Other,
+	    		"It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance."
+	    	));
+	    }
+
+		Ok(PathBuf::from(gd_proc.exe()).parent().unwrap().to_path_buf())
+    } else if cfg!(target_os = "ios") {
+    	match std::env::var("HOME") {
+    		Ok(val) => Ok(PathBuf::from(val)),
+    		Err(_) => Err(Error::new(io::ErrorKind::Other, "Could not fetch $HOME variable, please set it."))
+    	}
+    } else if cfg!(target_os = "macos") {
+    	let mut gd_procs = sys.processes_by_exact_name("Geometry Dash");
+	    let gd_proc = match gd_procs.next() {
+	        Some(e) => e,
+	        None => return Err(Error::new(io::ErrorKind::Other, "Please re-run with Geometry Dash open")),
+	    };
+
+	    if gd_procs.next().is_some() { 
+	    	return Err(Error::new(
+	    		io::ErrorKind::Other,
+	    		"It seems there is more than one instance of Geometry Dash open. Please re-run with only one instance."
+	    	));
+	    }
+
+		Ok(PathBuf::from(gd_proc.exe()).parent().unwrap().parent().unwrap().to_path_buf())
+    } else {
+    	panic!("Unsupported");
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Configuration {
@@ -39,7 +85,7 @@ impl Configuration {
 				}
 
 				if CONFIG.install_path.is_none() {
-				    match crate::update::figure_out_gd_path() {
+				    match figure_out_gd_path() {
 				        Ok(install_path) => {
 				            CONFIG.install_path = Some(install_path);
 				            println!("Loaded default GD path automatically: {:?}", CONFIG.install_path.as_ref().unwrap());
