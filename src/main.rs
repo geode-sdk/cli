@@ -9,6 +9,9 @@ pub mod config;
 pub mod link;
 
 #[cfg(windows)]
+pub mod windows_ansi;
+
+#[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
 use crate::config::Configuration;
 
