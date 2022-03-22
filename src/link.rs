@@ -23,7 +23,7 @@ impl CPackInfo {
 	}
 }
 
-#[link(name = "geode_lib")]
+#[link(name = "libgeode.dll")]
 extern "C" {
 	pub fn geode_update(
 		location: *const c_char,

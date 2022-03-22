@@ -5,10 +5,9 @@ authors = ["HJfod <60038575+HJfod@users.noreply.github.com>", "Camila314 <ilaca3
 edition = "2018"
 
 [lib]
-name = "geode_lib"
+name = "libgeode"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
-
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [target.'cfg(windows)'.build-dependencies]

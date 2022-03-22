@@ -150,7 +150,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
         throw_error!("[mod.json].binary is empty!");
     }
 
-    let name = match &mod_json["name"] {
+    let _name = match &mod_json["name"] {
         Value::String(n) => n,
         Value::Null => throw_error!("[mod.json].name is empty!"),
         _ => throw_error!("[mod.json].name is not a string!")
@@ -255,14 +255,14 @@ pub fn install_geode(
 }
 
 pub fn create_geode(
-    resource_dir: &Path,
+    mod_src_dir: &Path,
     exec_dir: &Path,
     out_file: &Path,
     log: bool,
     use_cached_resources: bool
 ) -> Result<(), Box<dyn std::error::Error>> {
-	let mod_json = serde_json::from_str(&fs::read_to_string(resource_dir.join("mod.json"))?)?;
-    let modinfo = extract_mod_info(&mod_json, &resource_dir.to_path_buf())?;
+	let mod_json = serde_json::from_str(&fs::read_to_string(mod_src_dir.join("mod.json"))?)?;
+    let modinfo = extract_mod_info(&mod_json, &mod_src_dir.to_path_buf())?;
 
     println!("{}", 
         format!("Packaging {}", 
@@ -275,7 +275,6 @@ pub fn create_geode(
     let mut cache_data = CacheData {
         latest_gamesheet_file: HashMap::new()
     };
-
 
     if !use_cached_resources {
         fs::remove_dir_all(tmp_pkg).unwrap_or(());
@@ -309,16 +308,21 @@ pub fn create_geode(
         fs::copy(exec_dir.join(f), tmp_pkg.join(f))?;
     }
 
-    fs::copy(resource_dir.join("mod.json"), tmp_pkg.join("mod.json"))?;
+    fs::copy(mod_src_dir.join("mod.json"), tmp_pkg.join("mod.json"))?;
 
     if !tmp_pkg.join("resources").exists() {
         fs::create_dir_all(tmp_pkg.join("resources"))?;
     }
 
-    if resource_dir.join("logo.png").exists() {
+    if mod_src_dir.join("logo.png").exists() {
         println!("Creating variants of logo.png");
-        fs::copy(resource_dir.join("logo.png"), tmp_pkg.join(modinfo.id.clone() + ".png"))?;
+        fs::copy(mod_src_dir.join("logo.png"), tmp_pkg.join(modinfo.id.clone() + ".png"))?;
         throw_unwrap!(spritesheet::create_variants_of_sprite(&tmp_pkg.join(modinfo.id.clone() + ".png"), &tmp_pkg), "Could not create sprite variants");
+    }
+
+    if mod_src_dir.join("about.md").exists() {
+        println!("Found about.md, adding to package");
+        fs::copy(mod_src_dir.join("about.md"), tmp_pkg.join("about.md"))?;
     }
 
     for file in modinfo.resources.files {
