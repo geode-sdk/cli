@@ -4,3 +4,4 @@ mod.json
 list.json
 .DS_Store
 .cargo
+.vscode/

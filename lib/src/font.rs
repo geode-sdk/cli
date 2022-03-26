@@ -76,36 +76,77 @@ fn create_resized_bitmap_font_from_ttf(
 
     let mut packer = TexturePacker::new_skyline(config);
 
+    fn render_char_blend(
+        metrics: &fontdue::Metrics,
+        bitmap: &Vec<u8>,
+        offset_x: u32,
+        offset_y: u32,
+        luma: u8,
+        texture: &mut DynamicImage,
+    ) -> () {
+        for x in 0..metrics.width {
+            for y in 0..metrics.height {
+                texture.blend_pixel(x as u32 + offset_x, y as u32 + offset_y, image::Rgba([
+                    luma, luma, luma,
+                    bitmap[x + y * metrics.width]
+                ]));
+            }
+        }
+    }
+
+    fn render_char(
+        metrics: &fontdue::Metrics,
+        bitmap: &Vec<u8>,
+        offset_x: u32,
+        offset_y: u32,
+        luma: u8,
+        texture: &mut DynamicImage,
+    ) -> () {
+        for x in 0..metrics.width {
+            for y in 0..metrics.height {
+                texture.put_pixel(x as u32 + offset_x, y as u32 + offset_y, image::Rgba([
+                    luma, luma, luma,
+                    bitmap[x + y * metrics.width]
+                ]));
+            }
+        }
+    }
+
+    let shadow_offset = outline;
+
     for (ch, metrics, bitmap) in rendered_chars {
         if metrics.width == 0 || metrics.height == 0 {
             continue;
         }
         let mut texture = DynamicImage::new_rgba8(
-            metrics.width as u32 + outline * 2,
-            metrics.height as u32 + outline * 2
+            metrics.width as u32 + outline * 2 + shadow_offset,
+            metrics.height as u32 + outline * 2 + shadow_offset
         );
         if outline > 0 {
-            for x in 0..metrics.width {
-                for y in 0..metrics.height {
-                    for px in 0..outline * 2 * outline * 2 {
-                        let old_alpha = texture.get_pixel(x as u32, y as u32).channels4().3;
-                        let new_alpha = bitmap[x + y * metrics.width];
-                        if new_alpha > old_alpha {
-                            texture.put_pixel(x as u32 + outline, y as u32 + outline, image::Rgba([
-                                0, 0, 0, new_alpha
-                            ]));
-                        }
-                    }
+            for x in 0..outline*2 {
+                for y in 0..outline*2 {
+                    render_char_blend(
+                        &metrics, &bitmap,
+                        x + shadow_offset, y + shadow_offset,
+                        0, &mut texture
+                    );
                 }
             }
-        }
-        for x in 0..metrics.width {
-            for y in 0..metrics.height {
-                texture.put_pixel(x as u32 + outline, y as u32 + outline, image::Rgba([
-                    255, 255, 255,
-                    bitmap[x + y * metrics.width]
-                ]));
+            for x in 0..texture.width() {
+                for y in 0..texture.height() {
+                    let mut px = texture.get_pixel(x, y);
+                    px.channels_mut()[3] /= 3;
+                    texture.put_pixel(x, y, px);
+                }
             }
+            for x in 0..outline*2 {
+                for y in 0..outline*2 {
+                    render_char_blend(&metrics, &bitmap, x, y, 0, &mut texture);
+                }
+            }
+            render_char_blend(&metrics, &bitmap, outline, outline, 255, &mut texture);
+        } else {
+            render_char(&metrics, &bitmap, outline, outline, 255, &mut texture);
         }
         packer.pack_own(ch, texture).expect("Internal error packing font characters");
     }
@@ -141,10 +182,10 @@ pub fn create_bitmap_font_from_ttf(
             ttf_path, out_dir, (true_name.clone() + "-uhd").as_str(), fontsize, charset, outline
         ).unwrap();
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, (true_name.clone() + "-hd").as_str(), fontsize / 2, charset, outline
+            ttf_path, out_dir, (true_name.clone() + "-hd").as_str(), fontsize / 2, charset, outline / 2
         ).unwrap();
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, true_name.as_str(), fontsize / 4, charset, outline
+            ttf_path, out_dir, true_name.as_str(), fontsize / 4, charset, outline / 4
         ).unwrap();
         Ok(())
     } else {
