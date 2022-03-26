@@ -84,6 +84,7 @@ extern "C" {
 		prefix: *const c_char, // can be null
 		create_variants: bool,
 		charset: *const c_char, // can be null
+		outline: u32,
 	) -> *const c_char;
 }
 

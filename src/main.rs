@@ -105,6 +105,10 @@ enum Commands {
         /// Defaults to ASCII
         #[clap(long)]
         charset: Option<String>,
+        /// Font outline size, defaults to 0. If passed a number greater 
+        /// than 0, a black outline will be added to the font
+        #[clap(long, default_value_t = 0)]
+        outline: u32,
     },
 
     /// Create variants (High, Medium, Low) of a sprite
@@ -275,7 +279,7 @@ fn main() {
             bar.finish_with_message(format!("{}", "Variants created!".bright_green()));
         },
 
-        Commands::Font { ttf_path, dest, fontsize, name, variants, prefix, charset } => {
+        Commands::Font { ttf_path, dest, fontsize, name, variants, prefix, charset, outline } => {
             let bar = ProgressBar::new_spinner();
             bar.enable_steady_tick(120);
             bar.set_style(
@@ -302,6 +306,7 @@ fn main() {
                 opt2c(prefix),
                 variants,
                 opt2c(charset),
+                outline,
             ));
             bar.finish_with_message(format!("{}", "Bitmap font created!".bright_green()));
         },

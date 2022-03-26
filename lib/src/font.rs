@@ -4,7 +4,7 @@ use crate::throw_error;
 use std::vec;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::{TexturePacker, TexturePackerConfig};
-use image::{self, GenericImage, DynamicImage};
+use image::{self, Pixel, GenericImage, GenericImageView, DynamicImage};
 
 fn create_resized_bitmap_font_from_ttf(
     ttf_path: &Path,
@@ -12,6 +12,7 @@ fn create_resized_bitmap_font_from_ttf(
     name: &str,
     fontsize: u32,
     charset: Option<&str>,
+    outline: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     create_dir_all(out_dir).unwrap();
 
@@ -31,6 +32,7 @@ fn create_resized_bitmap_font_from_ttf(
         allow_rotation: false,
         texture_outlines: false,
         border_padding: 1,
+        trim: false,
         ..Default::default()
     };
 
@@ -78,10 +80,28 @@ fn create_resized_bitmap_font_from_ttf(
         if metrics.width == 0 || metrics.height == 0 {
             continue;
         }
-        let mut texture = DynamicImage::new_rgba8(metrics.width as u32, metrics.height as u32);
+        let mut texture = DynamicImage::new_rgba8(
+            metrics.width as u32 + outline * 2,
+            metrics.height as u32 + outline * 2
+        );
+        if outline > 0 {
+            for x in 0..metrics.width {
+                for y in 0..metrics.height {
+                    for px in 0..outline * 2 * outline * 2 {
+                        let old_alpha = texture.get_pixel(x as u32, y as u32).channels4().3;
+                        let new_alpha = bitmap[x + y * metrics.width];
+                        if new_alpha > old_alpha {
+                            texture.put_pixel(x as u32 + outline, y as u32 + outline, image::Rgba([
+                                0, 0, 0, new_alpha
+                            ]));
+                        }
+                    }
+                }
+            }
+        }
         for x in 0..metrics.width {
             for y in 0..metrics.height {
-                texture.put_pixel(x as u32, y as u32, image::Rgba([
+                texture.put_pixel(x as u32 + outline, y as u32 + outline, image::Rgba([
                     255, 255, 255,
                     bitmap[x + y * metrics.width]
                 ]));
@@ -105,6 +125,7 @@ pub fn create_bitmap_font_from_ttf(
     prefix: Option<&str>,
     create_variants: bool,
     charset: Option<&str>,
+    outline: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let true_prefix = match prefix {
         Some(s) => s,
@@ -117,18 +138,18 @@ pub fn create_bitmap_font_from_ttf(
 
     if create_variants {
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, (true_name.clone() + "-uhd").as_str(), fontsize, charset
+            ttf_path, out_dir, (true_name.clone() + "-uhd").as_str(), fontsize, charset, outline
         ).unwrap();
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, (true_name.clone() + "-hd").as_str(), fontsize / 2, charset
+            ttf_path, out_dir, (true_name.clone() + "-hd").as_str(), fontsize / 2, charset, outline
         ).unwrap();
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, true_name.as_str(), fontsize / 4, charset
+            ttf_path, out_dir, true_name.as_str(), fontsize / 4, charset, outline
         ).unwrap();
         Ok(())
     } else {
         create_resized_bitmap_font_from_ttf(
-            ttf_path, out_dir, (true_name + "-uhd").as_str(), fontsize, charset
+            ttf_path, out_dir, (true_name + "-uhd").as_str(), fontsize, charset, outline
         )
     }
 }

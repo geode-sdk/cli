@@ -203,6 +203,7 @@ pub unsafe extern "C" fn geode_create_bitmap_font_from_ttf(
 	prefix: *const c_char, // can be null
 	create_variants: bool,
 	charset: *const c_char, // can be null
+	outline: u32,
 ) -> *const c_char {
 	match crate::font::create_bitmap_font_from_ttf(
 		Path::new(c2string(ttf_path)),
@@ -212,6 +213,7 @@ pub unsafe extern "C" fn geode_create_bitmap_font_from_ttf(
 		c2option(prefix),
 		create_variants,
 		c2option(charset),
+		outline,
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => {

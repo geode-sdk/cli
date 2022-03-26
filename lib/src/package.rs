@@ -24,6 +24,7 @@ struct BMFont {
     ttf_src: PathBuf,
     charset: Option<String>,
     fontsize: u32,
+    outline: u32,
 }
 
 struct ModResources {
@@ -261,13 +262,21 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                                 _ => throw_error!("[mod.json].resources.fonts.{}.size is not an int!", bm_name)
                             };
                             let mut charset: Option<String> = None;
+                            let mut outline = 0u32;
                             for (key, val) in bm_obj {
                                 match key.as_str() {
                                     "charset" => {
                                         if val.is_string() {
                                             charset = Some(val.as_str().unwrap().to_string());
                                         } else {
-                                            throw_error!("[mod.json].resources.fonts.{}.charset is null, expected string!", bm_name);
+                                            throw_error!("[mod.json].resources.fonts.{}.charset is not a string!", bm_name);
+                                        }
+                                    },
+                                    "outline" => {
+                                        if val.is_u64() {
+                                            outline = val.as_u64().unwrap() as u32;
+                                        } else {
+                                            throw_error!("[mod.json].resources.fonts.{}.outline is not an integer!", bm_name);
                                         }
                                     },
                                     "size" => {},
@@ -282,6 +291,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                                 ttf_src: ttf_path,
                                 charset: charset,
                                 fontsize: fontsize,
+                                outline: outline,
                             });
                         }
                     },
@@ -467,6 +477,7 @@ pub fn create_geode(
             Some(&(modinfo.id.clone() + "_")),
             true,
             font.charset.as_deref(),
+            font.outline,
         ), "Could not create bitmap font");
     }
 
