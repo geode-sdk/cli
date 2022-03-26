@@ -3,8 +3,9 @@ use std::fs::File;
 use colored::Colorize;
 use glob::glob;
 use std::time::{Duration, SystemTime};
+use path_absolutize::Absolutize;
 
-use crate::{throw_error, throw_unwrap, spritesheet};
+use crate::{throw_error, throw_unwrap, spritesheet, font};
 
 use serde_json::{Value, json};
 
@@ -18,9 +19,18 @@ struct GameSheet {
     files: Vec<PathBuf>,
 }
 
+struct BMFont {
+    name: String,
+    ttf_src: PathBuf,
+    charset: Option<String>,
+    fontsize: u32,
+}
+
 struct ModResources {
-    files: Vec<PathBuf>,
+    raw_files: Vec<PathBuf>,
+    prefixed_files: Vec<PathBuf>,
     sheets: Vec<GameSheet>,
+    fonts: Vec<BMFont>,
 }
 
 struct ModInfo {
@@ -60,6 +70,9 @@ impl CacheData {
         }
         let mut res = false;
         for file in files {
+            if !file.exists() {
+                throw_error!("File {} does not exist (from cache check)", file.absolutize().unwrap().to_str().unwrap());
+            }
             let modified_date = fs::metadata(file)?.modified()?.duration_since(SystemTime::UNIX_EPOCH)?;
 
             if !self.latest_gamesheet_file.contains_key(sheet) ||
@@ -164,11 +177,29 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
 
     let resources = match &mod_json["resources"] {
         Value::Object(res_object) => {
-            let mut files: Vec<PathBuf> = vec![];
+            let mut raw_files: Vec<PathBuf> = vec![];
+            let mut prefixed: Vec<PathBuf> = vec![];
             let mut sheets: Vec<GameSheet> = vec![];
+            let mut fonts: Vec<BMFont> = vec![];
 
             for (key, value) in res_object {
                 match key.as_str() {
+                    "raw" => {
+                        for path in value.as_array().ok_or("[mod.json].resources.raw is not an array!")? {
+                            if path.is_string() {
+                                let mut search_path = Path::new(&path.as_str().unwrap()).to_path_buf();
+                                if search_path.is_relative() {
+                                    search_path = mod_json_location.join(search_path);
+                                }
+                                raw_files.extend(
+                                    glob(search_path.to_str().unwrap())
+                                    ?.map(|x| x.unwrap())
+                                );
+                            } else {
+                                throw_error!("[mod.json].resources.raw: Expected item to be 'string', but it was not");
+                            }
+                        }
+                    },
                     "files" => {
                         for path in value.as_array().ok_or("[mod.json].resources.files is not an array!")? {
                             if path.is_string() {
@@ -176,7 +207,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                                 if search_path.is_relative() {
                                     search_path = mod_json_location.join(search_path);
                                 }
-                                files.extend(
+                                prefixed.extend(
                                     glob(search_path.to_str().unwrap())
                                     ?.map(|x| x.unwrap())
                                 );
@@ -188,7 +219,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                     "spritesheets" => {
                         for (sheet_name, sheet_files) in value.as_object().unwrap() {
                             let mut sheet_paths: Vec<PathBuf> = vec!();
-                            for path in sheet_files.as_array().ok_or(format!("[mod.json].resources.spritesheets.{} is not an array!", sheet_name).as_str())? {
+                            for path in sheet_files.as_array().ok_or(
+                                format!("[mod.json].resources.spritesheets.{} is not an array!", sheet_name).as_str()
+                            )? {
                                 if path.is_string() {
                                     let mut search_path = Path::new(&path.as_str().unwrap()).to_path_buf();
                                     if search_path.is_relative() {
@@ -199,12 +232,56 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                                         ?.map(|x| x.unwrap())
                                     );
                                 } else {
-                                    throw_error!("[mod.json].resources.spritesheets.{}: Expected item to be 'string', but it was not", sheet_name);
+                                    throw_error!(
+                                        "[mod.json].resources.spritesheets.{}: Expected item to be 'string', but it was not",
+                                        sheet_name
+                                    );
                                 }
                             }
                             sheets.push(GameSheet {
                                 name: sheet_name.clone(),
                                 files: sheet_paths,
+                            });
+                        }
+                    },
+                    "fonts" => {
+                        for (bm_name, bm_json) in value.as_object().unwrap() {
+                            let bm_obj = bm_json.as_object().unwrap();
+                            let mut ttf_path = Path::new(match &bm_obj["path"] {
+                                Value::String(n) => n,
+                                Value::Null => throw_error!("[mod.json].resources.fonts.{}.path is empty!", bm_name),
+                                _ => throw_error!("[mod.json].resources.fonts.{}.id is not a string!", bm_name)
+                            }).to_path_buf();
+                            if ttf_path.is_relative() {
+                                ttf_path = mod_json_location.join(ttf_path);
+                            }
+                            let fontsize: u32 = match &bm_obj["size"] {
+                                Value::Number(n) => n.as_u64().unwrap() as u32,
+                                Value::Null => throw_error!("[mod.json].resources.fonts.{}.size is null!", bm_name),
+                                _ => throw_error!("[mod.json].resources.fonts.{}.size is not an int!", bm_name)
+                            };
+                            let mut charset: Option<String> = None;
+                            for (key, val) in bm_obj {
+                                match key.as_str() {
+                                    "charset" => {
+                                        if val.is_string() {
+                                            charset = Some(val.as_str().unwrap().to_string());
+                                        } else {
+                                            throw_error!("[mod.json].resources.fonts.{}.charset is null, expected string!", bm_name);
+                                        }
+                                    },
+                                    "size" => {},
+                                    "path" => {},
+                                    _ => {
+                                        throw_error!("[mod.json].resources.fonts.{}: Unknown key {}", bm_name, key);
+                                    }
+                                }
+                            }
+                            fonts.push(BMFont {
+                                name: bm_name.clone(),
+                                ttf_src: ttf_path,
+                                charset: charset,
+                                fontsize: fontsize,
                             });
                         }
                     },
@@ -215,14 +292,18 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
             }
 
             ModResources {
-                files: files,
+                raw_files: raw_files,
+                prefixed_files: prefixed,
                 sheets: sheets,
+                fonts: fonts,
             }
         },
         _ => {
             ModResources {
-                files: vec!(),
+                raw_files: vec!(),
+                prefixed_files: vec!(),
                 sheets: vec!(),
+                fonts: vec!(),
             }
         }
     };
@@ -259,7 +340,7 @@ pub fn create_geode(
     exec_dir: &Path,
     out_file: &Path,
     log: bool,
-    use_cached_resources: bool
+    use_cached_resources: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mod_json = serde_json::from_str(&fs::read_to_string(mod_src_dir.join("mod.json"))?)?;
     let modinfo = extract_mod_info(&mod_json, &mod_src_dir.to_path_buf())?;
@@ -317,7 +398,9 @@ pub fn create_geode(
     if mod_src_dir.join("logo.png").exists() {
         println!("Creating variants of logo.png");
         fs::copy(mod_src_dir.join("logo.png"), tmp_pkg.join(modinfo.id.clone() + ".png"))?;
-        throw_unwrap!(spritesheet::create_variants_of_sprite(&tmp_pkg.join(modinfo.id.clone() + ".png"), &tmp_pkg), "Could not create sprite variants");
+        throw_unwrap!(spritesheet::create_variants_of_sprite(
+            &tmp_pkg.join(modinfo.id.clone() + ".png"), &tmp_pkg, None
+        ), "Could not create sprite variants");
     }
 
     if mod_src_dir.join("about.md").exists() {
@@ -325,7 +408,16 @@ pub fn create_geode(
         fs::copy(mod_src_dir.join("about.md"), tmp_pkg.join("about.md"))?;
     }
 
-    for file in modinfo.resources.files {
+    for file in modinfo.resources.raw_files {
+        let file_name = &file.file_name().unwrap().to_str().unwrap();
+        if !cache_data.are_any_of_these_later(&file_name, &[file.clone()])? {
+            println!("Skipping {} as no changes were detected", file_name.yellow().bold());
+            continue;
+        }
+        fs::copy(&file, &tmp_pkg.join("resources").join(&file_name))?;
+    }
+
+    for file in modinfo.resources.prefixed_files {
         let file_name = &file.file_name().unwrap().to_str().unwrap();
         if !cache_data.are_any_of_these_later(&file_name, &[file.clone()])? {
             println!("Skipping {} as no changes were detected", file_name.yellow().bold());
@@ -334,9 +426,11 @@ pub fn create_geode(
 
         if spritesheet::is_image(&file) {
             println!("Creating variants of {}", &file_name);
-            throw_unwrap!(spritesheet::create_variants_of_sprite(&file, &tmp_pkg.join("resources")), "Could not create sprite variants");
+            throw_unwrap!(spritesheet::create_variants_of_sprite(
+                &file, &tmp_pkg.join("resources"), Some(&(modinfo.id.clone() + "_"))
+            ), "Could not create sprite variants");
         } else {
-            fs::copy(&file, &tmp_pkg.join("resources").join(&file_name))?;
+            fs::copy(&file, &tmp_pkg.join("resources").join(modinfo.id.clone() + "_" + file_name))?;
         }
     }
 
@@ -353,8 +447,27 @@ pub fn create_geode(
             &tmp_pkg.join("resources"),
             true,
             Some(&sheet.name),
-            Some(&(modinfo.id.clone() + "_")
-        )), "Could not pack sprites");
+            Some(&(modinfo.id.clone() + "_")),
+        ), "Could not pack sprites");
+    }
+
+    for font in modinfo.resources.fonts {
+        // if !cache_data.are_any_of_these_later(&font.name, &[font.ttf_src.clone()])? {
+        //     println!("Skipping processing {} as no changes were detected", font.name.yellow().bold());
+        //     continue;
+        // }
+        if log {
+            println!("Creating bitmap font from {}", font.name.yellow().bold());
+        }
+        throw_unwrap!(font::create_bitmap_font_from_ttf(
+            &Path::new(&font.ttf_src),
+            &tmp_pkg.join("resources"),
+            Some(&font.name),
+            font.fontsize,
+            Some(&(modinfo.id.clone() + "_")),
+            true,
+            font.charset.as_deref(),
+        ), "Could not create bitmap font");
     }
 
     let mut zip = zip::ZipWriter::new(File::create(out_file)?);

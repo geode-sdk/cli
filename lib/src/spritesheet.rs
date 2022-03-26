@@ -185,7 +185,13 @@ fn pack_sprites_with_suffix(in_files: Vec<PathBuf>, out_dir: &Path, name: Option
     return pack_sprites_to_file(in_files, out_dir, &actual_name);
 }
 
-fn create_resized_sprites(in_files: &[PathBuf], out_dir: &Path, downscale: u32, prefix: Option<&str>, suffix: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn create_resized_sprites(
+    in_files: &[PathBuf],
+    out_dir: &Path,
+    downscale: u32,
+    prefix: Option<&str>,
+    suffix: &str
+) -> Result<(), Box<dyn std::error::Error>> {
     create_dir_all(out_dir).unwrap();
 
     for path in in_files {
@@ -277,11 +283,15 @@ pub fn pack_sprites_in_dir(
     pack_sprites(read_sprites(in_dir), out_dir, create_variants, name, prefix)
 }
 
-pub fn create_variants_of_sprite(file: &Path, out_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_variants_of_sprite(
+    file: &Path,
+    out_dir: &Path,
+    prefix: Option<&str>
+) -> Result<(), Box<dyn std::error::Error>> {
     let in_files = vec!(file.to_path_buf());
-    create_resized_sprites(&in_files, out_dir, 1, None, "-uhd").unwrap();
-    create_resized_sprites(&in_files, out_dir, 2, None, "-hd").unwrap();
-    create_resized_sprites(&in_files, out_dir, 4, None, "").unwrap();
+    create_resized_sprites(&in_files, out_dir, 1, prefix, "-uhd").unwrap();
+    create_resized_sprites(&in_files, out_dir, 2, prefix, "-hd").unwrap();
+    create_resized_sprites(&in_files, out_dir, 4, prefix, "").unwrap();
     Ok(())
 }
 

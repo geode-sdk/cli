@@ -52,7 +52,7 @@ extern "C" {
 	    exec_dir: *const c_char,
 	    out_file: *const c_char,
 	    log: bool,
-	    use_cached_resources: bool
+	    use_cached_resources: bool,
 	) -> *const c_char;
 
 	pub fn geode_install_package(
@@ -72,7 +72,18 @@ extern "C" {
 
 	pub fn geode_sprite_variants(
 		file: *const c_char,
-		out_dir: *const c_char
+		out_dir: *const c_char,
+		prefix: *const c_char // can be null
+	) -> *const c_char;
+
+	pub fn geode_create_bitmap_font_from_ttf(
+		ttf_path: *const c_char,
+		out_dir: *const c_char,
+		name: *const c_char, // can be null
+		fontsize: u32,
+		prefix: *const c_char, // can be null
+		create_variants: bool,
+		charset: *const c_char, // can be null
 	) -> *const c_char;
 }
 
@@ -82,7 +93,7 @@ macro_rules! call_extern {
 		unsafe {
 			let y = $x;
 			if !(y == std::ptr::null()) {
-				println!("{}", std::ffi::CStr::from_ptr(y).to_str().unwrap().red());
+				println!("Extern function call failed: {}", std::ffi::CStr::from_ptr(y).to_str().unwrap().red());
 			}
 		}
 	}}

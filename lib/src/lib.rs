@@ -5,6 +5,7 @@ pub mod template;
 pub mod windows_ansi;
 pub mod spritesheet;
 pub mod dither;
+pub mod font;
 
 use std::path::Path;
 
@@ -103,13 +104,14 @@ pub unsafe extern "C" fn geode_package(
     exec_dir: *const c_char,
     out_file: *const c_char,
     log: bool,
-    use_cached_resources: bool) -> *const c_char {
+    use_cached_resources: bool,
+) -> *const c_char {
 	match crate::package::create_geode(
 		Path::new(c2string(resource_dir)),
 		Path::new(c2string(exec_dir)),
 		Path::new(c2string(out_file)),
 		log,
-		use_cached_resources
+		use_cached_resources,
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => {
@@ -177,11 +179,39 @@ pub unsafe extern "C" fn geode_sprite_sheet(
 #[no_mangle]
 pub unsafe extern "C" fn geode_sprite_variants(
 	file: *const c_char,
-	out_dir: *const c_char
+	out_dir: *const c_char,
+	prefix: *const c_char // can be null
 ) -> *const c_char {
 	match crate::spritesheet::create_variants_of_sprite(
 		Path::new(c2string(file)),
-		Path::new(c2string(out_dir))
+		Path::new(c2string(out_dir)),
+		c2option(prefix)
+	) {
+		Ok(_) => std::ptr::null(),
+		Err(b) => {
+			string2c(b)
+		}
+	}
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn geode_create_bitmap_font_from_ttf(
+	ttf_path: *const c_char,
+	out_dir: *const c_char,
+	name: *const c_char, // can be null
+	fontsize: u32,
+	prefix: *const c_char, // can be null
+	create_variants: bool,
+	charset: *const c_char, // can be null
+) -> *const c_char {
+	match crate::font::create_bitmap_font_from_ttf(
+		Path::new(c2string(ttf_path)),
+		Path::new(c2string(out_dir)),
+		c2option(name),
+		fontsize,
+		c2option(prefix),
+		create_variants,
+		c2option(charset),
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => {

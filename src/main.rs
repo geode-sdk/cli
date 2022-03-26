@@ -84,12 +84,38 @@ enum Commands {
         prefix: Option<String>,
     },
 
+    /// Create a bitmap font out of a TTF file
+    Font {
+        /// Path to TTF font
+        ttf_path: PathBuf,
+        /// Font size
+        fontsize: u32,
+        /// Font name, if not specified defaults to same name as TTF
+        name: Option<String>,
+        /// Path to directory where to put the resulting bitmap font files
+        #[clap(short, long)]
+        dest: Option<PathBuf>,
+        /// Create variants (High, Medium, Low)
+        #[clap(short, long)]
+        variants: bool,
+        /// Prefix
+        #[clap(long)]
+        prefix: Option<String>,
+        /// Character set; for example 0-0,8-9,13,29,32-126,160-255. 
+        /// Defaults to ASCII
+        #[clap(long)]
+        charset: Option<String>,
+    },
+
     /// Create variants (High, Medium, Low) of a sprite
     Sprite {
         /// Path to the sprite
         src: PathBuf,
         /// Path to directory where to put the resulting sprites
         dest: PathBuf,
+        /// Prefix
+        #[clap(long)]
+        prefix: Option<String>
     },
 
     Info {
@@ -144,7 +170,7 @@ fn main() {
                     string2c(exec_dir),
                     string2c(&out_file),
                     true,
-                    cached
+                    cached,
                 ));
 
                 if install {
@@ -222,7 +248,7 @@ fn main() {
             );
         },
 
-        Commands::Sprite { src, dest } => {
+        Commands::Sprite { src, dest, prefix } => {
             let bar = ProgressBar::new_spinner();
             bar.enable_steady_tick(120);
             bar.set_style(
@@ -243,9 +269,41 @@ fn main() {
 
             call_extern!(link::geode_sprite_variants(
                 string2c(src.to_str().unwrap()),
-                string2c(dest.to_str().unwrap())
+                string2c(dest.to_str().unwrap()),
+                opt2c(prefix)
             ));
             bar.finish_with_message(format!("{}", "Variants created!".bright_green()));
+        },
+
+        Commands::Font { ttf_path, dest, fontsize, name, variants, prefix, charset } => {
+            let bar = ProgressBar::new_spinner();
+            bar.enable_steady_tick(120);
+            bar.set_style(
+                ProgressStyle::default_spinner()
+                    .tick_strings(&[
+                        "[##    ]",
+                        "[###   ]",
+                        "[####  ]",
+                        "[ #### ]",
+                        "[   ###]",
+                        "[    ##]",
+                        "[#    #]",
+                        "[ done ]",
+                    ])
+                    .template("{spinner:.cyan} {msg}"),
+            );
+            bar.set_message(format!("{}", "Creating font...".bright_cyan()));
+
+            call_extern!(link::geode_create_bitmap_font_from_ttf(
+                string2c(ttf_path.to_str().unwrap()),
+                string2c(dest.unwrap_or(std::env::current_dir().unwrap()).to_str().unwrap()),
+                opt2c(name),
+                fontsize,
+                opt2c(prefix),
+                variants,
+                opt2c(charset),
+            ));
+            bar.finish_with_message(format!("{}", "Bitmap font created!".bright_green()));
         },
 
         Commands::Update { version, check } => {
