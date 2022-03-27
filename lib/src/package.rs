@@ -481,6 +481,8 @@ pub fn create_geode(
         ), "Could not create bitmap font");
     }
 
+    println!("Zipping...");
+
     let mut zip = zip::ZipWriter::new(File::create(out_file)?);
 
     let cwd = std::env::current_dir()?;

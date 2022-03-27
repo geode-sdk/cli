@@ -5,6 +5,11 @@ use std::vec;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::{TexturePacker, TexturePackerConfig};
 use image::{self, Pixel, GenericImage, GenericImageView, DynamicImage};
+use texture_packer::texture::Texture;
+
+fn point_in_circle(x: i32, y: i32, r: u32) -> bool {
+    return ((x.pow(2) + y.pow(2)) as f64).sqrt() < r as f64;
+}
 
 fn create_resized_bitmap_font_from_ttf(
     ttf_path: &Path,
@@ -12,13 +17,13 @@ fn create_resized_bitmap_font_from_ttf(
     name: &str,
     fontsize: u32,
     charset: Option<&str>,
-    outline: u32,
+    outline_dia: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     create_dir_all(out_dir).unwrap();
 
     let true_charset = match charset {
         Some(s) => s,
-        None => "32-126"
+        None => "32-126,8226" // same as bigFont.fnt
     };
 
     let ttf_data = fs::read(ttf_path).unwrap();
@@ -112,48 +117,201 @@ fn create_resized_bitmap_font_from_ttf(
         }
     }
 
-    let shadow_offset = outline;
+    let outline = outline_dia / 2;
+    let use_shadow = outline > 0;
+    let shadow_offset = if use_shadow { outline * 2 + 2 } else { 0 };
+    let shadow_pad = if use_shadow { 2 } else { 0 };
 
-    for (ch, metrics, bitmap) in rendered_chars {
+    let mut largest_height = 0;
+
+    for (ch, metrics, bitmap) in &rendered_chars {
         if metrics.width == 0 || metrics.height == 0 {
             continue;
         }
-        let mut texture = DynamicImage::new_rgba8(
-            metrics.width as u32 + outline * 2 + shadow_offset,
-            metrics.height as u32 + outline * 2 + shadow_offset
-        );
+        let texture_width = metrics.width as u32 + outline * 2 + shadow_offset + shadow_pad;
+        let texture_height = metrics.height as u32 + outline * 2 + shadow_offset + shadow_pad;
+        let mut texture = DynamicImage::new_rgba8(texture_width, texture_height);
+        let mut outline_texture = DynamicImage::new_rgba8(texture_width, texture_height);
+        if texture_height > largest_height {
+            largest_height = texture_height;
+        }
         if outline > 0 {
-            for x in 0..outline*2 {
-                for y in 0..outline*2 {
-                    render_char_blend(
-                        &metrics, &bitmap,
-                        x + shadow_offset, y + shadow_offset,
-                        0, &mut texture
+            if use_shadow {
+                // draw buldged version for shadow
+                for x in 0..outline*2 {
+                    for y in 0..outline*2 {
+                        if point_in_circle(
+                            x as i32 - outline as i32,
+                            y as i32 - outline as i32,
+                            outline
+                        ) {
+                            render_char_blend(
+                                &metrics, &bitmap,
+                                x + shadow_offset, y + shadow_offset,
+                                0, &mut texture
+                            );
+                        }
+                    }
+                }
+                // lower opacity of drawn pixels
+                for x in 0..GenericImageView::width(&texture) {
+                    for y in 0..GenericImageView::height(&texture) {
+                        let mut px = texture.get_pixel(x, y);
+                        px.channels_mut()[3] = (px.channels()[3] as f32 / 2.7f32) as u8;
+                        texture.put_pixel(x, y, px);
+                    }
+                }
+                // if you look at bigFont, you can see the 
+                // shadow is slightly blurred
+                texture = texture.blur(1.5);
+            }
+            // draw character itself
+            render_char_blend(&metrics, &bitmap, outline, outline, 255, &mut texture);
+            // draw outline
+            for x in 0..metrics.width {
+                for y in 0..metrics.height {
+                    let ix = x + y * metrics.width;
+                    let alpha = bitmap[ix];
+                    let next_alpha = if ix + 1 < metrics.width * metrics.height { bitmap[ix + 1] } else { 0 };
+                    let prev_alpha = if ix > 0 { bitmap[ix - 1] } else { 0 };
+                    let above_alpha = if ix >= metrics.width { bitmap[ix - metrics.width] } else { 0 };
+                    let below_alpha = if ix < metrics.width * (metrics.height - 1) { bitmap[ix + metrics.width] } else { 0 };
+                    let on_edge: bool;
+                    if alpha == 255 {
+                        on_edge =
+                            prev_alpha != 255 ||
+                            next_alpha != 255 ||
+                            above_alpha != 255 ||
+                            below_alpha != 255;
+                    } else {
+                        on_edge =
+                            prev_alpha == 255 ||
+                            next_alpha == 255 ||
+                            above_alpha == 255 ||
+                            below_alpha == 255;
+                    }
+                    if on_edge {
+                        imageproc::drawing::draw_filled_circle_mut(
+                            &mut outline_texture,
+                            (
+                                x as i32 + outline as i32,
+                                y as i32 + outline as i32
+                            ),
+                            outline as i32,
+                            image::Rgba([0u8, 0u8, 0u8, 255u8])
+                        );
+                    }
+                }
+            }
+            // https://stackoverflow.com/questions/485800/algorithm-for-drawing-an-anti-aliased-circle
+            // anti_alised_matrix[x][y] = point[x][y] / 2 + point[x+1][y]/8 + point[x-1][y]/8 + point[x][y-1]/8 + point[x][y+1]/8;
+            let mut antialised_outline_texture = DynamicImage::new_rgba8(
+                metrics.width as u32 + outline * 2 + shadow_offset + shadow_pad,
+                metrics.height as u32 + outline * 2 + shadow_offset + shadow_pad
+            );
+            for x in 0..GenericImageView::width(&antialised_outline_texture) {
+                for y in 0..GenericImageView::height(&antialised_outline_texture) {
+                    antialised_outline_texture.put_pixel(
+                        x as u32, y as u32, 
+                        image::Rgba([
+                            0u8, 0u8, 0u8,
+                            outline_texture.get_pixel(x, y).channels()[3] / 2 +
+                            if x < GenericImageView::width(&antialised_outline_texture) - 1 {
+                                outline_texture.get_pixel(x + 1, y).channels()[3] / 8
+                            } else { 0 } +
+                            if x > 0 {
+                                outline_texture.get_pixel(x - 1, y).channels()[3] / 8
+                            } else { 0 } +
+                            if y < GenericImageView::height(&antialised_outline_texture) - 1 {
+                                outline_texture.get_pixel(x, y + 1).channels()[3] / 8
+                            } else { 0 } +
+                            if y > 0 {
+                                outline_texture.get_pixel(x, y - 1).channels()[3] / 8
+                            } else { 0 }
+                        ])
                     );
                 }
             }
-            for x in 0..texture.width() {
-                for y in 0..texture.height() {
-                    let mut px = texture.get_pixel(x, y);
-                    px.channels_mut()[3] /= 3;
-                    texture.put_pixel(x, y, px);
-                }
-            }
-            for x in 0..outline*2 {
-                for y in 0..outline*2 {
-                    render_char_blend(&metrics, &bitmap, x, y, 0, &mut texture);
-                }
-            }
-            render_char_blend(&metrics, &bitmap, outline, outline, 255, &mut texture);
+            image::imageops::overlay(&mut texture, &antialised_outline_texture, 0, 0);
         } else {
             render_char(&metrics, &bitmap, outline, outline, 255, &mut texture);
         }
         packer.pack_own(ch, texture).expect("Internal error packing font characters");
     }
+
+    let line_metrics = font.horizontal_line_metrics(fontsize as f32).unwrap();
+    let mut fnt_data = format!(
+        concat!(
+            "info face=\"{font_name}\" size={font_size} bold=0 italic=0 ",
+            "charset=\"\" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1\n",
+            "common lineHeight={common_line_height} base={font_base} ",
+            "scaleW={scale_w} scaleH={scale_h} pages=1 packed=0\n",
+            "page id=0 file=\"{sprite_file_name}\"\n"
+        ),
+        font_name = ttf_path.file_name().unwrap().to_str().unwrap(),
+        font_size = fontsize,
+        common_line_height = largest_height as u32,
+        font_base = (-line_metrics.descent + line_metrics.line_gap) as i32,
+        scale_w = packer.width(),
+        scale_h = packer.height(),
+        sprite_file_name = format!("{}.png", name)
+    );
+    let mut fnt_chars_data: Vec<String> = vec!();
+    let mut fnt_kernings_data: Vec<String> = vec!();
+
+    fnt_chars_data.push(format!(
+        "char id=32 x=0 y=0 width=0 height=0 xoffset=0 yoffset=0 xadvance={} page=0 chnl=0\n",
+        font.metrics(' ', fontsize as f32).advance_width
+    ));
+
+    for (name, frame) in packer.get_frames() {
+        let metrics = font.metrics(std::char::from_u32(**name).unwrap(), fontsize as f32);
+        fnt_chars_data.push(format!(
+            "char id={} x={} y={} width={} height={} xoffset={} yoffset={} xadvance={} page=0 chnl=0\n",
+            name,
+            frame.frame.x as i32,
+            frame.frame.y as i32,
+            frame.frame.w as i32,
+            frame.frame.h as i32,
+            metrics.xmin,
+            fontsize as i32 - metrics.height as i32 - metrics.ymin,
+            metrics.advance_width as i32
+        ));
+    }
+
+    fnt_data.push_str(&format!("chars count={}\n", fnt_chars_data.len()));
+    for char_data in fnt_chars_data {
+        fnt_data.push_str(&char_data);
+    }
+
+    for (ch_left, _, _) in &rendered_chars {
+        for (ch_right, _, _) in &rendered_chars {
+            let kern = font.horizontal_kern(
+                std::char::from_u32(*ch_left).unwrap(),
+                std::char::from_u32(*ch_right).unwrap(),
+                fontsize as f32
+            );
+            if kern.is_some() {
+                fnt_kernings_data.push(format!(
+                    "kerning first={} second={} amount={}\n",
+                    ch_left,
+                    ch_right,
+                    kern.unwrap() as i32
+                ));
+            }
+        }
+    }
+
+    fnt_data.push_str(&format!("kernings count={}\n", fnt_kernings_data.len()));
+    for kerning_data in fnt_kernings_data {
+        fnt_data.push_str(&kerning_data);
+    }
     
     let exporter = ImageExporter::export(&packer).unwrap();
     let mut f = File::create(out_dir.join(format!("{}.png", name))).unwrap();
     exporter.write_to(&mut f, image::ImageFormat::Png)?;
+
+    fs::write(out_dir.join(format!("{}.fnt", name)), fnt_data)?;
 
     Ok(())
 }
