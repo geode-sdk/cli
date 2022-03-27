@@ -239,7 +239,13 @@ fn create_resized_bitmap_font_from_ttf(
         packer.pack_own(ch, texture).expect("Internal error packing font characters");
     }
 
+    
     let line_metrics = font.horizontal_line_metrics(fontsize as f32).unwrap();
+    let new_line_size = if largest_height > line_metrics.new_line_size as u32 {
+        largest_height
+    } else {
+        line_metrics.new_line_size as u32
+    };
     let mut fnt_data = format!(
         concat!(
             "info face=\"{font_name}\" size={font_size} bold=0 italic=0 ",
@@ -250,7 +256,7 @@ fn create_resized_bitmap_font_from_ttf(
         ),
         font_name = ttf_path.file_name().unwrap().to_str().unwrap(),
         font_size = fontsize,
-        common_line_height = largest_height as u32,
+        common_line_height = new_line_size,
         font_base = (-line_metrics.descent + line_metrics.line_gap) as i32,
         scale_w = packer.width(),
         scale_h = packer.height(),
