@@ -23,8 +23,8 @@ impl CPackInfo {
 	}
 }
 
-#[cfg(windows)]
-#[link(name = "libgeode.dll")]
+// #[cfg(windows)]
+// #[link(name = "libgeode.dll")]
 #[cfg(not(windows))]
 #[link(name = "libgeode")]
 extern "C" {
