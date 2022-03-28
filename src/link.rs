@@ -23,7 +23,10 @@ impl CPackInfo {
 	}
 }
 
+#[cfg(windows)]
 #[link(name = "libgeode.dll")]
+#[cfg(not(windows))]
+#[link(name = "libgeode")]
 extern "C" {
 	pub fn geode_update(
 		location: *const c_char,
