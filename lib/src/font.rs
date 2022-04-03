@@ -58,7 +58,7 @@ fn create_resized_bitmap_font_from_ttf(
             start = range.parse().unwrap();
             end = start;
         }
-        for i in start..end {
+        for i in start..(end + 1) {
             let (metrics, px) = font.rasterize(std::char::from_u32(i).unwrap(), fontsize as f32);
             if metrics.width > largest_width as usize {
                 largest_width = metrics.width as u32 + 10;
