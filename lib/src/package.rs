@@ -32,6 +32,7 @@ struct ModResources {
     prefixed_files: Vec<PathBuf>,
     sheets: Vec<GameSheet>,
     fonts: Vec<BMFont>,
+    font_jsons: HashMap<String, Value>,
 }
 
 struct ModInfo {
@@ -42,7 +43,8 @@ struct ModInfo {
 }
 
 struct CacheData {
-    latest_gamesheet_file: HashMap<String, Duration>,
+    latest_file: HashMap<String, Duration>,
+    latest_json: HashMap<String, Value>,
 }
 
 impl CacheData {
@@ -50,8 +52,12 @@ impl CacheData {
         let json: Value = serde_json::from_str(&fs::read_to_string(file)?)?;
 
         for (k, v) in json.as_object().unwrap() {
-            let time = Duration::from_secs(v.as_u64().unwrap());
-            self.latest_gamesheet_file.insert(k.to_string(), time);
+            if v.is_u64() {
+                let time = Duration::from_secs(v.as_u64().unwrap());
+                self.latest_file.insert(k.to_string(), time);
+            } else if v.is_object() {
+                self.latest_json.insert(k.to_string(), v.clone());
+            }
         }
 
         Ok(())
@@ -59,13 +65,41 @@ impl CacheData {
 
     fn to_json_string(&self) -> String {
         let mut json = json!({});
-        for (k, v) in &self.latest_gamesheet_file {
+        for (k, v) in &self.latest_file {
             json[k] = serde_json::to_value(v.as_secs()).unwrap();
+        }
+        for (k, v) in &self.latest_json {
+            json[k] = v.clone();
         }
         json.to_string()
     }
 
-    fn are_any_of_these_later(&mut self, sheet: &str, files: &[PathBuf]) -> Result<bool, Box<dyn std::error::Error>> {
+    fn is_this_json_different_or_file_later(&mut self, json: &Value, key: &str, file: &PathBuf)
+        -> Result<bool, Box<dyn std::error::Error>> {
+        if file.exists() {
+            let modified_date = fs::metadata(file)?.modified()?.duration_since(SystemTime::UNIX_EPOCH)?;
+            let mut latest_json_key = key.to_string();
+            latest_json_key.push_str("_json");
+            if !self.latest_json.contains_key(&latest_json_key) {
+                self.latest_json.insert(latest_json_key, json.clone());
+                self.latest_file.insert(key.to_string(), modified_date);
+                return Ok(true);
+            }
+            let cached_json = &self.latest_json[&latest_json_key];
+            if *cached_json != *json {
+                return Ok(true);
+            }
+            if !self.latest_file.contains_key(key) ||
+               modified_date.as_secs() > self.latest_file[key].as_secs() {
+                self.latest_file.insert(key.to_string(), modified_date);
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    fn are_any_of_these_later(&mut self, sheet: &str, files: &[PathBuf])
+        -> Result<bool, Box<dyn std::error::Error>> {
         if files.len() == 0 {
             return Ok(true);
         }
@@ -76,10 +110,10 @@ impl CacheData {
             }
             let modified_date = fs::metadata(file)?.modified()?.duration_since(SystemTime::UNIX_EPOCH)?;
 
-            if !self.latest_gamesheet_file.contains_key(sheet) ||
-                modified_date.as_secs() > self.latest_gamesheet_file[sheet].as_secs()
+            if !self.latest_file.contains_key(sheet) ||
+                modified_date.as_secs() > self.latest_file[sheet].as_secs()
             {
-                self.latest_gamesheet_file.insert(sheet.to_string(), modified_date);
+                self.latest_file.insert(sheet.to_string(), modified_date);
                 res = true;
             }
         }
@@ -182,6 +216,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
             let mut prefixed: Vec<PathBuf> = vec![];
             let mut sheets: Vec<GameSheet> = vec![];
             let mut fonts: Vec<BMFont> = vec![];
+            let mut font_jsons = HashMap::new();
 
             for (key, value) in res_object {
                 match key.as_str() {
@@ -286,6 +321,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                                     }
                                 }
                             }
+                            font_jsons.insert(bm_name.clone(), bm_json.clone());
                             fonts.push(BMFont {
                                 name: bm_name.clone(),
                                 ttf_src: ttf_path,
@@ -306,6 +342,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                 prefixed_files: prefixed,
                 sheets: sheets,
                 fonts: fonts,
+                font_jsons: font_jsons,
             }
         },
         _ => {
@@ -314,6 +351,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                 prefixed_files: vec!(),
                 sheets: vec!(),
                 fonts: vec!(),
+                font_jsons: HashMap::new(),
             }
         }
     };
@@ -364,7 +402,8 @@ pub fn create_geode(
     let tmp_pkg = &std::env::temp_dir().join(format!("geode_pkg_{}", modinfo.id));
 
     let mut cache_data = CacheData {
-        latest_gamesheet_file: HashMap::new()
+        latest_file: HashMap::new(),
+        latest_json: HashMap::new(),
     };
 
     if !use_cached_resources {
@@ -462,10 +501,12 @@ pub fn create_geode(
     }
 
     for font in modinfo.resources.fonts {
-        // if !cache_data.are_any_of_these_later(&font.name, &[font.ttf_src.clone()])? {
-        //     println!("Skipping processing {} as no changes were detected", font.name.yellow().bold());
-        //     continue;
-        // }
+        if !cache_data.is_this_json_different_or_file_later(
+            &modinfo.resources.font_jsons[&font.name], font.name.as_str(), &font.ttf_src
+        )? {
+            println!("Skipping processing {} as no changes were detected", font.name.yellow().bold());
+            continue;
+        }
         if log {
             println!("Creating bitmap font from {}", font.name.yellow().bold());
         }
