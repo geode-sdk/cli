@@ -87,10 +87,13 @@ impl CacheData {
             }
             let cached_json = &self.latest_json[&latest_json_key];
             if *cached_json != *json {
+                self.latest_json.insert(latest_json_key, json.clone());
+                self.latest_file.insert(key.to_string(), modified_date);
                 return Ok(true);
             }
             if !self.latest_file.contains_key(key) ||
                modified_date.as_secs() > self.latest_file[key].as_secs() {
+                self.latest_json.insert(latest_json_key, json.clone());
                 self.latest_file.insert(key.to_string(), modified_date);
                 return Ok(true);
             }
