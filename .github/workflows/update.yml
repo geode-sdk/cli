@@ -43,6 +43,7 @@ jobs:
       working-directory: ${{ github.workspace }}
       run: |
         mv ./windows/geode.exe ./bin/windows
+        mv ./windows/deps/libgeode.dll ./bin/windows
         mv ./macos/geode ./bin/macos
         
     - name: Commit and push to bin
