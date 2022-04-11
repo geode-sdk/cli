@@ -13,8 +13,8 @@ jobs:
         - name: "Windows"
           os: windows-latest
           upload_path: |
-            "./build/release/geode.exe"
-            "./build/release/deps/libgeode.dll"
+            ./build/release/geode.exe
+            ./build/release/deps/libgeode.dll
         - name: "macOS"
           os: macos-latest
           upload_path: "./build/release/geode"
