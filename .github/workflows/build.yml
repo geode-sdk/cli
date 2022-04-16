@@ -12,10 +12,10 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          upload_path: "./build/release/geode.exe"
+          out_paths: './build/release/geode.exe ./build/release/deps/libgeode.dll'
         - name: "macOS"
           os: macos-latest
-          upload_path: "./build/release/geode"
+          out_paths: './build/release/geode'
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -37,8 +37,15 @@ jobs:
       run: |
         cargo build --release --target-dir ${{ github.workspace }}/build     
     
+    - name: Move to output folder
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        mkdir ./out
+        mv ${{ matrix.config.out_paths }} ./out
+        
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
         name: ${{ matrix.config.name }} CLI Binary
-        path: ${{ matrix.config.upload_path }}
+        path: ./out/

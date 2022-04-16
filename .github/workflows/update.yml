@@ -40,8 +40,8 @@ jobs:
       shell: bash
       working-directory: ${{ github.workspace }}
       run: |
-        mv ./windows/geode.exe ./bin/windows
-        mv ./macos/geode ./bin/macos
+        cp -r ./windows/* ./bin/windows
+        cp -r ./macos/* ./bin/macos
         
     - name: Commit and push to bin
       working-directory: ${{ github.workspace }}/bin
