@@ -24,7 +24,6 @@ jobs:
         github_token: ${{secrets.GEODE_BOT_PUSH_BIN_TOKEN}}
         workflow: build.yml
         workflow_conclusion: success
-        branch: main
         name: "Windows CLI Binary"
         path: '${{ github.workspace }}/windows'
         
@@ -34,7 +33,6 @@ jobs:
         github_token: ${{secrets.GEODE_BOT_PUSH_BIN_TOKEN}}
         workflow: build.yml
         workflow_conclusion: success
-        branch: main
         name: "macOS CLI Binary"
         path: '${{ github.workspace }}/macos'
       
