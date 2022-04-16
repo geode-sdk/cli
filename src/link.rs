@@ -92,7 +92,7 @@ extern "C" {
 }
 
 #[cfg(not(windows))]
-#[link(name = "libgeode")]
+#[link(name = "geode")]
 extern "C" {
 	pub fn geode_update(
 		location: *const c_char,

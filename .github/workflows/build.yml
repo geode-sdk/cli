@@ -15,7 +15,7 @@ jobs:
           out_paths: './build/release/geode.exe ./build/release/deps/libgeode.dll'
         - name: "macOS"
           os: macos-latest
-          out_paths: './build/release/geode'
+          out_paths: './build/release/geode ./build/release/deps/libgeode.dylib'
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
