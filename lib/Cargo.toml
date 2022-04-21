@@ -5,7 +5,7 @@ authors = ["HJfod <60038575+HJfod@users.noreply.github.com>", "Camila314 <ilaca3
 edition = "2018"
 
 [lib]
-name = "libgeode"
+name = "geodelib"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
