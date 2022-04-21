@@ -498,7 +498,7 @@ pub fn create_geode(
             sheet.files.clone(),
             &tmp_pkg.join("resources"),
             true,
-            Some(&sheet.name),
+            Some(&(modinfo.id.clone() + "_" + &sheet.name)),
             Some(&(modinfo.id.clone() + "_")),
         ), "Could not pack sprites");
     }
