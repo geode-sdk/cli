@@ -12,10 +12,10 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          out_paths: './build/release/geode.exe ./build/release/deps/libgeode.dll'
+          out_paths: './build/release/geode.exe ./build/release/deps/geodeutils.dll ./build/release/deps/geodeutils.dll.lib'
         - name: "macOS"
           os: macos-latest
-          out_paths: './build/release/geode ./build/release/deps/libgeode.dylib'
+          out_paths: './build/release/geode ./build/release/deps/libgeodeutils.dylib'
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 

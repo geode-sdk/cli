@@ -1,11 +1,11 @@
 [package]
-name = "geode-lib"
+name = "geode-utils"
 version = "0.1.0"
 authors = ["HJfod <60038575+HJfod@users.noreply.github.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2018"
 
 [lib]
-name = "geodelib"
+name = "geodeutils"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

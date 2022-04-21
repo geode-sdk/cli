@@ -26,7 +26,7 @@ impl CPackInfo {
 // there is a solution with cfg_if crate but imlazy
 
 #[cfg(windows)]
-#[link(name = "geodelib.dll")]
+#[link(name = "geodeutils.dll")]
 extern "C" {
 	pub fn geode_update(
 		location: *const c_char,
@@ -92,7 +92,7 @@ extern "C" {
 }
 
 #[cfg(not(windows))]
-#[link(name = "geodelib")]
+#[link(name = "geodeutils")]
 extern "C" {
 	pub fn geode_update(
 		location: *const c_char,
