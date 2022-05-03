@@ -15,6 +15,7 @@ jobs:
       with:
         repository: geode-sdk/suite
         path: suite
+        ref: nightly
         submodules: recursive
         token: '${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}'
 
