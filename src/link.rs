@@ -174,7 +174,6 @@ where E: ToString {
     let mut bytes = err.to_string().into_bytes();
     bytes.push(0);
     let desc = bytes.iter().map(|b| *b as c_char).collect::<Vec<c_char>>().as_mut_ptr();
-
     let new = libc::malloc(bytes.len()) as *mut c_char;
     libc::strcpy(new, desc);
 
