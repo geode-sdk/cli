@@ -6,6 +6,7 @@ pub mod windows_ansi;
 pub mod spritesheet;
 pub mod dither;
 pub mod font;
+pub mod install;
 
 use std::path::Path;
 
@@ -42,6 +43,18 @@ unsafe fn c2option(a: *const c_char) -> Option<&'static str> {
 #[no_mangle]
 pub unsafe extern "C" fn geode_version() -> i32 {
 	return GEODE_VERSION;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn geode_install_suite(location: *const c_char) -> *const c_char {
+	match crate::install::install_suite(
+		Path::new(c2string(location))
+	) {
+		Ok(_) => std::ptr::null(),
+		Err(b) => {
+			string2c(b)
+		}
+	}
 }
 
 #[no_mangle]
