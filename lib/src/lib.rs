@@ -46,9 +46,15 @@ pub unsafe extern "C" fn geode_version() -> i32 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn geode_install_suite(location: *const c_char) -> *const c_char {
+pub unsafe extern "C" fn geode_install_suite(
+	location: *const c_char,
+	nightly: bool,
+	callback: install::SuiteProgressCallback
+) -> *const c_char {
 	match crate::install::install_suite(
-		Path::new(c2string(location))
+		Path::new(c2string(location)),
+		nightly,
+		callback
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => {
