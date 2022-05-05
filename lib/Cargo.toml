@@ -1,6 +1,6 @@
 [package]
 name = "geode-utils"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["HJfod <60038575+HJfod@users.noreply.github.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2018"
 build = "build.rs"
