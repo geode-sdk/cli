@@ -85,7 +85,11 @@ pub fn cli_create_template(project_name: Option<String>, location: Option<PathBu
 	let locstr = ask_value("Location", buffer.as_str(), true);
 	let project_location = Path::new(&locstr);
 
-	let id = format!("com.{}.{}", developer.to_lowercase(), name.to_lowercase());
+	let id = format!(
+		"com.{}.{}",
+		developer.to_lowercase().replace(" ", "_"),
+		name.to_lowercase().replace(" ", "_")
+	);
 	
 	println!(
 	    "Creating mod with ID {} named {} by {} version {} in {}",

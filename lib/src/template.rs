@@ -6,7 +6,14 @@ use serde_json::{json, to_string_pretty};
 
 use std::{fs, path::Path};
 
-pub fn create_template(project_location: &Path, name: &str, version: &str, id: &str, developer: &str, description: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn create_template(
+	project_location: &Path,
+	name: &str,
+	version: &str,
+	id: &str,
+	developer: &str,
+	description: &str
+) -> Result<(), Box<dyn std::error::Error>> {
 	let project_name = name.chars().filter(|c| !c.is_whitespace()).collect::<String>();
 
 	match Repository::clone("https://github.com/geode-sdk/example-mod", project_location) {
@@ -37,8 +44,6 @@ pub fn create_template(project_location: &Path, name: &str, version: &str, id: &
 	    "name":         name,
 	    "developer":    developer,
 	    "description":  description,
-	    "details":      null,
-	    "credits":      null,
 	    "binary": {
 	        "*": project_name
 	    },
