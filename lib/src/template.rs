@@ -19,17 +19,12 @@ pub fn create_template(project_location: &Path, name: &str, version: &str, id: &
 	for thing in fs::read_dir(&project_location).unwrap() {
 	    if !thing.as_ref().unwrap().metadata().unwrap().is_dir() {
 	        let file = thing.unwrap().path();
-	        let contents = fs::read_to_string(&file).unwrap().replace("$Template", &project_name);
+	        let contents = fs::read_to_string(&file).unwrap().replace("Template", &project_name);
 
 	        fs::write(file, contents).unwrap();
 	    }
 	}
 
-	match Repository::clone_recurse("https://github.com/geode-sdk/sdk", project_location.join("sdk")) {
-	    Ok(_) => (),
-	    Err(e) => throw_error!("Failed to clone sdk: {}", e),
-	};
-	
 	let mod_json = json!({
 	    "geode":        GEODE_VERSION,
 	    "version":      version,
@@ -38,10 +33,7 @@ pub fn create_template(project_location: &Path, name: &str, version: &str, id: &
 	    "developer":    developer,
 	    "description":  description,
 	    "details":      null,
-	    "credits":      null,
-	    "binary": {
-	        "*": project_name
-	    },
+	    "binary": project_name,
 	    "dependencies": [
 	        {
 	            "id": "com.geode.api",
