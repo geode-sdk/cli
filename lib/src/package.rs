@@ -167,10 +167,11 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
             bin_list.push(filename);
         },
         Value::Object(bin_object) => {
-            for i in ["windows", "macos", "android", "ios"] {
+            for i in ["windows", "macos", "android", "ios", "*"] {
                 match &bin_object[i] {
                     Value::Null => (),
                     Value::String(s) => {
+                        if s == "*" { continue; }
                         let mut filename = s.to_string();
                         if !filename.ends_with(get_extension(i)) {
                             filename += get_extension(i);
