@@ -4,6 +4,7 @@ use std::process::exit;
 use std::fs;
 use serde::{Deserialize, Serialize};
 use directories::BaseDirs;
+use colored::*;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -17,14 +18,14 @@ pub struct Installation {
 pub struct Config {
 	pub default_installation: usize,
 	pub working_installation: Option<usize>,
-	pub installations: Vec<Installation>,
+	pub installations: Option<Vec<Installation>>,
 	pub default_developer: Option<String>,
 }
 
 static mut CONFIG: Config = Config {
 	default_installation: 0,
 	working_installation: None,
-	installations: vec!(),
+	installations: None,
 	default_developer: None,
 };
 
@@ -50,11 +51,17 @@ impl Config {
 			let config_json = Config::data_dir().join("config.json");
 			if !config_json.exists() {
 				println!(
-					"It seems you don't have Geode installed! \
+					"{}{}{}{}",
+					"WARNING: It seems you don't have Geode installed! \
 					Please install Geode first using the official installer \
-					(https://github.com/geode-sdk/installer/releases/latest)"
+					(".yellow(),
+					"https://github.com/geode-sdk/installer/releases/latest".cyan(),
+					")".yellow(),
+					"\nYou may still use the CLI, but be warned that certain \
+					operations will cause crashes.\n".purple()
 				);
-				exit(1);
+				fs::create_dir_all(Config::data_dir()).unwrap();
+				return;
 			}
 			CONFIG = match serde_json::from_str(
 				&fs::read_to_string(&config_json).unwrap()
@@ -65,13 +72,18 @@ impl Config {
 					exit(1);
 				}
 			};
-			if CONFIG.installations.len() == 0 {
+			if CONFIG.installations.is_none() {
 				println!(
-					"It seems you don't have any installations of Geode! \
+					"{}{}{}{}",
+					"WARNING: It seems you don't have any installations of Geode! \
 					Please install Geode first using the official installer \
-					(https://github.com/geode-sdk/installer/releases/latest)"
+					(".yellow(),
+					"https://github.com/geode-sdk/installer/releases/latest".cyan(),
+					")".yellow(),
+					"\nYou may still use the CLI, but be warned that certain \
+					operations will cause crashes.\n".purple()
 				);
-				exit(1);
+				return;
 			}
 			if CONFIG.working_installation.is_none() {
 				CONFIG.working_installation = Some(CONFIG.default_installation);
@@ -93,6 +105,8 @@ impl Config {
 	}
 
 	pub fn work_inst() -> &'static Installation {
-		&Config::get().installations[Config::get().working_installation.unwrap()]
+		&Config::get().installations.as_ref().unwrap()[
+			Config::get().working_installation.unwrap()
+		]
 	}
 }

@@ -198,7 +198,7 @@ fn main() {
         Commands::Config { cwi, dev } => {
             let mut some_set = false;
             if cwi.is_some() {
-                if cwi.unwrap() >= Config::get().installations.len() {
+                if cwi.unwrap() >= Config::get().installations.as_ref().unwrap().len() {
                     print_error!(
                         "Provided index is higher than your \
                         amount of installations!"
@@ -217,6 +217,7 @@ fn main() {
                 println!(
                     " == {} == \n\
                     Version: {}\n\
+                    Path: {}\n\
                     Default developer: {}\n\
                     Data directory: {}\n\
                     Selected Installation: {}\n\
@@ -224,6 +225,7 @@ fn main() {
                     -> Loader Version: {}",
                     GEODE_CLI_NAME.to_string().green(),
                     GEODE_CLI_VERSION.to_string().yellow(),
+                    std::env::current_exe().unwrap().to_str().unwrap().cyan(),
                     match Config::get().default_developer.as_ref() {
                         Some(s) => s,
                         None => "<none>"
