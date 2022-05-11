@@ -35,10 +35,10 @@ impl Config {
 		#[cfg(windows)] {
 			data_dir = BaseDirs::new().unwrap().data_local_dir().to_path_buf().join("Geode");
 		};
-		#[cfg(mac)] {
+		#[cfg(macos)] {
 			data_dir = PathBuf::from("/Users/Shared/Geode");
 		};
-		#[cfg(not(any(windows, mac)))] {
+		#[cfg(not(any(windows, macos)))] {
 			use std::compile_error;
 			compile_error!("implement config.json directory");
 		};
