@@ -8,9 +8,9 @@ use std::io::stdout;
 use std::io::stdin;
 use indicatif::ProgressBar;
 use indicatif::ProgressStyle;
-use crate::Configuration;
 use path_absolutize::Absolutize;
 use std::fs;
+use crate::config::Config;
 use crate::call_extern;
 use crate::link::string2c;
 
@@ -62,10 +62,12 @@ pub fn cli_create_template(project_name: Option<String>, location: Option<PathBu
 	};
 	let version = ask_value("Version", "v1.0.0", true);
 	let developer = ask_value(
-		"Developer", Configuration::dev_name().as_str(), true
+		"Developer",
+		Config::get().default_developer.as_ref().unwrap_or(&String::new()).as_str(),
+		true
 	);
 
-	if Configuration::get().default_developer.is_none() {
+	if Config::get().default_developer.is_none() {
 		println!("{}{}{}\n{}{}",
 			"Using ".bright_cyan(),
 			developer,
@@ -73,7 +75,7 @@ pub fn cli_create_template(project_name: Option<String>, location: Option<PathBu
 			"If this is undesirable, use ".bright_cyan(),
 			"`geode config --dev <NAME>`".bright_yellow()
 		);
-		Configuration::set_dev_name(developer.clone());
+		Config::get().default_developer = Some(developer.clone());
 	}
 
 	let description = ask_value("Description", "", false);

@@ -13,7 +13,7 @@ pub mod windows_ansi;
 
 #[cfg(windows)]
 use crate::windows_ansi::enable_ansi_support;
-use crate::config::Configuration;
+use crate::config::Config;
 
 pub const GEODE_CLI_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GEODE_CLI_NAME: &str = env!("CARGO_PKG_NAME");
@@ -27,16 +27,17 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// List information about Geode
-    About {},
-    /// Modify Geode configuration
+    /// Display / modify Geode configuration
     Config {
+        /// Current working installation index
         #[clap(long)]
-        path: Option<PathBuf>,
-
+        cwi: Option<usize>,
+        
+        /// Default developer name
         #[clap(long)]
         dev: Option<String>,
     },
+
     /// Create a new Geode project
     New {
         /// Mod name
@@ -45,11 +46,13 @@ enum Commands {
         /// to the current folder
         location: Option<PathBuf>,
     },
+
     /// Package a mod.json and a platform binary file 
     /// into a .geode file
     Pkg {
         /// Path to the mod's mod.json file
         resource_dir: String,
+
         /// Path to the directory containing the mod's 
         /// platform binary.
         exec_dir: String,
@@ -61,7 +64,8 @@ enum Commands {
         /// file to the Geode mods directory
         #[clap(short, long)]
         install: bool,
-
+        
+        /// Use cached resources
         #[clap(long)]
         cached: bool,
     },
@@ -122,11 +126,6 @@ enum Commands {
         prefix: Option<String>
     },
 
-    Info {
-        #[clap(long)]
-        modpath: bool
-    },
-
     /// Update Geode
     Update {
         // if you want to switch to a certain version
@@ -136,12 +135,33 @@ enum Commands {
         check: bool
     },
 
-    Setup {},
-
+    /// Install a .geode file to the current
+    /// selected installation
     Install {
         /// Path to .geode file to install
         path: PathBuf
     }
+}
+
+fn progress_bar(text: &str) -> ProgressBar {
+    let bar = ProgressBar::new_spinner();
+    bar.enable_steady_tick(120);
+    bar.set_style(
+        ProgressStyle::default_spinner()
+            .tick_strings(&[
+                "[##    ]",
+                "[###   ]",
+                "[####  ]",
+                "[ #### ]",
+                "[   ###]",
+                "[    ##]",
+                "[#    #]",
+                "[ done ]",
+            ])
+            .template("{spinner:.cyan} {msg}"),
+    );
+    bar.set_message(format!("{}", text.bright_cyan()));
+    bar
 }
 
 fn main() {
@@ -151,81 +171,73 @@ fn main() {
         Err(e) => println!("Unable to enable ANSI support: {}", e)
     }
 
-    Configuration::get();
+    Config::init();
 
     let args = Cli::parse();
 
     match args.command {
         Commands::New { location, name } => template_ui::cli_create_template(name, location),
 
-        Commands::About {} => {
-            println!(
-                " == {} == \nGeode Version: {}\nCLI Version: {}\nGeode Installation: {}",
-                GEODE_CLI_NAME.to_string().green(),
-                unsafe {link::geode_version()}.to_string().red(),
-                GEODE_CLI_VERSION.to_string().yellow(),
-                Configuration::install_path().to_str().unwrap().purple()
-            );
+        Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => {
+            call_extern!(link::geode_package(
+                string2c(resource_dir),
+                string2c(exec_dir),
+                string2c(&out_file),
+                true,
+                cached,
+            ));
+
+            if install {
+                call_extern!(link::geode_install_package(
+                    string2c(Config::work_inst().path.to_str().unwrap()),
+                    string2c(out_file)
+                ));
+            }
         },
 
-        Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => {
-                call_extern!(link::geode_package(
-                    string2c(resource_dir),
-                    string2c(exec_dir),
-                    string2c(&out_file),
-                    true,
-                    cached,
-                ));
-
-                if install {
-                    call_extern!(link::geode_install_package(
-                        string2c(Configuration::install_path().to_str().unwrap()),
-                        string2c(out_file)
-                    ));
-                }
-            },
-
-        Commands::Config { path, dev } => {
+        Commands::Config { cwi, dev } => {
             let mut some_set = false;
-            if path.is_some() {
-                Configuration::set_install_path(path.unwrap());
+            if cwi.is_some() {
+                if cwi.unwrap() >= Config::get().installations.len() {
+                    print_error!(
+                        "Provided index is higher than your \
+                        amount of installations!"
+                    );
+                }
+                Config::get().working_installation = cwi;
                 some_set = true;
+                println!("Updated working installation");
             }
             if dev.is_some() {
-                Configuration::set_dev_name(dev.unwrap());
+                Config::get().default_developer = dev;
                 some_set = true;
+                println!("Updated default developer");
             }
             if !some_set {
-                print_error!("Please provide some setting to set the value of");
-            }
-        },
-
-        Commands::Info { modpath } => {
-            if modpath {
-                println!("{}", Configuration::install_path().join("geode").join("mods").display());
-            } else {
-                print_error!("Please specify thing you want information from");
+                println!(
+                    " == {} == \n\
+                    Version: {}\n\
+                    Default developer: {}\n\
+                    Data directory: {}\n\
+                    Selected Installation: {}\n\
+                    -> Path: {}\n\
+                    -> Loader Version: {}",
+                    GEODE_CLI_NAME.to_string().green(),
+                    GEODE_CLI_VERSION.to_string().yellow(),
+                    match Config::get().default_developer.as_ref() {
+                        Some(s) => s,
+                        None => "<none>"
+                    }.purple(),
+                    Config::data_dir().to_str().unwrap().cyan(),
+                    Config::get().working_installation.unwrap().to_string().red(),
+                    Config::work_inst().path.to_str().unwrap().cyan(),
+                    unsafe {link::geode_version()}.to_string().red(),
+                );
             }
         },
 
         Commands::Sheet { src, dest, variants, name, prefix } => {
-            let bar = ProgressBar::new_spinner();
-            bar.enable_steady_tick(120);
-            bar.set_style(
-                ProgressStyle::default_spinner()
-                    .tick_strings(&[
-                        "[##    ]",
-                        "[###   ]",
-                        "[####  ]",
-                        "[ #### ]",
-                        "[   ###]",
-                        "[    ##]",
-                        "[#    #]",
-                        "[ done ]",
-                    ])
-                    .template("{spinner:.cyan} {msg}"),
-            );
-            bar.set_message(format!("{}", "Creating spritesheet(s)...".bright_cyan()));
+            let bar = progress_bar("Creating spritesheet(s)...");
 
             let mut res = link::CPackInfo {
                 suffix_removals: 0,
@@ -253,24 +265,7 @@ fn main() {
         },
 
         Commands::Sprite { src, dest, prefix } => {
-            let bar = ProgressBar::new_spinner();
-            bar.enable_steady_tick(120);
-            bar.set_style(
-                ProgressStyle::default_spinner()
-                    .tick_strings(&[
-                        "[##    ]",
-                        "[###   ]",
-                        "[####  ]",
-                        "[ #### ]",
-                        "[   ###]",
-                        "[    ##]",
-                        "[#    #]",
-                        "[ done ]",
-                    ])
-                    .template("{spinner:.cyan} {msg}"),
-            );
-            bar.set_message(format!("{}", "Creating variants...".bright_cyan()));
-
+            let bar = progress_bar("Creating variants...");
             call_extern!(link::geode_sprite_variants(
                 string2c(src.to_str().unwrap()),
                 string2c(dest.to_str().unwrap()),
@@ -280,24 +275,7 @@ fn main() {
         },
 
         Commands::Font { ttf_path, dest, fontsize, name, variants, prefix, charset, outline } => {
-            let bar = ProgressBar::new_spinner();
-            bar.enable_steady_tick(120);
-            bar.set_style(
-                ProgressStyle::default_spinner()
-                    .tick_strings(&[
-                        "[##    ]",
-                        "[###   ]",
-                        "[####  ]",
-                        "[ #### ]",
-                        "[   ###]",
-                        "[    ##]",
-                        "[#    #]",
-                        "[ done ]",
-                    ])
-                    .template("{spinner:.cyan} {msg}"),
-            );
-            bar.set_message(format!("{}", "Creating font...".bright_cyan()));
-
+            let bar = progress_bar("Creating font...");
             call_extern!(link::geode_create_bitmap_font_from_ttf(
                 string2c(ttf_path.to_str().unwrap()),
                 string2c(dest.unwrap_or(std::env::current_dir().unwrap()).to_str().unwrap()),
@@ -316,34 +294,28 @@ fn main() {
                 let mut has = false;
 
                 call_extern!(link::geode_update_check(
-                    string2c(Configuration::install_path().to_str().unwrap()),
+                    string2c(Config::work_inst().path.to_str().unwrap()),
                     opt2c(version),
                     (&mut has) as *mut bool
                 ));
             } else {
                 call_extern!(link::geode_update(
-                    string2c(Configuration::install_path().to_str().unwrap()),
+                    string2c(Config::work_inst().path.to_str().unwrap()),
                     opt2c(version)
                 ));
             }
         },
 
-        Commands::Setup {} => {
-            match Configuration::install_file_associations() {
-                Ok(_) => (
-                    println!("File association for .geode files created!")
-                ),
-                Err(e) => {
-                    print_error!("File association failed: {}", e)
-                }
-            }
-        },
-
-        Commands::Install {path} => {
-            let mut target_path = Configuration::install_path().join("geode").join("mods");
-            target_path = target_path.join(path.file_name().unwrap());
-
-            std::fs::rename(path, target_path).unwrap();
+        Commands::Install { path } => {
+            std::fs::rename(
+                &path,
+                Config::work_inst().path
+                    .join("geode")
+                    .join("mods")
+                    .join(path.file_name().unwrap())
+            ).unwrap();
         }
     }
+
+    Config::save();
 }
