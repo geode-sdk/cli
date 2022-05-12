@@ -5,7 +5,7 @@ pub mod windows_ansi;
 pub mod spritesheet;
 pub mod dither;
 pub mod font;
-pub mod install;
+pub mod suite;
 
 use std::path::Path;
 
@@ -48,17 +48,15 @@ pub unsafe extern "C" fn geode_version() -> i32 {
 pub unsafe extern "C" fn geode_install_suite(
 	location: *const c_char,
 	nightly: bool,
-	callback: install::SuiteProgressCallback
+	callback: suite::SuiteProgressCallback
 ) -> *const c_char {
-	match crate::install::install_suite(
+	match crate::suite::install_suite(
 		Path::new(c2string(location)),
 		nightly,
 		callback
 	) {
 		Ok(_) => std::ptr::null(),
-		Err(b) => {
-			string2c(b)
-		}
+		Err(b) => string2c(b)
 	}
 }
 
