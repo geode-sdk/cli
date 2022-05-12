@@ -139,15 +139,6 @@ enum Commands {
         prefix: Option<String>
     },
 
-    /// Update Geode
-    Update {
-        // if you want to switch to a certain version
-        version: Option<String>,
-
-        #[clap(long)]
-        check: bool
-    },
-
     /// Install a .geode file to the current
     /// selected installation
     Install {
@@ -311,23 +302,6 @@ fn main() {
                 outline,
             ));
             bar.finish_with_message(format!("{}", "Bitmap font created!".bright_green()));
-        },
-
-        Commands::Update { version, check } => {
-            if check {
-                let mut has = false;
-
-                call_extern!(link::geode_update_check(
-                    string2c(Config::work_inst().path.to_str().unwrap()),
-                    opt2c(version),
-                    (&mut has) as *mut bool
-                ));
-            } else {
-                call_extern!(link::geode_update(
-                    string2c(Config::work_inst().path.to_str().unwrap()),
-                    opt2c(version)
-                ));
-            }
         },
 
         Commands::Install { path } => {

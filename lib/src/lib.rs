@@ -1,6 +1,5 @@
 pub mod util;
 pub mod package;
-pub mod update;
 pub mod template;
 pub mod windows_ansi;
 pub mod spritesheet;
@@ -62,37 +61,6 @@ pub unsafe extern "C" fn geode_install_suite(
 		}
 	}
 }
-
-#[no_mangle]
-pub unsafe extern "C" fn geode_update(location: *const c_char, version: *const c_char) -> *const c_char {
-	match crate::update::update_geode(
-		c2option(version), 
-		Path::new(c2string(location))
-	) {
-		Ok(_) => std::ptr::null(),
-		Err(b) => {
-			string2c(b)
-		}
-	}
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn geode_update_check(location: *const c_char, version: *const c_char, has_update: *mut bool) -> *const c_char {
-	match crate::update::check_update(
-		c2option(version), 
-		Path::new(c2string(location))
-	) {
-		Ok(res) => {
-			*has_update = res;
-
-			std::ptr::null()
-		},
-		Err(b) => {
-			string2c(b)
-		}
-	}
-}
-
 
 #[no_mangle]
 pub unsafe extern "C" fn geode_create_template(
