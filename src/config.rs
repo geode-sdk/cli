@@ -3,7 +3,6 @@ use std::vec::Vec;
 use std::process::exit;
 use std::fs;
 use serde::{Deserialize, Serialize};
-use directories::BaseDirs;
 use colored::*;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -43,7 +42,7 @@ impl Config {
 			use std::compile_error;
 			compile_error!("implement config.json directory");
 		};
-		return data_dir;
+		data_dir
 	}
 
 	pub fn init() {

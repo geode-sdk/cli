@@ -8,7 +8,7 @@ use image::{self, Pixel, GenericImage, GenericImageView, DynamicImage};
 use texture_packer::texture::Texture;
 
 fn point_in_circle(x: i32, y: i32, r: u32) -> bool {
-    return ((x.pow(2) + y.pow(2)) as f64).sqrt() < r as f64;
+    ((x.pow(2) + y.pow(2)) as f64).sqrt() < r as f64
 }
 
 fn create_resized_bitmap_font_from_ttf(
@@ -21,10 +21,7 @@ fn create_resized_bitmap_font_from_ttf(
 ) -> Result<(), Box<dyn std::error::Error>> {
     create_dir_all(out_dir).unwrap();
 
-    let true_charset = match charset {
-        Some(s) => s,
-        None => "32-126,8226" // same as bigFont.fnt
-    };
+    let true_charset = charset.unwrap_or("32-126,8226");
 
     let ttf_data = fs::read(ttf_path).unwrap();
     let font = fontdue::Font::from_bytes(ttf_data, fontdue::FontSettings::default()).unwrap();
@@ -44,11 +41,11 @@ fn create_resized_bitmap_font_from_ttf(
     let mut heights = Vec::new();
 
     let mut largest_width = 0u32;
-    for range in true_charset.split(",") {
+    for range in true_charset.split(',') {
         let start: u32;
         let end: u32;
-        if range.contains("-") {
-            let nums = range.split("-").collect::<Vec<_>>();
+        if range.contains('-') {
+            let nums = range.split('-').collect::<Vec<_>>();
             if nums.len() > 2 {
                 throw_error!("Some set in the font's specified charset has more than one '-' which makes no sense");
             }
@@ -83,12 +80,12 @@ fn create_resized_bitmap_font_from_ttf(
 
     fn render_char_blend(
         metrics: &fontdue::Metrics,
-        bitmap: &Vec<u8>,
+        bitmap: &[u8],
         offset_x: u32,
         offset_y: u32,
         luma: u8,
         texture: &mut DynamicImage,
-    ) -> () {
+    ) {
         for x in 0..metrics.width {
             for y in 0..metrics.height {
                 texture.blend_pixel(x as u32 + offset_x, y as u32 + offset_y, image::Rgba([
@@ -101,12 +98,12 @@ fn create_resized_bitmap_font_from_ttf(
 
     fn render_char(
         metrics: &fontdue::Metrics,
-        bitmap: &Vec<u8>,
+        bitmap: &[u8],
         offset_x: u32,
         offset_y: u32,
         luma: u8,
         texture: &mut DynamicImage,
-    ) -> () {
+    ) {
         for x in 0..metrics.width {
             for y in 0..metrics.height {
                 texture.put_pixel(x as u32 + offset_x, y as u32 + offset_y, image::Rgba([
@@ -146,7 +143,7 @@ fn create_resized_bitmap_font_from_ttf(
                             outline
                         ) {
                             render_char_blend(
-                                &metrics, &bitmap,
+                                metrics, bitmap,
                                 x + shadow_offset, y + shadow_offset,
                                 0, &mut texture
                             );
@@ -166,7 +163,7 @@ fn create_resized_bitmap_font_from_ttf(
                 texture = texture.blur(1.5);
             }
             // draw character itself
-            render_char_blend(&metrics, &bitmap, outline, outline, 255, &mut texture);
+            render_char_blend(metrics, bitmap, outline, outline, 255, &mut texture);
             // draw outline
             for x in 0..metrics.width {
                 for y in 0..metrics.height {
@@ -176,20 +173,18 @@ fn create_resized_bitmap_font_from_ttf(
                     let prev_alpha = if ix > 0 { bitmap[ix - 1] } else { 0 };
                     let above_alpha = if ix >= metrics.width { bitmap[ix - metrics.width] } else { 0 };
                     let below_alpha = if ix < metrics.width * (metrics.height - 1) { bitmap[ix + metrics.width] } else { 0 };
-                    let on_edge: bool;
-                    if alpha == 255 {
-                        on_edge =
-                            prev_alpha != 255 ||
+                    
+                    let on_edge: bool = if alpha == 255 {
+                        prev_alpha != 255 ||
                             next_alpha != 255 ||
                             above_alpha != 255 ||
-                            below_alpha != 255;
+                            below_alpha != 255
                     } else {
-                        on_edge =
-                            prev_alpha == 255 ||
+                        prev_alpha == 255 ||
                             next_alpha == 255 ||
                             above_alpha == 255 ||
-                            below_alpha == 255;
-                    }
+                            below_alpha == 255
+                    };
                     if on_edge {
                         imageproc::drawing::draw_filled_circle_mut(
                             &mut outline_texture,
@@ -234,7 +229,7 @@ fn create_resized_bitmap_font_from_ttf(
             }
             image::imageops::overlay(&mut texture, &antialised_outline_texture, 0, 0);
         } else {
-            render_char(&metrics, &bitmap, outline, outline, 255, &mut texture);
+            render_char(metrics, bitmap, outline, outline, 255, &mut texture);
         }
         packer.pack_own(ch, texture).expect("Internal error packing font characters");
     }
@@ -252,7 +247,7 @@ fn create_resized_bitmap_font_from_ttf(
             "charset=\"\" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1\n",
             "common lineHeight={common_line_height} base={font_base} ",
             "scaleW={scale_w} scaleH={scale_h} pages=1 packed=0\n",
-            "page id=0 file=\"{sprite_file_name}\"\n"
+            "page id=0 file=\"{sprite_file_name}.png\"\n"
         ),
         font_name = ttf_path.file_name().unwrap().to_str().unwrap(),
         font_size = fontsize,
@@ -260,7 +255,7 @@ fn create_resized_bitmap_font_from_ttf(
         font_base = (-line_metrics.descent + line_metrics.line_gap) as i32,
         scale_w = packer.width(),
         scale_h = packer.height(),
-        sprite_file_name = format!("{}.png", name)
+        sprite_file_name = name
     );
     let mut fnt_chars_data: Vec<String> = vec!();
     let mut fnt_kernings_data: Vec<String> = vec!();
@@ -322,6 +317,7 @@ fn create_resized_bitmap_font_from_ttf(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_bitmap_font_from_ttf(
     ttf_path: &Path,
     out_dir: &Path,
@@ -332,10 +328,7 @@ pub fn create_bitmap_font_from_ttf(
     charset: Option<&str>,
     outline: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let true_prefix = match prefix {
-        Some(s) => s,
-        None => ""
-    }.to_string();
+    let true_prefix = prefix.unwrap_or("").to_string();
     let true_name = true_prefix + match name {
         Some(s) => s,
         None => ttf_path.file_name().unwrap().to_str().unwrap()

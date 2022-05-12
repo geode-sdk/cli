@@ -74,7 +74,7 @@ fn update_suffix(name: &mut String, suffix: &str) -> bool {
     false
 }
 
-fn pack_sprites_to_file(in_files: Vec<PathBuf>, out_dir: &Path, name: &String) ->
+fn pack_sprites_to_file(in_files: Vec<PathBuf>, out_dir: &Path, name: &str) ->
     Result<PackResult, Box<dyn std::error::Error>>
 {
     assert_ne!(in_files.len(), 0, "No files provided to pack_sprites_to_file for {}", name);
@@ -111,7 +111,7 @@ fn pack_sprites_to_file(in_files: Vec<PathBuf>, out_dir: &Path, name: &String) -
             Err(_) => continue
         };
 
-        if frames.iter().filter(|x| x.1 == framename).collect::<Vec<_>>().len() > 0 {
+        if frames.iter().any(|x| x.1 == framename) {
             throw_error!("Duplicate sprite name found: {}", framename);
         } else {
             frames.push((path, framename));
@@ -169,7 +169,7 @@ fn pack_sprites_to_file(in_files: Vec<PathBuf>, out_dir: &Path, name: &String) -
     let mut f = File::create(out_dir.join(format!("{}.png", name))).unwrap();
     exporter.write_to(&mut f, image::ImageFormat::Png)?;
     Ok(PackResult {
-        suffix_removals: suffix_removals,
+        suffix_removals,
         created_files: vec!(format!("{}.plist", name))
     })
 }
@@ -177,12 +177,9 @@ fn pack_sprites_to_file(in_files: Vec<PathBuf>, out_dir: &Path, name: &String) -
 fn pack_sprites_with_suffix(in_files: Vec<PathBuf>, out_dir: &Path, name: Option<&str>, suffix: &str) -> 
     Result<PackResult, Box<dyn std::error::Error>> 
 {
-    let mut actual_name = match name {
-        Some(s) => s,
-        None => "spritesheet"
-    }.to_string();
+    let mut actual_name = name.unwrap_or("spritesheet").to_string();
     actual_name.push_str(suffix);
-    return pack_sprites_to_file(in_files, out_dir, &actual_name);
+    pack_sprites_to_file(in_files, out_dir, &actual_name)
 }
 
 fn create_resized_sprites(
@@ -202,11 +199,8 @@ fn create_resized_sprites(
         let mut framename = path.file_stem().unwrap().to_str().unwrap_or("").to_string();
 
         update_suffix(&mut framename, suffix);
-        match prefix {
-            Some(p) => {
-                framename = p.to_string() + &framename;
-            },
-            None => {}
+        if let Some(p) = prefix {
+            framename = p.to_string() + &framename;
         }
 
         let mut out_file = out_dir.to_path_buf();
@@ -230,7 +224,7 @@ fn create_resized_sprites(
     Ok(())
 }
 
-fn read_sprites<'a>(in_dir: &'a Path) -> Vec<PathBuf> {
+fn read_sprites(in_dir: &Path) -> Vec<PathBuf> {
     fs::read_dir(in_dir).unwrap().map(|x| x.unwrap().path()).collect()
 }
 
@@ -268,7 +262,7 @@ pub fn pack_sprites(
         println!("{}", " -> Creating UHD Spritesheet".yellow().bold());
         let res = pack_sprites_with_suffix(read_sprites(&out_dir.join("tmp_uhd")), out_dir, name, "");
         fs::remove_dir_all(&out_dir.join("tmp_uhd")).unwrap();
-        return res;
+        res
     }
 }
 
@@ -295,12 +289,9 @@ pub fn create_variants_of_sprite(
     Ok(())
 }
 
-pub fn is_image(file: &PathBuf) -> bool {
+pub fn is_image(file: &Path) -> bool {
     match image::io::Reader::open(file) {
-        Ok(i) => match i.decode() {
-            Ok(_) => true,
-            Err(_) => false
-        },
+        Ok(i) => i.decode().is_ok(),
         Err(_) => false
     }
 }

@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
@@ -101,7 +103,7 @@ macro_rules! call_extern {
 	($x: expr) => {{
 		unsafe {
 			let y = $x;
-			if !(y == std::ptr::null()) {
+			if !y.is_null() {
 				println!("Extern function call failed: {}", std::ffi::CStr::from_ptr(y).to_str().unwrap().red());
 			}
 		}
@@ -116,7 +118,7 @@ where E: ToString {
     let new = libc::malloc(bytes.len()) as *mut c_char;
     libc::strcpy(new, desc);
 
-    return new;
+    new
 }
 
 pub unsafe fn opt2c<E>(err: Option<E>) -> *mut c_char

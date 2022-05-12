@@ -76,14 +76,14 @@ impl CacheData {
         json.to_string()
     }
 
-    fn is_this_json_different_or_file_later(&mut self, json: &Value, key: &str, file: &PathBuf)
+    fn check_json_different_or_file_later(&mut self, json: &Value, key: &str, file: &Path)
         -> Result<bool, Box<dyn std::error::Error>> {
         if file.exists() {
             let modified_date = fs::metadata(file)?.modified()?.duration_since(SystemTime::UNIX_EPOCH)?;
             let mut latest_json_key = key.to_string();
             latest_json_key.push_str("_json");
-            if !self.latest_json.contains_key(&latest_json_key) {
-                self.latest_json.insert(latest_json_key, json.clone());
+            if let std::collections::hash_map::Entry::Vacant(e) = self.latest_json.entry(latest_json_key.clone()) {
+                e.insert(json.clone());
                 self.latest_file.insert(key.to_string(), modified_date);
                 return Ok(true);
             }
@@ -105,7 +105,7 @@ impl CacheData {
 
     fn are_any_of_these_later(&mut self, sheet: &str, files: &[PathBuf])
         -> Result<bool, Box<dyn std::error::Error>> {
-        if files.len() == 0 {
+        if files.is_empty() {
             return Ok(true);
         }
         let mut res = false;
@@ -156,13 +156,13 @@ pub fn platform_extension() -> &'static str {
     get_extension(platform_string())
 }
 
-fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<ModInfo, Box<dyn std::error::Error>> {
+fn extract_mod_info(mod_json: &Value, mod_json_location: &Path) -> Result<ModInfo, Box<dyn std::error::Error>> {
     let mut bin_list = Vec::new();
 
 
     match mod_json["binary"].clone() {
         Value::String(s) => {
-            let mut filename = s.to_string();
+            let mut filename = s;
             if !filename.ends_with(platform_extension()) {
                 filename += platform_extension();
             }
@@ -261,6 +261,8 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                     "spritesheets" => {
                         for (sheet_name, sheet_files) in value.as_object().unwrap() {
                             let mut sheet_paths: Vec<PathBuf> = vec!();
+
+                            #[allow(clippy::or_fun_call)]
                             for path in sheet_files.as_array().ok_or(
                                 format!("[mod.json].resources.spritesheets.{} is not an array!", sheet_name).as_str()
                             )? {
@@ -331,9 +333,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
                             fonts.push(BMFont {
                                 name: bm_name.clone(),
                                 ttf_src: ttf_path,
-                                charset: charset,
-                                fontsize: fontsize,
-                                outline: outline,
+                                charset,
+                                fontsize,
+                                outline,
                             });
                         }
                     },
@@ -344,11 +346,11 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
             }
 
             ModResources {
-                raw_files: raw_files,
+                raw_files,
                 prefixed_files: prefixed,
-                sheets: sheets,
-                fonts: fonts,
-                font_jsons: font_jsons,
+                sheets,
+                fonts,
+                font_jsons,
             }
         },
         _ => {
@@ -364,9 +366,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &PathBuf) -> Result<Mod
 
     Ok(ModInfo {
         //name: name.to_string(),
-        bin_list: bin_list,
+        bin_list,
         id: id.clone(),
-        resources: resources
+        resources
     })
 }
 
@@ -397,7 +399,7 @@ pub fn create_geode(
     use_cached_resources: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mod_json = serde_json::from_str(&fs::read_to_string(mod_src_dir.join("mod.json"))?)?;
-    let modinfo = extract_mod_info(&mod_json, &mod_src_dir.to_path_buf())?;
+    let modinfo = extract_mod_info(&mod_json, mod_src_dir)?;
     
     println!("{}", 
         format!("Packaging {}", 
@@ -454,7 +456,7 @@ pub fn create_geode(
         println!("Creating variants of logo.png");
         fs::copy(mod_src_dir.join("logo.png"), tmp_pkg.join(modinfo.id.clone() + ".png"))?;
         throw_unwrap!(spritesheet::create_variants_of_sprite(
-            &tmp_pkg.join(modinfo.id.clone() + ".png"), &tmp_pkg, None
+            &tmp_pkg.join(modinfo.id.clone() + ".png"), tmp_pkg, None
         ), "Could not create sprite variants");
     }
 
@@ -465,7 +467,7 @@ pub fn create_geode(
 
     for file in modinfo.resources.raw_files {
         let file_name = &file.file_name().unwrap().to_str().unwrap();
-        if !cache_data.are_any_of_these_later(&file_name, &[file.clone()])? {
+        if !cache_data.are_any_of_these_later(file_name, &[file.clone()])? {
             println!("Skipping {} as no changes were detected", file_name.yellow().bold());
             continue;
         }
@@ -474,7 +476,7 @@ pub fn create_geode(
 
     for file in modinfo.resources.prefixed_files {
         let file_name = &file.file_name().unwrap().to_str().unwrap();
-        if !cache_data.are_any_of_these_later(&file_name, &[file.clone()])? {
+        if !cache_data.are_any_of_these_later(file_name, &[file.clone()])? {
             println!("Skipping {} as no changes were detected", file_name.yellow().bold());
             continue;
         }
@@ -507,7 +509,7 @@ pub fn create_geode(
     }
 
     for font in modinfo.resources.fonts {
-        if !cache_data.is_this_json_different_or_file_later(
+        if !cache_data.check_json_different_or_file_later(
             &modinfo.resources.font_jsons[&font.name], font.name.as_str(), &font.ttf_src
         )? {
             println!("Skipping processing {} as no changes were detected", font.name.yellow().bold());
@@ -517,7 +519,7 @@ pub fn create_geode(
             println!("Creating bitmap font from {}", font.name.yellow().bold());
         }
         throw_unwrap!(font::create_bitmap_font_from_ttf(
-            &Path::new(&font.ttf_src),
+            Path::new(&font.ttf_src),
             &tmp_pkg.join("resources"),
             Some(&font.name),
             font.fontsize,
@@ -542,7 +544,7 @@ pub fn create_geode(
         if !item.metadata()?.is_dir() && item.file_name() != "cache_data.json" {
             let mut file_path = item.path().strip_prefix("./")?.to_str().unwrap().to_string();
             if cfg!(windows) {
-                file_path = file_path.replace("/", "\\");
+                file_path = file_path.replace('/', "\\");
             }
             zip.start_file(file_path, zopts)?;
             zip.write_all(&fs::read(item.path())?)?;

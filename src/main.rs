@@ -210,8 +210,8 @@ fn main() {
 
         Commands::Config { cwi, dev } => {
             let mut some_set = false;
-            if cwi.is_some() {
-                if cwi.unwrap() >= Config::get().installations.as_ref().unwrap().len() {
+            if let Some(ver) = cwi {
+                if ver >= Config::get().installations.as_ref().unwrap().len() {
                     print_error!(
                         "Provided index is higher than your \
                         amount of installations!"
@@ -293,7 +293,7 @@ fn main() {
             let bar = progress_bar("Creating font...");
             call_extern!(link::geode_create_bitmap_font_from_ttf(
                 string2c(ttf_path.to_str().unwrap()),
-                string2c(dest.unwrap_or(std::env::current_dir().unwrap()).to_str().unwrap()),
+                string2c(dest.unwrap_or_else(|| std::env::current_dir().unwrap()).to_str().unwrap()),
                 opt2c(name),
                 fontsize,
                 opt2c(prefix),

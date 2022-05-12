@@ -89,8 +89,8 @@ pub fn cli_create_template(project_name: Option<String>, location: Option<PathBu
 
 	let id = format!(
 		"com.{}.{}",
-		developer.to_lowercase().replace(" ", "_"),
-		name.to_lowercase().replace(" ", "_")
+		developer.to_lowercase().replace(' ', "_"),
+		name.to_lowercase().replace(' ', "_")
 	);
 	
 	println!(
@@ -113,10 +113,8 @@ pub fn cli_create_template(project_name: Option<String>, location: Option<PathBu
 			println!("{}", "Aborting".bright_red());
 			return;
 		}
-	} else {
-		if fs::create_dir_all(&project_location).is_err() {
-			print_error!("Unable to create directory for project");
-		}
+	} else if fs::create_dir_all(&project_location).is_err() {
+		print_error!("Unable to create directory for project");
 	}
 
 	let bar = ProgressBar::new_spinner();

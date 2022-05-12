@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 pub mod util;
 pub mod package;
 pub mod template;
@@ -23,7 +25,7 @@ where E: ToString {
     let new = libc::malloc(bytes.len()) as *mut c_char;
     libc::strcpy(new, desc);
 
-    return new;
+    new
 }
 
 unsafe fn c2string(a: *const c_char) -> &'static str {
@@ -41,7 +43,7 @@ unsafe fn c2option(a: *const c_char) -> Option<&'static str> {
 
 #[no_mangle]
 pub unsafe extern "C" fn geode_version() -> i32 {
-	return GEODE_VERSION;
+	GEODE_VERSION
 }
 
 #[no_mangle]
@@ -166,8 +168,8 @@ pub unsafe extern "C" fn geode_sprite_sheet(
 
 			let sl = std::slice::from_raw_parts_mut((*pack_info).created_files, res.suffix_removals as usize);
 
-			for file_idx in 0..res.created_files.len() {
-				sl[file_idx] = string2c(&res.created_files[file_idx]);
+			for (file_idx, file) in res.created_files.into_iter().enumerate() {
+				sl[file_idx] = string2c(file);
 			}
 			std::ptr::null()
 		},
