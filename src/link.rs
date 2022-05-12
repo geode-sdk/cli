@@ -130,6 +130,12 @@ extern "C" {
 	    use_cached_resources: bool,
 	) -> *const c_char;
 
+	pub fn geode_amend_package(
+		geode_file: *const c_char,
+		file_to_add: *const c_char,
+		dir_in_zip: *const c_char
+	) -> *const c_char;
+	
 	pub fn geode_install_package(
 		out_file: *const c_char,
 		install_path: *const c_char
