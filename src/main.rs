@@ -70,6 +70,19 @@ enum Commands {
         cached: bool,
     },
 
+    /// Add a file to a .geode package
+    Amend {
+        /// Path to the .geode file to amend
+		geode_file: PathBuf,
+
+        /// Path to the file to add
+		file_to_add: PathBuf,
+
+        /// Directory in the .geode package where to 
+        /// add the file
+		dir_in_zip: PathBuf
+    },
+
     /// Create a sprite sheet out of a bunch of sprites
     Sheet {
         /// Path to directory containing the sprites
@@ -193,6 +206,15 @@ fn main() {
                     string2c(out_file)
                 ));
             }
+        },
+
+        Commands::Amend { geode_file, file_to_add, dir_in_zip } => {
+            call_extern!(link::geode_amend_package(
+                string2c(geode_file.to_str().unwrap()),
+                string2c(file_to_add.to_str().unwrap()),
+                string2c(dir_in_zip.to_str().unwrap()),
+            ));
+            println!("{}", "Amended package :)".green());
         },
 
         Commands::Config { cwi, dev } => {

@@ -4,6 +4,8 @@ use colored::Colorize;
 use glob::glob;
 use std::time::{Duration, SystemTime};
 use path_absolutize::Absolutize;
+use std::io::BufReader;
+use std::io::Read;
 
 use crate::{throw_error, throw_unwrap, spritesheet, font};
 
@@ -396,7 +398,7 @@ pub fn create_geode(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let mod_json = serde_json::from_str(&fs::read_to_string(mod_src_dir.join("mod.json"))?)?;
     let modinfo = extract_mod_info(&mod_json, &mod_src_dir.to_path_buf())?;
-
+    
     println!("{}", 
         format!("Packaging {}", 
             modinfo.id
@@ -559,6 +561,31 @@ pub fn create_geode(
             out_file.file_name().unwrap().to_str().unwrap()
         ).yellow().bold()
     );
+
+    Ok(())
+}
+
+pub fn amend_geode(
+    geode_file: &Path,
+    file_to_add: &Path,
+    dir_in_zip: &Path
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut zip = zip::ZipWriter::new_append(
+        File::options().read(true).write(true).open(geode_file)?
+    )?;
+    
+    zip.start_file(
+        dir_in_zip.join(file_to_add.file_name().unwrap()).to_str().unwrap(),
+        Default::default()
+    )?;
+    
+    let f = File::open(file_to_add)?;
+    let mut reader = BufReader::new(f);
+    let mut buf = Vec::new();
+    reader.read_to_end(&mut buf)?;
+    zip.write_all(&buf)?;
+
+    zip.finish()?;
 
     Ok(())
 }

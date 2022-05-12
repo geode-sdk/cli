@@ -140,6 +140,22 @@ pub unsafe extern "C" fn geode_package(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn geode_amend_package(
+    geode_file: *const c_char,
+    file_to_add: *const c_char,
+    dir_in_zip: *const c_char
+) -> *const c_char {
+	match crate::package::amend_geode(
+		Path::new(c2string(geode_file)),
+		Path::new(c2string(file_to_add)),
+		Path::new(c2string(dir_in_zip)),
+	) {
+		Ok(_) => std::ptr::null(),
+		Err(b) => string2c(b)
+	}
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn geode_install_package(
 	out_file: *const c_char,
 	install_path: *const c_char
