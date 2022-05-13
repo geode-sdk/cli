@@ -9,6 +9,19 @@ pub struct CPackInfo {
 	pub created_files: *mut *const c_char
 }
 
+#[repr(C)]
+pub struct VersionInfo {
+	major: i32,
+	minor: i32,
+	patch: i32,
+}
+
+impl VersionInfo {
+    pub fn to_string(&self) -> String {
+        format!("v{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
 impl CPackInfo {
 	pub fn get_files(&self) -> Vec<String> {
 		unsafe {
@@ -25,7 +38,6 @@ impl CPackInfo {
 	}
 }
 
-
 #[cfg_attr(target_os = "windows", link(name = "geodeutils.dll"))]
 #[cfg_attr(not(target_os = "windows"), link(name = "geodeutils"))]
 extern "C" {
@@ -40,7 +52,7 @@ extern "C" {
 		has_update: *mut bool
 	) -> *const c_char;
 
-	pub fn geode_version() -> i32;
+	pub fn geode_version() -> VersionInfo;
 }
 
 #[macro_export]

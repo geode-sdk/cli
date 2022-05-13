@@ -8,7 +8,24 @@ pub mod suite;
 
 use std::path::Path;
 
-pub const GEODE_VERSION: i32 = 1;
+#[repr(C)]
+pub struct VersionInfo {
+	major: i32,
+	minor: i32,
+	patch: i32,
+}
+
+impl VersionInfo {
+    pub fn to_string(&self) -> String {
+        format!("v{}.{}.{}", self.major, self.minor, self.patch)
+    }
+}
+
+pub const GEODE_VERSION: VersionInfo = VersionInfo {
+	major: 0,
+	minor: 1,
+	patch: 0
+};
 
 use std::ffi::CStr;
 use std::os::raw::c_char;
@@ -31,8 +48,8 @@ unsafe fn c2string(a: *const c_char) -> &'static str {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn geode_version() -> i32 {
-	GEODE_VERSION
+pub unsafe extern "C" fn geode_version() -> VersionInfo {
+	return GEODE_VERSION;
 }
 
 #[no_mangle]

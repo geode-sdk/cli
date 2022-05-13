@@ -41,7 +41,7 @@ pub fn create_template(
     }
 
     let mod_json = json!({
-        "geode":        unsafe {geode_version()},
+        "geode":        unsafe {geode_version().to_string()},
         "version":      version,
         "id":           id,
         "name":         name,
