@@ -230,14 +230,15 @@ fn main() {
                 println!(
                     " == {} == \n\
                     Version: {}\n\
+                    Target Geode Version: {}\n\
                     Path: {}\n\
                     Default developer: {}\n\
                     Data directory: {}\n\
                     Selected Installation: {}\n\
-                    -> Path: {}\n\
-                    -> Loader Version: {}",
+                    -> Path: {}",
                     GEODE_CLI_NAME.to_string().green(),
                     GEODE_CLI_VERSION.to_string().yellow(),
+                    unsafe {link::geode_version()}.to_string().red(),
                     std::env::current_exe().unwrap().to_str().unwrap().cyan(),
                     match Config::get().default_developer.as_ref() {
                         Some(s) => s,
@@ -246,7 +247,6 @@ fn main() {
                     Config::data_dir().to_str().unwrap().cyan(),
                     Config::get().working_installation.unwrap().to_string().red(),
                     Config::work_inst().path.to_str().unwrap().cyan(),
-                    unsafe {link::geode_version()}.to_string().red(),
                 );
             }
         },
