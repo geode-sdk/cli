@@ -1,9 +1,10 @@
+use path_absolutize::Absolutize;
 use std::io::Write;
 use std::fs::File;
 use colored::Colorize;
 use glob::glob;
 use std::time::{Duration, SystemTime};
-use path_absolutize::Absolutize;
+
 use std::io::BufReader;
 use std::io::Read;
 
@@ -160,9 +161,9 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &Path) -> Result<ModInf
     let mut bin_list = Vec::new();
 
 
-    match mod_json["binary"].clone() {
+    match &mod_json["binary"] {
         Value::String(s) => {
-            let mut filename = s;
+            let mut filename = s.to_string();
             if !filename.ends_with(platform_extension()) {
                 filename += platform_extension();
             }

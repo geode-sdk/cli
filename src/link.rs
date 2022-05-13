@@ -41,61 +41,6 @@ extern "C" {
 	) -> *const c_char;
 
 	pub fn geode_version() -> i32;
-
-	pub fn geode_create_template(
-		project_location: *const c_char,
-		name: *const c_char,
-		version: *const c_char,
-		id: *const c_char,
-		developer: *const c_char,
-		description: *const c_char
-	) -> *const c_char;
-
-	pub fn geode_package(
-	    resource_dir: *const c_char,
-	    exec_dir: *const c_char,
-	    out_file: *const c_char,
-	    log: bool,
-	    use_cached_resources: bool,
-	) -> *const c_char;
-
-	pub fn geode_amend_package(
-		geode_file: *const c_char,
-		file_to_add: *const c_char,
-		dir_in_zip: *const c_char
-	) -> *const c_char;
-
-	pub fn geode_install_package(
-		out_file: *const c_char,
-		install_path: *const c_char
-	) -> *const c_char;
-
-	pub fn geode_sprite_sheet(
-		in_dir: *const c_char,
-		out_dir: *const c_char,
-		create_variants: bool,
-		name: *const c_char, // can be null
-		prefix: *const c_char, // can be null
-		pack_info: *mut CPackInfo
-	) -> *const c_char;
-
-
-	pub fn geode_sprite_variants(
-		file: *const c_char,
-		out_dir: *const c_char,
-		prefix: *const c_char // can be null
-	) -> *const c_char;
-
-	pub fn geode_create_bitmap_font_from_ttf(
-		ttf_path: *const c_char,
-		out_dir: *const c_char,
-		name: *const c_char, // can be null
-		fontsize: u32,
-		prefix: *const c_char, // can be null
-		create_variants: bool,
-		charset: *const c_char, // can be null
-		outline: u32,
-	) -> *const c_char;
 }
 
 #[macro_export]

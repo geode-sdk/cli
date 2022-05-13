@@ -1,10 +1,15 @@
-use crate::link::{string2c, opt2c};
+
 use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
-pub mod template_ui;
+pub mod util;
+pub mod spritesheet;
+pub mod font;
+pub mod dither;
+pub mod template;
+pub mod package;
 pub mod config;
 pub mod link;
 
@@ -51,14 +56,14 @@ enum Commands {
     /// into a .geode file
     Pkg {
         /// Path to the mod's mod.json file
-        resource_dir: String,
+        resource_dir: PathBuf,
 
         /// Path to the directory containing the mod's 
         /// platform binary.
-        exec_dir: String,
+        exec_dir: PathBuf,
 
         /// Path to put the generated .geode file
-        out_file: String,
+        out_file: PathBuf,
         
         /// Automatically copy the generated .geode 
         /// file to the Geode mods directory
@@ -180,31 +185,37 @@ fn main() {
     let args = Cli::parse();
 
     match args.command {
-        Commands::New { location, name } => template_ui::cli_create_template(name, location),
+        Commands::New { location, name } => template::build_template(name, location),
 
         Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => {
-            call_extern!(link::geode_package(
-                string2c(resource_dir),
-                string2c(exec_dir),
-                string2c(&out_file),
+            if let Err(e) = package::create_geode(
+                &resource_dir,
+                &exec_dir,
+                &out_file,
                 true,
                 cached,
-            ));
+            ) {
+                print_error!("Error packaging geode file: {}", e);
+            }
 
             if install {
-                call_extern!(link::geode_install_package(
-                    string2c(Config::work_inst().path.to_str().unwrap()),
-                    string2c(out_file)
-                ));
+                if let Err(e) = package::install_geode(
+                    &Config::work_inst().path,
+                    &out_file
+                ) {
+                    print_error!("Error installing package: {}", e);
+                }
             }
         },
 
         Commands::Amend { geode_file, file_to_add, dir_in_zip } => {
-            call_extern!(link::geode_amend_package(
-                string2c(geode_file.to_str().unwrap()),
-                string2c(file_to_add.to_str().unwrap()),
-                string2c(dir_in_zip.to_str().unwrap()),
-            ));
+            if let Err(e) = package::amend_geode(
+                &geode_file,
+                &file_to_add,
+                &dir_in_zip,
+            ) {
+                print_error!("Error amending package: {}", e);
+            }
             println!("{}", "Amended package :)".green());
         },
 
@@ -254,23 +265,21 @@ fn main() {
         Commands::Sheet { src, dest, variants, name, prefix } => {
             let bar = progress_bar("Creating spritesheet(s)...");
 
-            let mut res = link::CPackInfo {
-                suffix_removals: 0,
-                created_files: std::ptr::null_mut()
-            };
 
-            call_extern!(link::geode_sprite_sheet(
-                string2c(src.to_str().unwrap()),
-                string2c(dest.to_str().unwrap()),
+            let res = match spritesheet::pack_sprites_in_dir(
+                &src,
+                &dest,
                 variants,
-                opt2c(name),
-                opt2c(prefix),
-                (&mut res) as *mut link::CPackInfo
-            ));
+                name.as_deref(),
+                prefix.as_deref()
+            ) {
+                Ok(a) => a,
+                Err(e) => print_error!("Error creating spritesheet: {}", e)
+            };
 
             bar.finish_with_message(format!("{}", "Spritesheet created!".bright_green()));
 
-            for file in res.get_files() {
+            for file in res.created_files {
                 println!("{} -> {}", "[ info ]".bright_yellow(), file);
             }
 
@@ -281,26 +290,32 @@ fn main() {
 
         Commands::Sprite { src, dest, prefix } => {
             let bar = progress_bar("Creating variants...");
-            call_extern!(link::geode_sprite_variants(
-                string2c(src.to_str().unwrap()),
-                string2c(dest.to_str().unwrap()),
-                opt2c(prefix)
-            ));
+            match spritesheet::create_variants_of_sprite(
+                &src,
+                &dest,
+                prefix.as_deref()
+            ) {
+                Ok(_) => (),
+                Err(e) => print_error!("Error creating variants: {}", e)
+            }
             bar.finish_with_message(format!("{}", "Variants created!".bright_green()));
         },
 
         Commands::Font { ttf_path, dest, fontsize, name, variants, prefix, charset, outline } => {
             let bar = progress_bar("Creating font...");
-            call_extern!(link::geode_create_bitmap_font_from_ttf(
-                string2c(ttf_path.to_str().unwrap()),
-                string2c(dest.unwrap_or_else(|| std::env::current_dir().unwrap()).to_str().unwrap()),
-                opt2c(name),
+            match font::create_bitmap_font_from_ttf(
+                &ttf_path,
+                &dest.unwrap_or_else(|| std::env::current_dir().unwrap()),
+                name.as_deref(),
                 fontsize,
-                opt2c(prefix),
+                prefix.as_deref(),
                 variants,
-                opt2c(charset),
+                charset.as_deref(),
                 outline,
-            ));
+            ) {
+                Ok(_) => (),
+                Err(e) => print_error!("Error creating font: {}", e)
+            }
             bar.finish_with_message(format!("{}", "Bitmap font created!".bright_green()));
         },
 
