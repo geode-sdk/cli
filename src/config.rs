@@ -1,9 +1,12 @@
+#[cfg(windows)]
+use directories::BaseDirs;
+
 use std::path::{PathBuf};
 use std::vec::Vec;
 use std::process::exit;
 use std::fs;
 use serde::{Deserialize, Serialize};
-use colored::*;
+use colored::Colorize;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
