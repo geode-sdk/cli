@@ -5,7 +5,8 @@ use reqwest::blocking::get;
 
 pub fn install_geode(
 	exe: &Path,
-	nightly: bool
+	nightly: bool,
+	api: bool
 ) -> Result<(), Box<dyn std::error::Error>> {
 	let url = if nightly {
 		"https://github.com/geode-sdk/suite/archive/refs/heads/nightly.zip"
@@ -40,8 +41,9 @@ pub fn install_geode(
 	let mut archive = zip::ZipArchive::new(std::io::Cursor::new(resp))?;
 	archive.extract(&src_dir).unwrap();
 
-
-	fs::copy(src_dir.join("GeodeAPI.geode"), mod_dir)?;
+	if api {
+		fs::copy(src_dir.join("GeodeAPI.geode"), mod_dir)?;
+	}
 
 	if cfg!(windows) {
 		fs::copy(src_dir.join("geode.dll"), &loader_dir)?;
@@ -56,6 +58,8 @@ pub fn install_geode(
 
 		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir)?;
 	}
+
+	fs::remove_dir_all(std::env::temp_dir().join("Geode"))?;
 
 	Ok(())
 }

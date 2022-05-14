@@ -72,11 +72,13 @@ pub unsafe extern "C" fn geode_install_suite(
 #[no_mangle]
 pub unsafe extern "C" fn geode_install_geode(
 	location: *const c_char,
-	nightly: bool
+	nightly: bool,
+	api: bool
 ) -> *const c_char {
 	match crate::install::install_geode(
 		Path::new(c2string(location)),
-		nightly
+		nightly,
+		api
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => string2c(b)
