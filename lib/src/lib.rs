@@ -82,3 +82,15 @@ pub unsafe extern "C" fn geode_install_geode(
 		Err(b) => string2c(b)
 	}
 }
+
+#[no_mangle]
+pub unsafe extern "C" fn geode_uninstall_geode(
+	location: *const c_char
+) -> *const c_char {
+	match crate::install::uninstall_geode(
+		Path::new(c2string(location))
+	) {
+		Ok(_) => std::ptr::null(),
+		Err(b) => string2c(b)
+	}
+}

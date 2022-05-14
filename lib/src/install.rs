@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 use std::fs;
 use std::path::Path;
 
@@ -49,10 +46,51 @@ pub fn install_geode(
 	if cfg!(windows) {
 		fs::copy(src_dir.join("geode.dll"), &loader_dir)?;
 		fs::copy(src_dir.join("XInput9_1_0.dll"), &loader_dir)?;
+		fs::write(loader_dir.join("steam_appid.txt"), "322170")?;
 	} else {
 		fs::copy(src_dir.join("Geode.dylib"), &loader_dir)?;
+
+		if !loader_dir.join("dontdelete_fmod.dylib").exists() {
+			fs::copy(loader_dir.join("libfmod.dylib"), loader_dir.join("dontdelete_fmod.dylib"))?;
+		}
+
 		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir)?;
 	}
+
+	Ok(())
+}
+
+#[cfg(windows)]
+pub fn uninstall_geode(exe: &Path) -> std::io::Result<()> {
+	if exe.join("XInput9_1_0.dll").exists() {
+		fs::remove_file(exe.join("XInput9_1_0.dll"))?;
+	}
+	if exe.join("geode.dll").exists() {
+		fs::remove_file(exe.join("geode.dll"))?;
+	}
+	if exe.join("geode").exists() {
+		fs::remove_dir_all(exe.join("geode"))?;
+	}
+
+	Ok(())
+}
+
+#[cfg(not(windows))]
+pub fn uninstall_geode(exe: &Path) -> std::io::Result<()> {
+	let frameworks = exe.join("Contents").join("Frameworks");
+	let contents = exe.join("Contents");
+
+	if !frameworks.join("dontdelete_fmod.dylib").exists() {
+		return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "Can't find backup libfmod.dylib, unable to install!"));
+	}
+	if frameworks.join("Geode.dylib").exists() {
+		fs::remove_file(frameworks.join("geode.dll"))?;
+	}
+	if contents.join("geode").exists() {
+		fs::remove_dir_all(contents.join("geode"))?;
+	}
+
+	fs::copy(frameworks.join("dontdelete_fmod.dylib"), frameworks.join("libfmod.dylib"))?;
 
 	Ok(())
 }
