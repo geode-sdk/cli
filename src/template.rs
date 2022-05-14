@@ -2,13 +2,14 @@ use colored::Colorize;
 use crate::config::Config;
 use crate::link::geode_version;
 use git2::Repository;
-use indicatif::{ProgressBar, ProgressStyle};
 use path_absolutize::Absolutize;
 use rustyline::Editor;
 use std::fs;
 use std::io::{stdin, stdout, Write};
 use std::path::{Path, PathBuf};
-use serde_json::{json, to_string_pretty};
+use serde_json::{json};
+use serde::Serialize;
+use crate::progress_bar;
 
 #[macro_export]
 macro_rules! print_error {
@@ -24,7 +25,7 @@ pub fn create_template(
     version: &str,
     id: &str,
     developer: &str,
-    description: &str
+    description: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let project_name: String = name.chars().filter(|c| !c.is_whitespace()).collect();
 
@@ -56,9 +57,13 @@ pub fn create_template(
         ]
     });
 
+    let buf = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+    let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+    mod_json.serialize(&mut ser).unwrap();
     fs::write(
         &project_location.join("mod.json"),
-        to_string_pretty(&mod_json).unwrap()
+        String::from_utf8(ser.into_inner()).unwrap()
     ).expect("Unable to write to specified project");
 
     Ok(())
@@ -152,23 +157,7 @@ pub fn build_template(name: Option<String>, location: Option<PathBuf>) {
         print_error!("Unable to create directory for project");
     }
 
-    let bar = ProgressBar::new_spinner();
-    bar.enable_steady_tick(120);
-    bar.set_style(
-        ProgressStyle::default_spinner()
-            .tick_strings(&[
-                "[##    ]",
-                "[###   ]",
-                "[####  ]",
-                "[ #### ]",
-                "[   ###]",
-                "[    ##]",
-                "[#    #]",
-                "[ done ]",
-            ])
-            .template("{spinner:.cyan} {msg}"),
-    );
-    bar.set_message(format!("{}", "Creating...".bright_cyan()));
+    let bar = progress_bar("Creating...");
 
     if let Err(e) = create_template(
         &project_location,
@@ -176,7 +165,7 @@ pub fn build_template(name: Option<String>, location: Option<PathBuf>) {
         &version,
         &id,
         &developer,
-        &description
+        &description,
     ) {
         print_error!("Error creating template: {}", e);
     }

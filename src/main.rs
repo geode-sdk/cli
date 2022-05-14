@@ -152,7 +152,7 @@ enum Commands {
     }
 }
 
-fn progress_bar(text: &str) -> ProgressBar {
+pub fn progress_bar(text: &str) -> ProgressBar {
     let bar = ProgressBar::new_spinner();
     bar.enable_steady_tick(120);
     bar.set_style(
