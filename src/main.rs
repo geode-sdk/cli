@@ -320,12 +320,9 @@ fn main() {
         },
 
         Commands::Install { path } => {
-            std::fs::rename(
-                &path,
-                Config::work_inst().path
-                    .join("geode")
-                    .join("mods")
-                    .join(path.file_name().unwrap())
+            package::install_geode_file(
+                &Config::work_inst().path,
+                &path
             ).unwrap();
         }
     }
