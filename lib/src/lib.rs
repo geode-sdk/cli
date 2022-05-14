@@ -5,6 +5,7 @@
 //pub mod dither;
 //pub mod font;
 pub mod suite;
+pub mod install;
 
 use std::path::Path;
 
@@ -68,3 +69,16 @@ pub unsafe extern "C" fn geode_install_suite(
 	}
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn geode_install_geode(
+	location: *const c_char,
+	nightly: bool
+) -> *const c_char {
+	match crate::install::install_geode(
+		Path::new(c2string(location)),
+		nightly
+	) {
+		Ok(_) => std::ptr::null(),
+		Err(b) => string2c(b)
+	}
+}

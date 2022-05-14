@@ -373,7 +373,7 @@ fn extract_mod_info(mod_json: &Value, mod_json_location: &Path) -> Result<ModInf
     })
 }
 
-pub fn install_geode(
+pub fn install_geode_file(
     install_path: &Path,
     out_file: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {

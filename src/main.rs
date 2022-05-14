@@ -199,7 +199,7 @@ fn main() {
             }
 
             if install {
-                if let Err(e) = package::install_geode(
+                if let Err(e) = package::install_geode_file(
                     &Config::work_inst().path,
                     &out_file
                 ) {
