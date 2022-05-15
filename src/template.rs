@@ -1,6 +1,6 @@
 use colored::Colorize;
 use crate::config::Config;
-use crate::link::geode_version;
+use crate::link::geode_target_version;
 use git2::Repository;
 use path_absolutize::Absolutize;
 use rustyline::Editor;
@@ -42,7 +42,7 @@ pub fn create_template(
     }
 
     let mod_json = json!({
-        "geode":        unsafe {geode_version().to_string()},
+        "geode":        unsafe {geode_target_version().to_string()},
         "version":      version,
         "id":           id,
         "name":         name,

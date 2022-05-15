@@ -7,12 +7,17 @@ use std::process::exit;
 use std::fs;
 use serde::{Deserialize, Serialize};
 use colored::Colorize;
+use std::collections::HashMap;
+
+type Other = HashMap<String, serde_json::Value>;
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Installation {
 	pub path: PathBuf,
 	pub executable: String,
+    #[serde(flatten)]
+    other: Option<Other>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -22,6 +27,8 @@ pub struct Config {
 	pub working_installation: Option<usize>,
 	pub installations: Option<Vec<Installation>>,
 	pub default_developer: Option<String>,
+    #[serde(flatten)]
+    other: Option<Other>,
 }
 
 static mut CONFIG: Config = Config {
@@ -29,6 +36,7 @@ static mut CONFIG: Config = Config {
 	working_installation: None,
 	installations: None,
 	default_developer: None,
+	other: None,
 };
 
 impl Config {

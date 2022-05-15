@@ -249,7 +249,7 @@ fn main() {
                     -> Path: {}",
                     GEODE_CLI_NAME.to_string().green(),
                     GEODE_CLI_VERSION.to_string().yellow(),
-                    unsafe {link::geode_version()}.to_string().red(),
+                    unsafe {link::geode_target_version()}.to_string().red(),
                     std::env::current_exe().unwrap().to_str().unwrap().cyan(),
                     match Config::get().default_developer.as_ref() {
                         Some(s) => s,

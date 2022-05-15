@@ -16,13 +16,35 @@ pub struct VersionInfo {
 	patch: i32,
 }
 
+macro_rules! scan {
+    ( $string:expr, $sep:expr, $( $x:ty ),+ ) => {{
+        let mut iter = $string.split($sep);
+        ($(iter.next().and_then(|word| word.parse::<$x>().ok()),)*)
+    }}
+}
+
 impl VersionInfo {
     pub fn to_string(&self) -> String {
         format!("v{}.{}.{}", self.major, self.minor, self.patch)
     }
+
+	pub fn from_string(str: &String) -> VersionInfo {
+		let r = scan!(str, ".", i32, i32, i32);
+		VersionInfo {
+			major: r.0.unwrap(),
+			minor: r.1.unwrap(),
+			patch: r.2.unwrap(),
+		}
+	}
 }
 
-pub const GEODE_VERSION: VersionInfo = VersionInfo {
+#[repr(C)]
+pub struct InstallInfo {
+	loader_version: VersionInfo,
+	api_version: VersionInfo,
+}
+
+pub const GEODE_TARGET_VERSION: VersionInfo = VersionInfo {
 	major: 0,
 	minor: 1,
 	patch: 0
@@ -49,8 +71,8 @@ unsafe fn c2string(a: *const c_char) -> &'static str {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn geode_version() -> VersionInfo {
-	return GEODE_VERSION;
+pub unsafe extern "C" fn geode_target_version() -> VersionInfo {
+	return GEODE_TARGET_VERSION;
 }
 
 #[no_mangle]

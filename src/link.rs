@@ -1,13 +1,6 @@
 #![allow(clippy::missing_safety_doc)]
 
-use std::ffi::CStr;
 use std::os::raw::c_char;
-
-#[repr(C)]
-pub struct CPackInfo {
-	pub suffix_removals: u32,
-	pub created_files: *mut *const c_char
-}
 
 #[repr(C)]
 pub struct VersionInfo {
@@ -22,20 +15,10 @@ impl VersionInfo {
     }
 }
 
-impl CPackInfo {
-	pub fn get_files(&self) -> Vec<String> {
-		unsafe {
-			let mut out: Vec<String> = vec![];
-
-			let sl = std::slice::from_raw_parts_mut(self.created_files, self.suffix_removals as usize);
-
-			for file_idx in 0..self.suffix_removals {
-				out.push(CStr::from_ptr(sl[file_idx as usize]).to_str().unwrap().to_string());
-			}
-
-			out
-		}
-	}
+#[repr(C)]
+pub struct InstallInfo {
+	loader_version: VersionInfo,
+	api_version: VersionInfo,
 }
 
 #[cfg_attr(target_os = "windows", link(name = "geodeutils.dll"))]
@@ -52,7 +35,7 @@ extern "C" {
 		has_update: *mut bool
 	) -> *const c_char;
 
-	pub fn geode_version() -> VersionInfo;
+	pub fn geode_target_version() -> VersionInfo;
 }
 
 #[macro_export]

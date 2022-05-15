@@ -2,12 +2,15 @@ use std::fs;
 use std::path::Path;
 
 use reqwest::blocking::get;
+use crate::VersionInfo;
+use crate::InstallInfo;
+use serde_json;
 
 pub fn install_geode(
 	exe: &Path,
 	nightly: bool,
 	api: bool
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<InstallInfo, Box<dyn std::error::Error>> {
 	let url = if nightly {
 		"https://github.com/geode-sdk/suite/archive/refs/heads/nightly.zip"
 	} else {
@@ -35,7 +38,6 @@ pub fn install_geode(
 		exe.join("Contents").join("Frameworks")
 	};
 
-
 	let resp = get(url)?.bytes()?;
 
 	let mut archive = zip::ZipArchive::new(std::io::Cursor::new(resp))?;
@@ -59,9 +61,24 @@ pub fn install_geode(
 		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir)?;
 	}
 
+	src_dir.pop();
+	let versions_json = match serde_json::from_str(
+		&fs::read_to_string(src_dir.join("versions.json")).unwrap()
+	) {
+		Ok(p) => p,
+		Err(_) => serde_json::Value::default()
+	};
+
 	fs::remove_dir_all(std::env::temp_dir().join("Geode"))?;
 
-	Ok(())
+	Ok(InstallInfo {
+		loader_version: VersionInfo::from_string(
+			&versions_json["loader"].as_str().unwrap().to_string()
+		),
+		api_version: VersionInfo::from_string(
+			&versions_json["api"].as_str().unwrap().to_string()
+		),
+	})
 }
 
 #[cfg(windows)]
