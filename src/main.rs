@@ -179,13 +179,13 @@ fn main() {
         Ok(_) => {},
         Err(e) => println!("Unable to enable ANSI support: {}", e)
     }
-
-    Config::init();
+    
+	let mut config = Config::new();
 
     let args = Cli::parse();
 
     match args.command {
-        Commands::New { location, name } => template::build_template(name, location),
+        Commands::New { location, name } => template::build_template(&mut config, name, location),
 
         Commands::Pkg { resource_dir, exec_dir, out_file, install, cached } => {
             if let Err(e) = package::create_geode(
@@ -200,7 +200,7 @@ fn main() {
 
             if install {
                 if let Err(e) = package::install_geode_file(
-                    &Config::work_inst().path,
+                    &config.work_inst().path,
                     &out_file
                 ) {
                     print_error!("Error installing package: {}", e);
@@ -222,18 +222,18 @@ fn main() {
         Commands::Config { cwi, dev } => {
             let mut some_set = false;
             if let Some(ver) = cwi {
-                if ver >= Config::get().installations.as_ref().unwrap().len() {
+                if ver >= config.installations.as_ref().unwrap().len() {
                     print_error!(
                         "Provided index is higher than your \
                         amount of installations!"
                     );
                 }
-                Config::get().working_installation = cwi;
+                config.working_installation = cwi;
                 some_set = true;
                 println!("Updated working installation");
             }
             if dev.is_some() {
-                Config::get().default_developer = dev;
+                config.default_developer = dev;
                 some_set = true;
                 println!("Updated default developer");
             }
@@ -251,13 +251,13 @@ fn main() {
                     GEODE_CLI_VERSION.to_string().yellow(),
                     unsafe {link::geode_target_version()}.to_string().red(),
                     std::env::current_exe().unwrap().to_str().unwrap().cyan(),
-                    match Config::get().default_developer.as_ref() {
+                    match config.default_developer.as_ref() {
                         Some(s) => s,
                         None => "<none>"
                     }.purple(),
                     Config::data_dir().to_str().unwrap().cyan(),
-                    Config::get().working_installation.unwrap().to_string().red(),
-                    Config::work_inst().path.to_str().unwrap().cyan(),
+                    config.working_installation.unwrap().to_string().red(),
+                    config.work_inst().path.to_str().unwrap().cyan(),
                 );
             }
         },
@@ -321,11 +321,11 @@ fn main() {
 
         Commands::Install { path } => {
             package::install_geode_file(
-                &Config::work_inst().path,
+                &config.work_inst().path,
                 &path
             ).unwrap();
         }
     }
 
-    Config::save();
+    config.save();
 }

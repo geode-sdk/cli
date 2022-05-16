@@ -94,7 +94,7 @@ fn ask_value(prompt: &str, default: &str, required: bool) -> String {
     }
 }
 
-pub fn build_template(name: Option<String>, location: Option<PathBuf>) {
+pub fn build_template(config: &mut Config, name: Option<String>, location: Option<PathBuf>) {
     let name = match name {
         Some(s) => ask_value("Name", s.as_str(), true),
         None => ask_value("Name", "", true)
@@ -109,11 +109,11 @@ pub fn build_template(name: Option<String>, location: Option<PathBuf>) {
     let version = ask_value("Version", "v1.0.0", true);
     let developer = ask_value(
         "Developer",
-        Config::get().default_developer.as_ref().unwrap_or(&String::new()),
+        config.default_developer.as_ref().unwrap_or(&String::new()),
         true
     );
 
-    if Config::get().default_developer.is_none() {
+    if config.default_developer.is_none() {
         println!("{}{}{}\n{}{}",
             "Using ".bright_cyan(),
             developer,
@@ -121,7 +121,7 @@ pub fn build_template(name: Option<String>, location: Option<PathBuf>) {
             "If this is undesirable, use ".bright_cyan(),
             "`geode config --dev <NAME>`".bright_yellow()
         );
-        Config::get().default_developer = Some(developer.clone());
+        config.default_developer = Some(developer.clone());
     }
 
     let description = ask_value("Description", "", false);
