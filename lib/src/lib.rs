@@ -6,8 +6,11 @@
 //pub mod font;
 pub mod suite;
 pub mod install;
+use std::os::raw::c_char;
 
 use std::path::Path;
+
+pub type ProgressCallback = extern "stdcall" fn(*const c_char, i32) -> ();
 
 #[repr(C)]
 pub struct VersionInfo {
@@ -51,7 +54,6 @@ pub const GEODE_TARGET_VERSION: VersionInfo = VersionInfo {
 };
 
 use std::ffi::CStr;
-use std::os::raw::c_char;
 
 unsafe fn string2c<E>(err: E) -> *mut c_char
 where E: ToString {
@@ -79,7 +81,7 @@ pub unsafe extern "C" fn geode_target_version() -> VersionInfo {
 pub unsafe extern "C" fn geode_install_suite(
 	location: *const c_char,
 	nightly: bool,
-	callback: suite::SuiteProgressCallback
+	callback: ProgressCallback
 ) -> *const c_char {
 	match crate::suite::install_suite(
 		Path::new(c2string(location)),
@@ -95,12 +97,14 @@ pub unsafe extern "C" fn geode_install_suite(
 pub unsafe extern "C" fn geode_install_geode(
 	location: *const c_char,
 	nightly: bool,
-	api: bool
+	api: bool,
+	callback: ProgressCallback
 ) -> *const c_char {
 	match crate::install::install_geode(
 		Path::new(c2string(location)),
 		nightly,
-		api
+		api,
+		callback
 	) {
 		Ok(_) => std::ptr::null(),
 		Err(b) => string2c(b)

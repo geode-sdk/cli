@@ -2,16 +2,14 @@ use git2::{FetchOptions, Repository, RemoteCallbacks, SubmoduleUpdateOptions, Pr
 
 use std::io::{Result, Error, ErrorKind};
 use std::path::Path;
-use std::os::raw::c_char;
 
+use crate::ProgressCallback;
 use crate::string2c;
-
-pub type SuiteProgressCallback = extern "stdcall" fn(*const c_char, i32) -> ();
 
 pub fn install_suite(
     path: &Path,
     nightly: bool,
-	callback: SuiteProgressCallback
+	callback: ProgressCallback
 ) -> Result<()> {
     let prog_fn = |info: &String, prog: Progress| {
         let percentage =

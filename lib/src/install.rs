@@ -6,10 +6,14 @@ use crate::VersionInfo;
 use crate::InstallInfo;
 use serde_json;
 
+use crate::ProgressCallback;
+use crate::string2c;
+
 pub fn install_geode(
 	exe: &Path,
 	nightly: bool,
-	api: bool
+	api: bool,
+	callback: ProgressCallback
 ) -> Result<InstallInfo, Box<dyn std::error::Error>> {
 	let url = if nightly {
 		"https://github.com/geode-sdk/suite/archive/refs/heads/nightly.zip"
@@ -22,7 +26,6 @@ pub fn install_geode(
 		fs::remove_dir_all(&src_dir).unwrap();
 	}
 	fs::create_dir(&src_dir).unwrap();
-
 
 	let mod_dir = if cfg!(windows) {
 		src_dir.push("windows");
@@ -38,7 +41,16 @@ pub fn install_geode(
 		exe.join("Contents").join("Frameworks")
 	};
 
+	unsafe {
+		callback(string2c("Downloading"), 0);
+	}
+
+	// todo: figure out some way to gauge get progress
 	let resp = get(url)?.bytes()?;
+
+	unsafe {
+		callback(string2c("Installing"), 99);
+	}
 
 	let mut archive = zip::ZipArchive::new(std::io::Cursor::new(resp))?;
 	archive.extract(&src_dir).unwrap();
