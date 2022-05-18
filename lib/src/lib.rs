@@ -19,24 +19,20 @@ pub struct VersionInfo {
 	patch: i32,
 }
 
-macro_rules! scan {
-    ( $string:expr, $sep:expr, $( $x:ty ),+ ) => {{
-        let mut iter = $string.split($sep);
-        ($(iter.next().and_then(|word| word.parse::<$x>().ok()),)*)
-    }}
-}
-
 impl VersionInfo {
     pub fn to_string(&self) -> String {
         format!("v{}.{}.{}", self.major, self.minor, self.patch)
     }
 
 	pub fn from_string(str: &String) -> VersionInfo {
-		let r = scan!(str, ".", i32, i32, i32);
+		let numbers: Vec<i32> = if str.starts_with("v") { &str[1..] } else { str.as_str() }
+			.trim().split('.')
+			.map(|s| s.parse().unwrap())
+			.collect();
 		VersionInfo {
-			major: r.0.unwrap(),
-			minor: r.1.unwrap(),
-			patch: r.2.unwrap(),
+			major: numbers[0],
+			minor: numbers[1],
+			patch: numbers[2],
 		}
 	}
 }

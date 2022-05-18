@@ -28,10 +28,8 @@ pub fn install_geode(
 	fs::create_dir(&src_dir).unwrap();
 
 	let mod_dir = if cfg!(windows) {
-		src_dir.push("windows");
 		exe.parent().unwrap().to_path_buf()
 	} else {
-		src_dir.push("macos");
 		exe.join("Contents")
 	}.join("geode").join("mods");
 
@@ -49,38 +47,52 @@ pub fn install_geode(
 	let resp = get(url)?.bytes()?;
 
 	unsafe {
-		callback(string2c("Installing"), 99);
+		callback(string2c("Installing"), 96);
 	}
 	
 	fs::create_dir_all(&mod_dir)?;
 
 	let mut archive = zip::ZipArchive::new(std::io::Cursor::new(resp))?;
 	archive.extract(&src_dir).unwrap();
-
-	if api {
-		fs::copy(src_dir.join("GeodeAPI.geode"), &mod_dir)?;
-	}
-
-	unsafe {
-		callback(string2c("Copying files"), 99);
+	
+	// idk how to access first element of 
+	// iterator in rust and frankly idc
+	for entry in src_dir.read_dir()? {
+		src_dir.push(entry?.file_name());
 	}
 
 	if cfg!(windows) {
-		fs::copy(src_dir.join("geode.dll"), &loader_dir)?;
-		fs::copy(src_dir.join("XInput9_1_0.dll"), &loader_dir)?;
+		src_dir.push("windows");
+	} else if cfg!(macos) {
+		src_dir.push("macos");
+	} else {
+		panic!("Not implemented for this platform");
+	}
+
+	unsafe {
+		callback(string2c("Copying files"), 97);
+	}
+
+	if api {
+		fs::copy(src_dir.join("GeodeAPI.geode"), &mod_dir.join("GeodeAPI.geode"))?;
+	}
+
+	if cfg!(windows) {
+		fs::copy(src_dir.join("geode.dll"), &loader_dir.join("geode.dll"))?;
+		fs::copy(src_dir.join("XInput9_1_0.dll"), &loader_dir.join("XInput9_1_0.dll"))?;
 		fs::write(loader_dir.join("steam_appid.txt"), "322170")?;
 	} else {
-		fs::copy(src_dir.join("Geode.dylib"), &loader_dir)?;
+		fs::copy(src_dir.join("Geode.dylib"), &loader_dir.join("Geode.dylib"))?;
 
 		if !loader_dir.join("dontdelete_fmod.dylib").exists() {
 			fs::copy(loader_dir.join("libfmod.dylib"), loader_dir.join("dontdelete_fmod.dylib"))?;
 		}
 
-		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir)?;
+		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir.join("libfmod.dylib"))?;
 	}
 
 	unsafe {
-		callback(string2c("Finishing"), 99);
+		callback(string2c("Finishing"), 98);
 	}
 
 	src_dir.pop();
