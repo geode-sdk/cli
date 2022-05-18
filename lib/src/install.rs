@@ -51,12 +51,18 @@ pub fn install_geode(
 	unsafe {
 		callback(string2c("Installing"), 99);
 	}
+	
+	fs::create_dir_all(&mod_dir)?;
 
 	let mut archive = zip::ZipArchive::new(std::io::Cursor::new(resp))?;
 	archive.extract(&src_dir).unwrap();
 
 	if api {
-		fs::copy(src_dir.join("GeodeAPI.geode"), mod_dir)?;
+		fs::copy(src_dir.join("GeodeAPI.geode"), &mod_dir)?;
+	}
+
+	unsafe {
+		callback(string2c("Copying files"), 99);
 	}
 
 	if cfg!(windows) {
@@ -73,6 +79,10 @@ pub fn install_geode(
 		fs::copy(src_dir.join("libfmod.dylib"), &loader_dir)?;
 	}
 
+	unsafe {
+		callback(string2c("Finishing"), 99);
+	}
+
 	src_dir.pop();
 	let versions_json = match serde_json::from_str(
 		&fs::read_to_string(src_dir.join("versions.json")).unwrap()
@@ -80,6 +90,10 @@ pub fn install_geode(
 		Ok(p) => p,
 		Err(_) => serde_json::Value::default()
 	};
+
+	unsafe {
+		callback(string2c("Cleaning up"), 99);
+	}
 
 	fs::remove_dir_all(std::env::temp_dir().join("Geode"))?;
 
