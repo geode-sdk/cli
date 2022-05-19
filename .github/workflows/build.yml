@@ -35,7 +35,7 @@ jobs:
 
     - name: Build
       run: |
-        cargo build --release --target-dir ${{ github.workspace }}/build     
+        OPENSSL_STATIC=1 cargo build --release --target-dir ${{ github.workspace }}/build     
     
     - name: Move to output folder
       shell: bash
