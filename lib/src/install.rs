@@ -15,6 +15,7 @@ pub fn install_geode(
 	api: bool,
 	callback: ProgressCallback
 ) -> Result<InstallInfo, Box<dyn std::error::Error>> {
+
 	let url = if nightly {
 		"https://github.com/geode-sdk/suite/archive/refs/heads/nightly.zip"
 	} else {
@@ -63,7 +64,7 @@ pub fn install_geode(
 
 	if cfg!(windows) {
 		src_dir.push("windows");
-	} else if cfg!(macos) {
+	} else if cfg!(target_os = "macos") {
 		src_dir.push("macos");
 	} else {
 		panic!("Not implemented for this platform");
