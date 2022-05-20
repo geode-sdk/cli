@@ -4,9 +4,6 @@ on:
   push:
     branches: [ main ]
 
-env:
-  OPENSSL_STATIC: 1 
-
 jobs:
   build:
     strategy:
@@ -16,9 +13,11 @@ jobs:
         - name: "Windows"
           os: windows-latest
           out_paths: './build/release/geode.exe ./build/release/deps/geodeutils.dll ./build/release/deps/geodeutils.dll.lib'
+          static: ''
         - name: "macOS"
           os: macos-latest
           out_paths: './build/release/geode ./build/release/deps/libgeodeutils.dylib'
+          static: 'export OPENSSL_STATIC=1'
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -38,6 +37,7 @@ jobs:
 
     - name: Build
       run: |
+        ${{ matrix.config.static }}
         cargo build --release --target-dir ${{ github.workspace }}/build     
     
     - name: Move to output folder
