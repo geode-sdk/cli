@@ -1,5 +1,4 @@
 **/target
-Cargo.lock
 mod.json
 list.json
 .DS_Store
