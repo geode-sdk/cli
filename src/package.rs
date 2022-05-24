@@ -592,3 +592,56 @@ pub fn amend_geode(
 
     Ok(())
 }
+
+pub fn edit_geode_interactive(
+    geode_file: &Path,
+    tmp_folder: Option<PathBuf>
+) -> Result<(), Box<dyn std::error::Error>> {
+    let cwd = std::env::current_dir().unwrap();
+
+    let tmp_folder = tmp_folder.unwrap_or(cwd.join("geode_interactive"));
+
+    if !tmp_folder.exists() {
+        fs::create_dir(&tmp_folder)?;
+    }
+
+    let reader = BufReader::new(File::open(geode_file).unwrap());
+    let mut zipfile = zip::ZipArchive::new(reader).unwrap();
+
+    zipfile.extract(&tmp_folder)?;
+
+
+    let mut _b = String::new();
+
+    println!("{}", "Currently unzipped, press enter to repackage".bright_cyan());
+    std::io::stdin().read_line(&mut _b).unwrap();
+
+    let tmp_zip = std::env::temp_dir().join(PathBuf::from(geode_file.file_stem().unwrap()));
+
+    let mut zipfile = zip::ZipWriter::new(File::create(&tmp_zip).unwrap());
+
+    std::env::set_current_dir(&tmp_folder).unwrap();
+
+    let zopts = zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    for item in walkdir::WalkDir::new(".") {
+        let item = item.unwrap();
+
+        if !item.metadata().unwrap().is_dir() && item.file_name() != "cache_data.json" {
+            let mut file_path = item.path().strip_prefix("./").unwrap().to_str().unwrap().to_string();
+            if cfg!(windows) {
+                file_path = file_path.replace('/', "\\");
+            }
+
+            zipfile.start_file(file_path, zopts).unwrap();
+            zipfile.write_all(&fs::read(item.path()).unwrap()).unwrap();
+        }
+    }
+
+    zipfile.finish().expect("Unable to repackage .geode file");
+
+    std::env::set_current_dir(cwd).unwrap();
+    fs::copy(tmp_zip, geode_file)?;
+
+    Ok(())
+}
+
