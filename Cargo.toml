@@ -1,6 +1,6 @@
 [package]
 name = "geode-cli"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["HJfod <dreadrollmusic@gmail.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2018"
 build = "build.rs"
