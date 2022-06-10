@@ -348,6 +348,7 @@ fn main() {
 
         Commands::Launch {} => {
             println!("{}", "Launching Geometry Dash...".bright_cyan());
+            #[cfg(windows)] 
             Command::new(&config.work_inst().path.join(&config.work_inst().executable))
                 .current_dir(&config.work_inst().path)
                 .spawn()
