@@ -90,6 +90,12 @@ enum Commands {
 		dir_in_zip: PathBuf
     },
 
+    /// Temporarily open a .geode package for editing
+    Edit {
+        geode_file: PathBuf,
+        tmp_folder: Option<PathBuf>
+    },
+
     /// Create a sprite sheet out of a bunch of sprites
     Sheet {
         /// Path to directory containing the sprites
@@ -223,6 +229,16 @@ fn main() {
             }
             println!("{}", "Amended package :)".green());
         },
+
+        Commands::Edit { geode_file, tmp_folder } => {
+            if let Err(e) = package::edit_geode_interactive(
+                &geode_file,
+                tmp_folder.clone(),
+            ) {
+                print_error!("Error editing package: {}", e);
+            }
+            println!("{}", "Edited package :)".green());
+        }
 
         Commands::Config { cwi, dev } => {
             let mut some_set = false;
