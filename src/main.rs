@@ -1,5 +1,3 @@
-#![feature(slice_concat_trait)]
-
 use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
