@@ -1,8 +1,10 @@
+#![feature(slice_concat_trait)]
 
 use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
+use std::process::Command;
 
 pub mod util;
 pub mod spritesheet;
@@ -149,7 +151,10 @@ enum Commands {
     Install {
         /// Path to .geode file to install
         path: PathBuf
-    }
+    },
+
+    /// Launch the selected Geometry Dash installation
+    Launch {},
 }
 
 pub fn progress_bar(text: &str) -> ProgressBar {
@@ -240,31 +245,32 @@ fn main() {
             if !some_set {
                 println!(
                     " == {} == \n\
-                    Version: {}\n\
+                    Version: {}{}\n\
                     Target Geode Version: {}\n\
                     Path: {}\n\
                     Default developer: {}\n\
                     Data directory: {}\n\
-                    Selected Installation: {}\n\
-                    -> Path: {}",
+                    Installations: {} (Selected: {})\n\
+                    {}",
                     GEODE_CLI_NAME.to_string().green(),
+                    "v".yellow(),
                     GEODE_CLI_VERSION.to_string().yellow(),
-                    unsafe {link::geode_target_version()}.to_string().red(),
+                    unsafe {link::geode_target_version()}.to_string().yellow(),
                     std::env::current_exe().unwrap().to_str().unwrap().cyan(),
                     match config.default_developer.as_ref() {
                         Some(s) => s,
                         None => "<none>"
                     }.purple(),
                     Config::data_dir().to_str().unwrap().cyan(),
+                    config.installations.as_ref().unwrap().len().to_string().red(),
                     config.working_installation.unwrap().to_string().red(),
-                    config.work_inst().path.to_str().unwrap().cyan(),
+                    config.installations_as_string(),
                 );
             }
         },
 
         Commands::Sheet { src, dest, variants, name, prefix } => {
             let bar = progress_bar("Creating spritesheet(s)...");
-
 
             let res = match spritesheet::pack_sprites_in_dir(
                 &src,
@@ -324,7 +330,15 @@ fn main() {
                 &config.work_inst().path,
                 &path
             ).unwrap();
-        }
+        },
+
+        Commands::Launch {} => {
+            println!("{}", "Launching Geometry Dash...".bright_cyan());
+            Command::new(&config.work_inst().path.join(&config.work_inst().executable))
+                .current_dir(&config.work_inst().path)
+                .spawn()
+                .expect("Unable to launch Geometry Dash");
+        },
     }
 
     config.save();

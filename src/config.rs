@@ -19,6 +19,13 @@ pub struct Installation {
     other: HashMap<String, Value>,
 }
 
+impl ToString for Installation {
+	fn to_string(&self) -> String {
+		String::from("Path: ") + self.path.to_str().unwrap() + "\n\
+			Executable: " + &self.executable
+	}
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
@@ -111,9 +118,18 @@ impl Config {
 		).unwrap();
 	}
 
-	pub fn work_inst(&mut self) -> &Installation {
+	pub fn work_inst(&self) -> &Installation {
 		&self.installations.as_ref().unwrap()[
 			self.working_installation.unwrap()
 		]
+	}
+
+	pub fn installations_as_string(&self) -> String {
+		let mut res = String::new();
+		for inst in self.installations.as_ref().unwrap() {
+			res += "------\n";
+			res += &inst.to_string();
+		}
+		res
 	}
 }
