@@ -51,7 +51,7 @@ pub fn create_template(
         "binary": project_name,
         "dependencies": [
             {
-                "id": "com.geode.api",
+                "id": "geode.api",
                 "required": true
             }
         ]
