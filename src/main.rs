@@ -3,6 +3,9 @@ use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 
+#[cfg(windows)]
+use std::process::Command;
+
 pub mod util;
 pub mod spritesheet;
 pub mod font;
