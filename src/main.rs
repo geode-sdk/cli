@@ -2,7 +2,6 @@ use std::path::{PathBuf};
 use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
-use std::process::Command;
 
 pub mod util;
 pub mod spritesheet;

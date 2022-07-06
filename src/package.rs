@@ -408,7 +408,7 @@ pub fn create_geode(
         ).yellow().bold()
     );
 
-    let tmp_pkg = &std::env::temp_dir().join(format!("geode_pkg_{}", modinfo.id));
+    let tmp_pkg = &dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", modinfo.id));
 
     let mut cache_data = CacheData {
         latest_file: HashMap::new(),
@@ -438,6 +438,7 @@ pub fn create_geode(
     } else {
         fs::create_dir(tmp_pkg)?;
     }
+
 
     for ref f in modinfo.bin_list {
         if !exec_dir.join(f).exists() {
