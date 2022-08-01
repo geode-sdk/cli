@@ -1,7 +1,9 @@
-use std::path::{PathBuf};
+use std::path::PathBuf;
 use colored::*;
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
+use resources::{create_resources, parse_resources};
+use std::fs;
 
 #[cfg(windows)]
 use std::process::Command;
@@ -14,6 +16,7 @@ pub mod template;
 pub mod package;
 pub mod config;
 pub mod link;
+pub mod resources;
 
 #[cfg(windows)]
 pub mod windows_ansi;
@@ -49,6 +52,7 @@ enum Commands {
     New {
         /// Mod name
         name: Option<String>,
+
         /// Where to create the project, defaults
         /// to the current folder
         location: Option<PathBuf>,
@@ -100,15 +104,19 @@ enum Commands {
     Sheet {
         /// Path to directory containing the sprites
         src: PathBuf,
+
         /// Path to directory where to put the resulting sheet
         dest: PathBuf,
+
         /// Create variants (High, Medium, Low). Note that 
         /// the source textures are assumed to be UHD
         #[clap(short, long)]
         variants: bool,
+
         /// Spritesheet name
         #[clap(short, long)]
         name: Option<String>,
+
         /// Prefix
         #[clap(long)]
         prefix: Option<String>,
@@ -118,23 +126,30 @@ enum Commands {
     Font {
         /// Path to TTF font
         ttf_path: PathBuf,
+
         /// Font size
         fontsize: u32,
+
         /// Font name, if not specified defaults to same name as TTF
         name: Option<String>,
+
         /// Path to directory where to put the resulting bitmap font files
         #[clap(short, long)]
         dest: Option<PathBuf>,
+
         /// Create variants (High, Medium, Low)
         #[clap(short, long)]
         variants: bool,
+
         /// Prefix
         #[clap(long)]
         prefix: Option<String>,
+
         /// Character set; for example 0-0,8-9,13,29,32-126,160-255. 
         /// Defaults to ASCII
         #[clap(long)]
         charset: Option<String>,
+
         /// Font outline size, defaults to 0. If passed a number greater 
         /// than 0, a black outline will be added to the font
         #[clap(long, default_value_t = 0)]
@@ -145,8 +160,10 @@ enum Commands {
     Sprite {
         /// Path to the sprite
         src: PathBuf,
+
         /// Path to directory where to put the resulting sprites
         dest: PathBuf,
+
         /// Prefix
         #[clap(long)]
         prefix: Option<String>
@@ -157,6 +174,25 @@ enum Commands {
     Install {
         /// Path to .geode file to install
         path: PathBuf
+    },
+
+    /// Process a folder of resources based on a json file
+    Resources {
+        /// Folder with resources. Use a resource.json file 
+        /// to list your resources in the same format as 
+        /// [mod.json].resources
+        src: PathBuf,
+
+        /// Folder to put the resulting files
+        dest: PathBuf,
+
+        /// Prefix
+        #[clap(long)]
+        prefix: Option<String>,
+
+        /// Use cached resources
+        #[clap(long)]
+        cached: bool,
     },
 
     /// Launch the selected Geometry Dash installation
@@ -238,7 +274,7 @@ fn main() {
                 print_error!("Error editing package: {}", e);
             }
             println!("{}", "Edited package :)".green());
-        }
+        },
 
         Commands::Config { cwi, dev } => {
             let mut some_set = false;
@@ -355,6 +391,30 @@ fn main() {
                 .current_dir(&config.work_inst().path)
                 .spawn()
                 .expect("Unable to launch Geometry Dash");
+        },
+
+        Commands::Resources { src, dest, prefix, cached } => {
+            if !src.join("resources.json").exists() {
+                print_error!(
+                    "Missing {}! Create it and list your resources 
+                    in the same format as [mod.json].resources",
+                    src.join("resources.json").to_str().unwrap()
+                );
+            }
+            let r = parse_resources(
+                serde_json::from_str::<serde_json::Value>(
+                    &fs::read_to_string(src.join("resources.json")).unwrap()
+                ).unwrap().as_object().unwrap(),
+                &src
+            ).unwrap();
+            create_resources(
+                &r,
+                cached,
+                &prefix.unwrap_or(String::new()),
+                &dest,
+                true
+            ).unwrap();
+            println!("{}", "Resources created!".bright_green());
         },
     }
 
