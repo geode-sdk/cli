@@ -173,6 +173,10 @@ pub fn create_geode(
         fs::remove_dir_all(tmp_pkg).unwrap_or(());
     }
 
+    if !tmp_pkg.exists() {
+        fs::create_dir_all(tmp_pkg).unwrap();
+    }
+
     for ref f in modinfo.bin_list {
         if !exec_dir.join(f).exists() {
             throw_error!("Unable to find binary {}, defined in [mod.json].binary", f);
