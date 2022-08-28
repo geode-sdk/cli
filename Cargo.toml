@@ -15,3 +15,7 @@ path-absolutize = "3.0.11"
 rustyline = "9.1.0"
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = { version = "1.0", features = ["preserve_order"] }
+zip = "0.5.13"
+glob = "0.3.0"
+sha256 = "1.0.3"
+dirs = "4.0.0"
