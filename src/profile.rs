@@ -16,28 +16,33 @@ use crate::{done, fail};
 
 #[derive(Subcommand, Debug)]
 pub enum Profile {
-	/// List geode profiles
+	/// List profiles
 	List,
-	/// Switch main geode profile
+
+	/// Switch main profile
 	Switch {
-		/// New main geode profile
+		/// New main profile
 		profile: String
 	},
-	/// Add geode profile
+
+	/// Add profile
 	Add {
 		/// New profile location
 		location: PathBuf,
+		
 		/// New profile name
 		#[clap(short, long)]
 		name: String,
 
 	},
+
 	/// Remove profile
 	Remove {
 		/// Profile to remove
 		name: String
 	},
-	/// Rename geode profile
+
+	/// Rename profile
 	Rename {
 		/// Profile to rename
 		old: String,

@@ -17,22 +17,22 @@ use crate::{fatal, done};
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub enum Package {
-	/// Install geode file to current profile
+	/// Install a .geode package to the current profile
     Install {
-        /// Location of .geode file to install
+        /// Location of the .geode package to install
         path: PathBuf
     },
 
-    /// Create geode file
+    /// Create a .geode package
     New {
-    	/// Location of mod folder
+    	/// Location of the mod's folder
     	path: PathBuf,
 
-    	/// Location of output file
+    	/// Location where to put the output file
     	#[clap(long)]
     	out: PathBuf,
 
-    	/// Whether to install the generated .geode file after creation
+    	/// Whether to install the generated package after creation
     	#[clap(short, long)]
     	install: bool
     }
