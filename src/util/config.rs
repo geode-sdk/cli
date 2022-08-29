@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use colored::Colorize;
 #[cfg(windows)]
 use directories::BaseDirs;
 
@@ -64,16 +63,15 @@ impl Config {
 	}
 
 	pub fn new() -> Config {
-		if !geode_root().exists() {
-			println!(
-				"{}{}{}{}",
-				"WARNING: It seems you don't have Geode installed! \
-				Please install Geode first using the official installer \
-				(".yellow(),
-				"https://github.com/geode-sdk/installer/releases/latest".cyan(),
-				")".yellow(),
-				"\nYou may still use the CLI, but be warned that certain \
-				operations will cause crashes.\n".purple()
+		if !geode_root().exists() || !geode_root().join("config.json").exists() {
+			warn!(
+				"It seems you don't have Geode installed! \
+				Please install Geode first using the official installer."
+			);
+			warn!("https://github.com/geode-sdk/installer/releases/latest");
+			info!(
+				"You may still use the CLI, but be warned that certain \
+				operations will cause crashes."
 			);
 
 			return Config {
@@ -119,6 +117,4 @@ impl Config {
 			profile.unwrap().borrow_mut().name = new;
 		}
 	}
-
-
 }

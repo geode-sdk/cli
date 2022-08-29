@@ -1,18 +1,17 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
-
 use crate::config::Config;
-use crate::util::spritesheet;
+use crate::util::{spritesheet, font};
 use crate::{mod_file, cache};
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::fs;
 use clap::Subcommand;
-use serde_json::{Value};
+use serde_json::Value;
 
-
-use crate::{fatal, done};
+use crate::{fatal, warn, done};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -47,8 +46,16 @@ pub fn install(config: &mut Config, pkg_path: &Path) {
 
     if !mod_path.exists() {
         fs::create_dir_all(&mod_path)
-        	.unwrap_or_else(|e| fatal!("Could not setup mod installation: {}", e));
+        	.unwrap_or_else(|e| fatal!("Could not create mod installation directory: {}", e));
     }
+
+	// this could probably be simplified, but i'm not rusty enough to know how to
+	if pkg_path.extension().unwrap_or(OsStr::new("")) != OsStr::new("geode") {
+		warn!(
+			"File {} does not appear to be a .geode package, installing anyway",
+			pkg_path.to_str().unwrap()
+		);
+	}
 
 	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
 		.unwrap_or_else(|e| fatal!("Could not install mod: {}", e));
@@ -82,6 +89,12 @@ fn create_package(config: &mut Config, path: &Path, out_path: &Path, do_install:
 	// Create spritesheets
 	for sheet in mod_file_info.resources.spritesheets.values() {
 		let out = spritesheet::get_spritesheet(sheet, &working_dir, &mut cache_bundle);
+		todo!();
+	}
+
+	// Create fonts
+	for font in mod_file_info.resources.fonts.values() {
+		let out = font::get_font(font, &working_dir, &mut cache_bundle);
 		todo!();
 	}
 }

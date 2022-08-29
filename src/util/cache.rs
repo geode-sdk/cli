@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::mod_file::{SpriteSheet, BitmapFont};
-use crate::{fatal};
+use crate::fatal;
 
 #[derive(Serialize, Deserialize)]
 pub struct ResourceCache {
