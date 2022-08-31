@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use colored::Colorize;
 use image::{RgbaImage, imageops, ImageFormat};
 use serde_json::json;
 use texture_packer::{TexturePacker, TexturePackerConfig};

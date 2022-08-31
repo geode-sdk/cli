@@ -39,9 +39,9 @@ enum GeodeCommands {
         name: Option<String>
     },
 
-    /// Install geode file to current profile, alias of `geode package install`
+    /// Install a .geode package to current profile, alias of `geode package install`
     Install {
-        /// Location of .geode file to install
+        /// Location of the .geode package to install
         path: PathBuf
     },
 

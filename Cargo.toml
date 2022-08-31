@@ -23,3 +23,6 @@ sha256 = "1.0.3"
 texture_packer = "0.24.0"
 walkdir = "2"
 zip = "0.5.13"
+
+[build-dependencies]
+winres = "0.1.12"

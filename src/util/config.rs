@@ -36,7 +36,7 @@ pub fn geode_root() -> PathBuf {
 	// get data dir per-platform
 	let data_dir: PathBuf;
 	#[cfg(windows)] {
-		data_dir = BaseDirs::new().unwrap().data_local_dir().to_path_buf().join("Geode");
+		data_dir = dirs::data_local_dir().join("Geode");
 	};
 	#[cfg(target_os = "macos")] {
 		data_dir = PathBuf::from("/Users/Shared/Geode");

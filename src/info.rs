@@ -17,6 +17,7 @@ pub enum Info {
 		/// New value
 		value: String
 	},
+
 	/// Get value
 	Get {
 		/// Field to get
@@ -26,6 +27,7 @@ pub enum Info {
 		#[clap(long)]
 		raw: bool
 	},
+	
 	/// List possible values
 	List
 }
