@@ -4,8 +4,9 @@ use std::fs::File;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
-use crate::mod_file::{SpriteSheet, BitmapFont};
-use crate::{fatal};
+use crate::mod_file::BitmapFont;
+use crate::spritesheet::SpriteSheet;
+use crate::{warn, fatal};
 
 #[derive(Serialize, Deserialize)]
 pub struct ResourceCache {
@@ -35,25 +36,32 @@ fn hash_font(font: &BitmapFont) -> String {
 
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 	path.exists().then(|| {
-		let mut archive = zip::ZipArchive::new(File::create(path).unwrap()).unwrap();
+		match zip::ZipArchive::new(File::open(path).unwrap()) {
+			Ok(mut archive) => {
+				let cache: ResourceCache;
 
-		let cache: ResourceCache;
+				if archive.by_name(".geode_cache").is_ok() {
+					let mut cache_data = String::new();
+					if archive.by_name(".geode_cache").unwrap().read_to_string(&mut cache_data).is_err() {
+						return None;
+					}
 
-		if archive.by_name(".geode_cache").is_ok() {
-			let mut cache_data = String::new();
-			if archive.by_name(".geode_cache").unwrap().read_to_string(&mut cache_data).is_err() {
-				return None;
+					cache = ResourceCache::load(cache_data);
+				} else {
+					cache = ResourceCache::new();
+				}
+
+				Some(CacheBundle {
+					cache,
+					archive
+				})			
+			},
+
+			Err(e) => {
+				warn!("Error reading cache from previous build: {}. Disabling cache for this build", e);
+				None
 			}
-
-			cache = ResourceCache::load(cache_data);
-		} else {
-			cache = ResourceCache::new();
 		}
-
-		Some(CacheBundle {
-			cache,
-			archive
-		})
 	}).flatten()
 }
 
@@ -70,21 +78,28 @@ impl ResourceCache {
 			.unwrap_or_else(|e| fatal!("Unable to parse cache file: {}", e))
 	}
 
+	pub fn save(&self, path: &Path) {
+		std::fs::write(
+			path.join(".geode_cache"),
+			serde_json::to_string(self).unwrap()
+		).unwrap()
+	}
+
 	pub fn add_sheet(&mut self, sheet: &SpriteSheet, path: PathBuf) {
 		if !path.is_relative() {
-			unreachable!("Contact geode developers");
+			unreachable!("Contact geode developers: {}", path.display());
 		}
 		self.spritesheets.insert(hash_sheet(sheet), path);
 	}
 
 	pub fn add_font(&mut self, font: &BitmapFont, path: PathBuf) {
 		if !path.is_relative() {
-			unreachable!("Contact geode developers");
+			unreachable!("Contact geode developers: {}", path.display());
 		}
 		self.fonts.insert(hash_font(font), path);
 	}
 
-	pub fn fetch_spritesheet(&self, sheet: &SpriteSheet) -> Option<&Path> {
+	pub fn fetch_spritesheet_bundles(&self, sheet: &SpriteSheet) -> Option<&Path> {
 		self.spritesheets.get(&hash_sheet(sheet)).and_then(|x| Some(&**x))
 	}
 

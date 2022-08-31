@@ -1,18 +1,20 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::fs;
+
+use clap::Subcommand;
+use serde_json::{Value};
+use zip::ZipWriter;
+use zip::write::FileOptions;
 
 use crate::config::Config;
 use crate::util::spritesheet;
+use crate::util::bmfont;
 use crate::{mod_file, cache};
-
-use std::path::{Path, PathBuf};
-use std::fs;
-use clap::Subcommand;
-use serde_json::{Value};
-
-
-use crate::{fatal, done};
+use crate::{fail, info, fatal, done};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -26,11 +28,15 @@ pub enum Package {
     /// Create geode file
     New {
     	/// Location of mod folder
-    	path: PathBuf,
+    	root_path: PathBuf,
+
+    	/// Add binary file
+    	#[clap(short, long)]
+    	binary: Vec<PathBuf>,
 
     	/// Location of output file
-    	#[clap(long)]
-    	out: PathBuf,
+    	#[clap(short, long)]
+    	output: PathBuf,
 
     	/// Whether to install the generated .geode file after creation
     	#[clap(short, long)]
@@ -56,33 +62,107 @@ pub fn install(config: &mut Config, pkg_path: &Path) {
     done!("Installed {}", pkg_path.file_name().unwrap().to_str().unwrap());
 }
 
-fn create_package(config: &mut Config, path: &Path, out_path: &Path, do_install: bool) {
+fn zip_folder(path: &Path, output: &Path) {
+	info!("Zipping");
+
+	// Setup zip
+	let mut zip_file = ZipWriter::new(fs::File::create(output).unwrap());
+	let zip_options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+	// Iterate files in target path
+	for item in walkdir::WalkDir::new(path) {
+		let item = item.unwrap();
+
+		// Only look at files
+		if item.metadata().unwrap().is_file() {
+			// Relativize
+			let mut relative_path = item.path().strip_prefix(path).unwrap().to_str().unwrap().to_string();
+			
+			// Windows is weird and needs this change
+			if cfg!(windows) {
+			    relative_path = relative_path.replace('/', "\\");
+			}
+
+			zip_file.start_file(relative_path, zip_options).unwrap();
+			zip_file.write_all(&fs::read(item.path()).unwrap()).unwrap();
+		}
+	}
+
+	zip_file.finish()
+		.unwrap_or_else(|e| fatal!("Unable to zip: {}", e));
+
+	done!("Successfully packaged {}", output.file_name().unwrap().to_str().unwrap().bright_yellow());
+}
+
+fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>, output: &Path, do_install: bool) {
+
+	// Ensure at least one binary
+	if binaries.is_empty() {
+		fail!("No binaries added");
+		info!("Help: Add a binary with `--binary <bin_path>`");
+		return;
+	}
+
 	// Test if possible to create file
-	if !out_path.exists() || out_path.is_dir() {
-		fs::write(out_path, "")
+	if !output.exists() || output.is_dir() {
+		fs::write(output, "")
 			.unwrap_or_else(|e| fatal!("Could not create package: {}", e));
 
-		fs::remove_file(out_path).unwrap();
+		fs::remove_file(output).unwrap();
 	}
 
 	// Parse mod.json
 	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(out_path.join("mod.json"))
+		&fs::read_to_string(root_path.join("mod.json"))
 			.unwrap_or_else(|e| fatal!("Could not read mod.json: {}", e))
 	).unwrap_or_else(|e| fatal!("Could not parse mod.json: {}", e));
+	let mod_file_info = mod_file::get_mod_file_info(&mod_json, &root_path);
 
-	let mod_file_info = mod_file::get_mod_file_info(&mod_json, &path);
-	let mut cache_bundle = cache::get_cache_bundle(out_path);
+	// Setup working directory
 	let working_dir = dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", mod_file_info.id));
-
-	// Reset working directory
 	fs::remove_dir_all(&working_dir).unwrap_or(());
 	fs::create_dir(&working_dir).unwrap_or(());
 
+	// Move mod.json
+	fs::copy(root_path.join("mod.json"), working_dir.join("mod.json")).unwrap();
+
+	// Resource directory
+	let resource_dir = working_dir.join("resources");
+	fs::create_dir(&resource_dir).unwrap();
+
+	// Setup cache
+	let mut cache_bundle = cache::get_cache_bundle(output);
+	let mut new_cache = cache::ResourceCache::new();
+
 	// Create spritesheets
 	for sheet in mod_file_info.resources.spritesheets.values() {
-		let out = spritesheet::get_spritesheet(sheet, &working_dir, &mut cache_bundle);
-		todo!();
+		let sheet_file = spritesheet::get_spritesheet_bundles(sheet, &resource_dir, &mut cache_bundle);
+		new_cache.add_sheet(sheet, sheet_file.cache_name(&working_dir));
+	}
+
+	// Create fonts
+	for font in mod_file_info.resources.fonts.values() {
+		let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
+		new_cache.add_font(font, font_file);
+	}
+
+	// Move other resources
+	for file in &mod_file_info.resources.files {
+		std::fs::copy(file, resource_dir.join(file.file_name().unwrap()))
+			.unwrap_or_else(|e| fatal!("Could not copy file at '{}': {}", file.display(), e));
+	}
+
+	for binary in &binaries {
+		std::fs::copy(binary, working_dir.join(binary.file_name().unwrap()))
+			.unwrap_or_else(|e| fatal!("Could not copy binary at '{}': {}", binary.display(), e));
+	}
+
+	new_cache.save(&working_dir);
+
+	zip_folder(&working_dir, output);
+
+	if do_install {
+		install(config, output);
 	}
 }
 
@@ -90,6 +170,6 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 	match cmd {
 		Package::Install { path } => install(config, &path),
 
-		Package::New { path, out, install } => create_package(config, &path, &out, install)
+		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, &output, install)
 	}
 }

@@ -47,7 +47,7 @@ pub enum Profile {
 	}
 }
 
-fn is_valid_geode_dir(dir: &Path) -> bool {
+fn is_valid_geode_dir(_dir: &Path) -> bool {
 	//TODO: this
 	return true;
 }

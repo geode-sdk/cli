@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use serde_json::{Value, json};
+use serde_json::{Value};
 
 use crate::fatal;
-
-pub struct SpriteSheet {
-	pub name: String,
-	pub files: Vec<PathBuf>,
-}
+use crate::spritesheet::SpriteSheet;
 
 pub struct BitmapFont {
     pub name: String,
@@ -25,39 +21,8 @@ pub struct ModResources {
 
 pub struct ModFileInfo {
     pub name: String,
-    pub binary_names: HashMap<String, String>,
     pub id: String,
     pub resources: ModResources,
-}
-
-fn get_extension(platform: &str) -> &'static str {
-    if platform == "windows" {
-        ".dll"
-    } else if platform == "macos" || platform == "ios" {
-        ".dylib"
-    } else if platform == "android" {
-        ".so"
-    } else {
-        unimplemented!("Unsupported platform");
-    }
-}
-
-fn platform_string() -> &'static str {
-    if cfg!(windows) || cfg!(target_os = "linux") {
-        "windows"
-    } else if cfg!(target_os = "macos") {
-        "macos"
-    } else if cfg!(target_os = "ios") {
-        "ios"
-    } else if cfg!(target_os = "android") {
-        "android"
-    } else {
-        unimplemented!("Unsupported platform");
-    }
-}
-
-fn platform_extension() -> &'static str {
-    get_extension(platform_string())
 }
 
 /// Reusability for get_mod_resources
@@ -231,75 +196,9 @@ pub fn get_mod_file_info(root: &Value, root_path: &Path) -> ModFileInfo {
 		.unwrap_or_else(|| fatal!("[mod.json].id: Expected string"))
 		.to_string();
 
-	let mut out = ModFileInfo {
+	ModFileInfo {
 		name,
 		id,
-		resources: get_mod_resources(root, root_path),
-		binary_names: HashMap::new()
-	};
-
-	// Get binaries field
-	let mut binaries_value = root.get("binary").unwrap_or_else(|| fatal!("[mod.json]: Missing required key 'binary'")).clone();
-	
-	// String is just wildcard
-	if binaries_value.is_string() {
-		binaries_value = json!({
-			"*": binaries_value.as_str().unwrap()
-		});
+		resources: get_mod_resources(root, root_path)
 	}
-
-	let binaries = binaries_value.as_object()
-		.unwrap_or_else(|| fatal!("[mod.json].binaries: Expected string or object"));
-
-
-	// Iterate through platforms
-	for (platform, binary) in binaries {
-		// Ensure string
-		if !binary.is_string() {
-			fatal!("[mod.json].binaries.{}: Expected string", platform);
-		}
-
-		match platform.as_str() {
-			"*" => (),
-			"macos" | "windows" | "ios" | "linux" => {
-				let mut binary_name = binary.as_str().unwrap().to_string();
-
-				// Add platform extension if not exist
-				if binary_name.ends_with(get_extension(platform)) {
-					binary_name += get_extension(platform);
-				}
-
-				out.binary_names.insert(platform.to_string(), binary_name);
-			},
-			_ => fatal!("[mod.json].binaries: Unknown key {}", platform)
-		}
-
-		// Wildcard
-		if platform == "*" {
-			// Wildcard is useless if all other platforms are defined
-			if binaries.len() == 5 {
-				fatal!("[mod.json].binaries: Cannot mix '*' with all other platforms");
-			}
-
-			for platform in ["macos", "windows", "ios", "linux"] {
-				// Add all binary names not already referenced
-				if out.binary_names.get(platform).is_none() {
-					let mut binary_name = binary.as_str().unwrap().to_string();
-
-					// Add platform extension if not exist
-					if binary_name.ends_with(get_extension(platform)) {
-						binary_name += get_extension(platform);
-					}
-
-					out.binary_names.insert(platform.to_string(), binary_name);
-				}
-			}
-		}
-	}
-
-	if out.binary_names.len() == 0 {
-		fatal!("[mod.json].binaries: Cannot be empty");
-	}
-
-	out
 }
