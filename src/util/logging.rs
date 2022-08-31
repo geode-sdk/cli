@@ -12,7 +12,7 @@ macro_rules! info {
 macro_rules! fail {
     ($x:expr $(, $more:expr)*) => {{
     	use ::colored::Colorize;
-        println!("{}{}", "| Fail | ".bright_red(), format!($x, $($more),*));
+        eprintln!("{}{}", "| Fail | ".bright_red(), format!($x, $($more),*));
     }}
 }
 
@@ -20,7 +20,7 @@ macro_rules! fail {
 macro_rules! fatal {
     ($x:expr $(, $more:expr)*) => {{
         use ::colored::Colorize;
-        println!("{}{}", "| Fail | ".bright_red(), format!($x, $($more),*));
+        eprintln!("{}{}", "| Fail | ".bright_red(), format!($x, $($more),*));
         std::process::exit(1);
     }}
 }

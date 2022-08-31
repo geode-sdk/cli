@@ -1,6 +1,7 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
+use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::fs;
@@ -28,7 +29,7 @@ pub enum Package {
 
     /// Create a .geode package
     New {
-    	/// Location of mo'sd folder
+    	/// Location of mod's folder
     	root_path: PathBuf,
 
     	/// Add binary file
@@ -42,6 +43,16 @@ pub enum Package {
     	/// Whether to install the generated package after creation
     	#[clap(short, long)]
     	install: bool
+    },
+
+    /// Fetch mod id from a package
+    GetId {
+    	/// Location of package
+    	input: PathBuf,
+
+    	/// Strip trailing newline
+    	#[clap(long)]
+    	raw: bool
     }
 }
 
@@ -167,10 +178,38 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	}
 }
 
+fn get_id(input: PathBuf, raw: bool) {
+	let text = if input.is_dir() {
+		std::fs::read_to_string(input.join("mod.json")).nice_unwrap("Unable to read mod.json")
+	} else {
+		let mut out = String::new();
+
+		zip::ZipArchive::new(fs::File::open(input).unwrap()).nice_unwrap("Unable to unzip")
+			.by_name("mod.json").nice_unwrap("Unable to find mod.json in package")
+			.read_to_string(&mut out).nice_unwrap("Unable to read mod.json");
+
+		out
+	};
+
+	let json = serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json");
+
+	let id = json
+		.get("id").nice_unwrap("[mod.json]: Missing key 'id'")
+		.as_str().nice_unwrap("[mod.json].id: Expected string");
+
+	if raw {
+		print!("{}", id);
+	} else {
+		println!("{}", id);
+	}
+}
+
 pub fn subcommand(config: &mut Config, cmd: Package) {
 	match cmd {
 		Package::Install { path } => install(config, &path),
 
-		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, output, install)
+		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, output, install),
+		
+		Package::GetId { input, raw } => get_id(input, raw)
 	}
 }
