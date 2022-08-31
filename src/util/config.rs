@@ -1,7 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-#[cfg(windows)]
-use directories::BaseDirs;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
