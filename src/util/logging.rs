@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 #[macro_export]
 macro_rules! info {
     ($x:expr $(, $more:expr)*) => {{
@@ -38,3 +40,21 @@ macro_rules! done {
         println!("{}{}", "| Done | ".bright_green(), format!($x, $($more),*));
     }}
 }
+
+
+pub trait NiceUnwrap<T> {
+    fn nice_unwrap<S: Display>(self, text: S) -> T;
+}
+
+impl<T, E: Display> NiceUnwrap<T> for Result<T, E> {
+    fn nice_unwrap<S: Display>(self, text: S) -> T {
+        self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
+    }
+}
+
+impl<T> NiceUnwrap<T> for Option<T> {
+    fn nice_unwrap<S: Display>(self, text: S) -> T {
+        self.unwrap_or_else(|| fatal!("{}", text))
+    }
+}
+

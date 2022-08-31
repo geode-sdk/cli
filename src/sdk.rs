@@ -6,7 +6,8 @@ use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository};
 use colored::Colorize;
 
-use crate::{fail, warn, info, done, fatal};
+use crate::{fail, warn, info, done};
+use crate::NiceUnwrap;
 
 #[derive(Subcommand, Debug)]
 pub enum Sdk {
@@ -97,8 +98,7 @@ fn install(config: &mut Config, path: PathBuf) {
 		repo.fetch_options(fetch);
 
 
-		repo.clone("https://github.com/geode-sdk/geode", &path)
-			.unwrap_or_else(|e| fatal!("Could not download SDK: {}", e));
+		repo.clone("https://github.com/geode-sdk/geode", &path).nice_unwrap("Could not download SDK");
 		
 		config.sdk_path = Some(path);
 		done!("Successfully installed SDK");
@@ -118,8 +118,8 @@ fn update(config: &mut Config, nightly: bool, stable: bool) {
 
 	// Initialize repository
 	let repo = Repository::open(
-		config.sdk_path.as_ref().unwrap_or_else(|| fatal!("Unable to update SDK as it is not installed"))
-	).unwrap_or_else(|e| fatal!("Could not initialize local SDK repository: {}", e));
+		config.sdk_path.as_ref().nice_unwrap("Unable to update SDK as it is not installed")
+	).nice_unwrap("Could not initialize local SDK repository");
 
 	// Fetch
 	let mut remote = repo.find_remote(
@@ -136,7 +136,7 @@ fn update(config: &mut Config, nightly: bool, stable: bool) {
 		&[branch],  
 		Some(FetchOptions::new().remote_callbacks(callbacks)),
 		None
-	).unwrap_or_else(|e| fatal!("Could not fetch latest update: {}", e));
+	).nice_unwrap("Could not fetch latest update");
 
 	// Check if can fast-forward
 	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();

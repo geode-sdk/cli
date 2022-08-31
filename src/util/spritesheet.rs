@@ -9,7 +9,8 @@ use texture_packer::exporter::ImageExporter;
 
 use crate::cache::CacheBundle;
 use crate::rgba4444::RGBA4444;
-use crate::{info, done, fatal};
+use crate::{info, done};
+use crate::NiceUnwrap;
 
 struct Sprite {
 	pub name: String,
@@ -71,9 +72,9 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, down
 		Sprite {
 			name: x.file_stem().unwrap().to_str().unwrap().to_string(),
 			image: image::io::Reader::open(x)
-				       .unwrap_or_else(|e| fatal!("Error reading sprite '{}': {}", x.display(), e))
+				       .nice_unwrap(format!("Error reading sprite '{}'", x.display()))
 				       .decode()
-				       .unwrap_or_else(|e| fatal!("Error decoding sprite '{}': {}", x.display(), e))
+				       .nice_unwrap(format!("Error decoding sprite '{}'", x.display()))
 				       .to_rgba8()
 
 		}
@@ -137,15 +138,13 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, down
 		}
 	});
 
-	plist::to_file_xml(&bundle.plist, &plist_file)
-		.unwrap_or_else(|e| fatal!("Unable to write to plist file: {}", e));
+	plist::to_file_xml(&bundle.plist, &plist_file).nice_unwrap("Unable to write to plist file");
 
 	// Write png
 	let mut file = std::fs::File::create(&bundle.png).unwrap();
 
 	let exporter = ImageExporter::export(&texture_packer).unwrap();
-	exporter.write_to(&mut file, ImageFormat::Png)
-		.unwrap_or_else(|e| fatal!("Unable to write to png file: {}", e));
+	exporter.write_to(&mut file, ImageFormat::Png).nice_unwrap("Unable to write to png file");
 
 	done!("Successfully packed {}", bundle.png.with_extension("").file_name().unwrap().to_str().unwrap().bright_yellow());
 }

@@ -5,7 +5,7 @@ use std::fs;
 use crate::mod_file::BitmapFont;
 use crate::cache::CacheBundle;
 
-fn create_font(font: &BitmapFont, working_dir: &Path) -> PathBuf {
+fn create_font(_font: &BitmapFont, _working_dir: &Path) -> PathBuf {
 	todo!()
 }
 

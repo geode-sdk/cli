@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::mod_file::BitmapFont;
 use crate::spritesheet::SpriteSheet;
-use crate::{warn, fatal};
+use crate::warn;
+use crate::NiceUnwrap;
 
 #[derive(Serialize, Deserialize)]
 pub struct ResourceCache {
@@ -74,8 +75,7 @@ impl ResourceCache {
 	}
 
 	pub fn load(cache_data: String) -> ResourceCache {
-		serde_json::from_str::<ResourceCache>(&cache_data)
-			.unwrap_or_else(|e| fatal!("Unable to parse cache file: {}", e))
+		serde_json::from_str::<ResourceCache>(&cache_data).nice_unwrap("Unable to parse cache file: {}")
 	}
 
 	pub fn save(&self, path: &Path) {

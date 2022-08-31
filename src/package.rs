@@ -14,7 +14,8 @@ use crate::config::Config;
 use crate::util::spritesheet;
 use crate::util::bmfont;
 use crate::{mod_file, cache};
-use crate::{fail, info, fatal, done};
+use crate::{fail, info, done};
+use crate::NiceUnwrap;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -46,18 +47,15 @@ pub enum Package {
 
 pub fn install(config: &mut Config, pkg_path: &Path) {
     let mod_path = config.get_profile(&config.current_profile)
-    	.unwrap_or_else(|| fatal!("No current profile to install to!"))
+    	.nice_unwrap("No current profile to install to!")
     	.borrow().gd_path
     	.join("geode")
     	.join("mods");
 
     if !mod_path.exists() {
-        fs::create_dir_all(&mod_path)
-        	.unwrap_or_else(|e| fatal!("Could not setup mod installation: {}", e));
+        fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
     }
-
-	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
-		.unwrap_or_else(|e| fatal!("Could not install mod: {}", e));
+	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap())).nice_unwrap("Could not install mod");
 
     done!("Installed {}", pkg_path.file_name().unwrap().to_str().unwrap());
 }
@@ -88,8 +86,7 @@ fn zip_folder(path: &Path, output: &Path) {
 		}
 	}
 
-	zip_file.finish()
-		.unwrap_or_else(|e| fatal!("Unable to zip: {}", e));
+	zip_file.finish().nice_unwrap("Unable to zip");
 
 	done!("Successfully packaged {}", output.file_name().unwrap().to_str().unwrap().bright_yellow());
 }
@@ -105,17 +102,15 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 
 	// Test if possible to create file
 	if !output.exists() || output.is_dir() {
-		fs::write(output, "")
-			.unwrap_or_else(|e| fatal!("Could not create package: {}", e));
-
+		fs::write(output, "").nice_unwrap("Could not create package");
 		fs::remove_file(output).unwrap();
 	}
 
 	// Parse mod.json
 	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(root_path.join("mod.json"))
-			.unwrap_or_else(|e| fatal!("Could not read mod.json: {}", e))
-	).unwrap_or_else(|e| fatal!("Could not parse mod.json: {}", e));
+		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json")
+	).nice_unwrap("Could not parse mod.json");
+
 	let mod_file_info = mod_file::get_mod_file_info(&mod_json, &root_path);
 
 	// Setup working directory
@@ -149,12 +144,12 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	// Move other resources
 	for file in &mod_file_info.resources.files {
 		std::fs::copy(file, resource_dir.join(file.file_name().unwrap()))
-			.unwrap_or_else(|e| fatal!("Could not copy file at '{}': {}", file.display(), e));
+			.nice_unwrap(format!("Could not copy file at '{}'", file.display()));
 	}
 
 	for binary in &binaries {
 		std::fs::copy(binary, working_dir.join(binary.file_name().unwrap()))
-			.unwrap_or_else(|e| fatal!("Could not copy binary at '{}': {}", binary.display(), e));
+			.nice_unwrap(format!("Could not copy binary at '{}'", binary.display()));
 	}
 
 	new_cache.save(&working_dir);

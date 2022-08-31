@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value};
 
 use crate::fatal;
+use crate::NiceUnwrap;
 use crate::spritesheet::SpriteSheet;
 
 pub struct BitmapFont {
@@ -34,9 +35,7 @@ fn collect_globs(value: &Value, value_name: &str, root_path: &Path, out: &mut Ve
 	// Iterate paths
 	for (i, entry) in value.as_array().unwrap().iter().enumerate() {
 		// Ensure path is a string
-		let mut path = PathBuf::from(entry.as_str().unwrap_or_else(|| {
-			fatal!("{}[{}]: Expected string", value_name, i);
-		}));
+		let mut path = PathBuf::from(entry.as_str().nice_unwrap(format!("{}[{}]: Expected string", value_name, i)));
 
 		// Absolutize
 		if path.is_relative() {
@@ -44,16 +43,14 @@ fn collect_globs(value: &Value, value_name: &str, root_path: &Path, out: &mut Ve
 		}
 
 		// Reusability for next 
-		let glob_err = |e: String| -> ! {
-			fatal!("{}[{}]: Could not parse glob pattern: {}", value_name, i, e);
-		};
+		let glob_err = format!("{}[{}]: Could not parse glob pattern", value_name, i);
 
 		// Evaluate glob pattern
 		let glob_results = glob::glob(path.to_str().unwrap())
-			.unwrap_or_else(|e| glob_err(e.to_string()))
+			.nice_unwrap(&glob_err)
 			.into_iter()
 			.collect::<Result<Vec<_>, _>>()
-			.unwrap_or_else(|e| glob_err(e.to_string()));
+			.nice_unwrap(glob_err);
 
 		// Add to files
 		out.extend(glob_results);
@@ -129,7 +126,7 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 								"path" => {
 									font.path = PathBuf::from(
 										value.as_str()
-											 .unwrap_or_else(|| fatal!("{}.path: Expected string", info_name))
+											 .nice_unwrap(format!("{}.path: Expected string", info_name))
 									);
 
 									// Absolutize
@@ -140,7 +137,7 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 
 								"size" => {
 									font.size = value.as_u64()
-										.unwrap_or_else(|| fatal!("{}.size: Expected unsigned integer", info_name)) as u32;
+										.nice_unwrap(format!("{}.size: Expected unsigned integer", info_name)) as u32;
 
 									if font.size == 0 {
 										fatal!("{}.size: Font size cannot be 0", info_name);
@@ -149,13 +146,13 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 
 								"outline" => {
 									font.outline = value.as_u64()
-										.unwrap_or_else(|| fatal!("{}.outline: Expected unsigned integer", info_name)) as u32;
+										.nice_unwrap(format!("{}.outline: Expected unsigned integer", info_name)) as u32;
 								},
 
 								"charset" => {
 									font.charset = Some(
 										value.as_str()
-											 .unwrap_or_else(|| fatal!("{}.charset: Expected string", info_name))
+											 .nice_unwrap(format!("{}.charset: Expected string", info_name))
 											 .to_string()
 									);
 								},
@@ -185,15 +182,15 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 
 pub fn get_mod_file_info(root: &Value, root_path: &Path) -> ModFileInfo {
 	let name = root.get("name")
-		.unwrap_or_else(|| fatal!("[mod.json]: Missing required key 'name'"))
+		.nice_unwrap(format!("[mod.json]: Missing required key 'name'"))
 		.as_str()
-		.unwrap_or_else(|| fatal!("[mod.json].name: Expected string"))
+		.nice_unwrap(format!("[mod.json].name: Expected string"))
 		.to_string();
 
 	let id = root.get("id")
-		.unwrap_or_else(|| fatal!("[mod.json]: Missing required key 'id'"))
+		.nice_unwrap("[mod.json]: Missing required key 'id'")
 		.as_str()
-		.unwrap_or_else(|| fatal!("[mod.json].id: Expected string"))
+		.nice_unwrap("[mod.json].id: Expected string")
 		.to_string();
 
 	ModFileInfo {
