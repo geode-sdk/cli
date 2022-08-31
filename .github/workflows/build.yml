@@ -1,0 +1,54 @@
+name: Build Binaries
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+        - name: "Windows"
+          os: windows-latest
+          out_paths: './build/release/geode.exe'
+          static: ''
+        - name: "macOS"
+          os: macos-latest
+          out_paths: './build/release/geode'
+          static: 'export OPENSSL_STATIC=1'
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        
+    - uses: Swatinem/rust-cache@v1
+      with:
+        key: ${{ matrix.config.name }}
+        target-dir: ./build
+
+    - name: Build
+      run: |
+        ${{ matrix.config.static }}
+        cargo build --release --target-dir ${{ github.workspace }}/build     
+    
+    - name: Move to output folder
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        mkdir ./out
+        mv ${{ matrix.config.out_paths }} ./out
+        
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: ${{ matrix.config.name }} CLI Binary
+        path: ./out/

@@ -1,5 +1,5 @@
 [package]
-name = "geode-cli"
+name = "geode"
 version = "0.3.0"
 authors = ["HJfod <dreadrollmusic@gmail.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2021"
