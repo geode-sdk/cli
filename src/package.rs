@@ -14,7 +14,7 @@ use crate::config::Config;
 use crate::util::spritesheet;
 use crate::util::bmfont;
 use crate::{mod_file, cache};
-use crate::{fail, info, done};
+use crate::{fail, warn, info, done};
 use crate::NiceUnwrap;
 
 #[derive(Subcommand, Debug)]
@@ -91,7 +91,13 @@ fn zip_folder(path: &Path, output: &Path) {
 	done!("Successfully packaged {}", output.file_name().unwrap().to_str().unwrap().bright_yellow());
 }
 
-fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>, output: &Path, do_install: bool) {
+fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>, mut output: PathBuf, do_install: bool) {
+	// If it's a directory, add file path to it
+	if output.is_dir() {
+		output.push(root_path.file_name().unwrap());
+		output.set_extension("geode");
+		warn!("Specified output is a directory. Creating package at {}", output.display());
+	}
 
 	// Ensure at least one binary
 	if binaries.is_empty() {
@@ -102,8 +108,8 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 
 	// Test if possible to create file
 	if !output.exists() || output.is_dir() {
-		fs::write(output, "").nice_unwrap("Could not create package");
-		fs::remove_file(output).unwrap();
+		fs::write(&output, "").nice_unwrap("Could not create package");
+		fs::remove_file(&output).unwrap();
 	}
 
 	// Parse mod.json
@@ -126,7 +132,7 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	fs::create_dir(&resource_dir).unwrap();
 
 	// Setup cache
-	let mut cache_bundle = cache::get_cache_bundle(output);
+	let mut cache_bundle = cache::get_cache_bundle(&output);
 	let mut new_cache = cache::ResourceCache::new();
 
 	// Create spritesheets
@@ -154,10 +160,10 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 
 	new_cache.save(&working_dir);
 
-	zip_folder(&working_dir, output);
+	zip_folder(&working_dir, &output);
 
 	if do_install {
-		install(config, output);
+		install(config, &output);
 	}
 }
 
@@ -165,6 +171,6 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 	match cmd {
 		Package::Install { path } => install(config, &path),
 
-		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, &output, install)
+		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, output, install)
 	}
 }

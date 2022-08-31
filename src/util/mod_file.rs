@@ -95,12 +95,8 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 				}
 
 				"fonts" => {
-					if !value.is_object() {
-						fatal!("[mod.json].resources.font: Expected object");
-					}
-
 					// Iterate fonts
-					for (name, info) in value.as_object().unwrap() {
+					for (name, info) in value.as_object().nice_unwrap("[mod.json].resources.font: Expected object") {
 						if out.fonts.get(name).is_some() {
 							fatal!("[mod.json].resources.fonts: Duplicate name '{}'", name);
 						}

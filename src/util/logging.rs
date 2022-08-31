@@ -57,4 +57,3 @@ impl<T> NiceUnwrap<T> for Option<T> {
         self.unwrap_or_else(|| fatal!("{}", text))
     }
 }
-

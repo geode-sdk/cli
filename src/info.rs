@@ -3,7 +3,8 @@
  */
 use std::path::{PathBuf};
 use crate::config::Config;
-use crate::{fail, fatal, done};
+use crate::{fail, done};
+use crate::NiceUnwrap;
 use colored::Colorize;
 use clap::Subcommand;
 
@@ -61,7 +62,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				config.sdk_path = Some(PathBuf::from(value));
 			} else if field == "sdk-nightly" {
 				config.sdk_nightly = get_bool(&value)
-					.unwrap_or_else(|| fatal!("'{}' cannot be parsed as a bool", value));
+					.nice_unwrap(format!("'{}' cannot be parsed as a bool", value));
 			} else {
 				fail!("Unknown field {}", field);
 				return;

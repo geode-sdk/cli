@@ -82,16 +82,18 @@ impl Config {
 		let config_json = geode_root().join("config.json");
 
 		let mut output: Config = if !config_json.exists() {
-						return Config {
+			// Create new config
+			Config {
 				current_profile: String::new(),
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_path: None,
 				sdk_nightly: false,
 				other: HashMap::<String, Value>::new()
-			};
+			}
 		} else {
-			serde_json::from_str(&std::fs::read_to_string(&config_json).unwrap()).nice_unwrap("Unable to parse config.json")
+			serde_json::from_str(&std::fs::read_to_string(&config_json).unwrap())
+				.nice_unwrap("Unable to parse config.json")
 		};
 
 		output.save();
@@ -111,19 +113,18 @@ impl Config {
 		std::fs::write(
 			geode_root().join("config.json"),
 			serde_json::to_string(self).unwrap()
-		).nice_unwrap("Unable to save config: {}");
+		).nice_unwrap("Unable to save config");
 	}
 
 	pub fn rename_profile(&mut self, old: &str, new: String) {
-		let profile = self.get_profile(old);
+		let profile = self.get_profile(old)
+			.nice_unwrap(format!("Profile named '{}' does not exist", old));
 
-		if profile.is_none() {
-			fail!("Profile named '{}' does not exist!", old);
-		} else if self.get_profile(&new).is_some() {
+		if self.get_profile(&new).is_some() {
 			fail!("The name '{}' is already taken!", new);
 		} else {
 			done!("Successfully renamed '{}' to '{}'", old, &new);
-			profile.unwrap().borrow_mut().name = new;
+			profile.borrow_mut().name = new;
 		}
 	}
 }
