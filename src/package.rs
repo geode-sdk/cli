@@ -154,8 +154,9 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 
 	// Create fonts
 	for font in mod_file_info.resources.fonts.values() {
-		let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
-		new_cache.add_font(font, font_file);
+		//let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
+		//new_cache.add_font(font, font_file);
+		warn!("TODO: add fonts");
 	}
 
 	// Move other resources

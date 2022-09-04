@@ -95,12 +95,14 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, down
 
 	// Determine maximum dimensions of sprite sheet
 	let largest_width: u32 = sprites.iter().map(|x| x.image.width()).max().unwrap();
-	let width_sum: u32 = sprites.iter().map(|x| x.image.width()).sum();
-	let height_sum: u32 = sprites.iter().map(|x| x.image.height()).sum();
 
-	let mut max_width = ((width_sum * height_sum) as f64).sqrt() as u32;
+	let mean_height = sprites.iter().map(|x| x.image.height() as f64).sum::<f64>() / sprites.len() as f64;
+	let width_sum = sprites.iter().map(|x| x.image.width()).sum::<u32>() as f64;
+
+	let mut max_width = (width_sum * mean_height).sqrt() as u32;
+
 	if max_width < largest_width {
-	    max_width = largest_width;
+	    max_width = largest_width + 2;
 	}
 
 	// Setup texture packer
@@ -109,7 +111,7 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, down
 	    max_height: u32::MAX,
 	    allow_rotation: false,
 	    texture_outlines: false,
-	    border_padding: 1,
+	    border_padding: 0,
 	    ..Default::default()
 	};
 	let mut texture_packer = TexturePacker::new_skyline(config);
@@ -142,6 +144,8 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, down
 
 	// Write png
 	let mut file = std::fs::File::create(&bundle.png).unwrap();
+
+	info!("Exporting");
 
 	let exporter = ImageExporter::export(&texture_packer).unwrap();
 	exporter.write_to(&mut file, ImageFormat::Png).nice_unwrap("Unable to write to png file");
