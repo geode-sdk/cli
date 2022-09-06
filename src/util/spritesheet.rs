@@ -12,7 +12,7 @@ use crate::rgba4444::RGBA4444;
 use crate::{info, done};
 use crate::NiceUnwrap;
 
-struct Sprite {
+pub struct Sprite {
 	pub name: String,
 	pub image: RgbaImage
 }
@@ -44,7 +44,9 @@ impl SheetBundles {
 		}
 	}
 
-	pub fn new(base: PathBuf) -> SheetBundles {
+	pub fn new(mut base: PathBuf) -> SheetBundles {
+		base.set_extension("png");
+
 		let base_name = base.file_stem().unwrap().to_str().unwrap().to_string();
 
 		let hd = base.with_file_name(base_name.to_string() + "-hd.png");
@@ -66,31 +68,39 @@ impl SheetBundles {
 	}
 }
 
-fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, downscale: u32) {
+pub fn read_to_image(path: &Path) -> RgbaImage {
+	image::io::Reader::open(path)
+		.nice_unwrap(format!("Error reading sprite '{}'", path.display()))
+		.decode()
+		.nice_unwrap(format!("Error decoding sprite '{}'", path.display()))
+		.to_rgba8()
+}
+
+pub fn downscale(img: &mut RgbaImage, factor: u32) {
+	*img = imageops::resize(
+		img, 
+		img.width() / factor,
+		img.height() / factor,
+		imageops::FilterType::Lanczos3
+	);
+
+	// Dither
+	imageops::dither(img, &RGBA4444);
+}
+
+fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, factor: u32) {
 	// Convert all files to sprites
 	let mut sprites: Vec<Sprite> = sheet.files.iter().map(|x| {
 		Sprite {
 			name: x.file_stem().unwrap().to_str().unwrap().to_string(),
-			image: image::io::Reader::open(x)
-				       .nice_unwrap(format!("Error reading sprite '{}'", x.display()))
-				       .decode()
-				       .nice_unwrap(format!("Error decoding sprite '{}'", x.display()))
-				       .to_rgba8()
+			image: read_to_image(x)
 
 		}
 	}).collect();
 
 	// Resize
 	for sprite in &mut sprites {
-		sprite.image = imageops::resize(
-			&sprite.image, 
-			sprite.image.width() / downscale,
-			sprite.image.height() / downscale,
-			imageops::FilterType::Lanczos3
-		);
-
-		// Dither
-		imageops::dither(&mut sprite.image, &RGBA4444);
+		downscale(&mut sprite.image, factor);
 	}
 
 	// Determine maximum dimensions of sprite sheet

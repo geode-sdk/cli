@@ -159,15 +159,46 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 		warn!("TODO: add fonts");
 	}
 
+	// Resize sprites
+	for sprite_path in &mod_file_info.resources.sprites {
+		let mut sprite = spritesheet::read_to_image(sprite_path);
+
+		// Sprite base name
+		let base = sprite_path.file_stem().and_then(|x| x.to_str()).unwrap();
+
+		// Collect all errors
+		(|| {
+
+			sprite.save(resource_dir.join(base.to_string() + "-uhd.png"))?;
+
+			spritesheet::downscale(&mut sprite, 2);
+			sprite.save(resource_dir.join(base.to_string() + "-hd.png"))?;
+
+			spritesheet::downscale(&mut sprite, 2);
+			sprite.save(resource_dir.join(base.to_string() + ".png"))
+		})().nice_unwrap(format!("Unable to copy sprite at {}", sprite_path.display()));
+	}
+
 	// Move other resources
 	for file in &mod_file_info.resources.files {
 		std::fs::copy(file, resource_dir.join(file.file_name().unwrap()))
-			.nice_unwrap(format!("Could not copy file at '{}'", file.display()));
+			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
 	}
+
+	// Custom hardcoded resources
+	let logo_png = root_path.join("logo.png");
+	if logo_png.exists() {
+		std::fs::copy(logo_png, working_dir.join("logo.png")).nice_unwrap("Could not copy logo.png");
+	}
+	let about_md = root_path.join("about.md");
+	if about_md.exists() {
+		std::fs::copy(about_md, working_dir.join("about.md")).nice_unwrap("Could not copy about.md");
+	}
+
 
 	for binary in &binaries {
 		std::fs::copy(binary, working_dir.join(binary.file_name().unwrap()))
-			.nice_unwrap(format!("Could not copy binary at '{}'", binary.display()));
+			.nice_unwrap(format!("Unable to copy binary at '{}'", binary.display()));
 	}
 
 	new_cache.save(&working_dir);

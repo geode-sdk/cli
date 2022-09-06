@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use serde_json::{Value};
 
-use crate::fatal;
-use crate::NiceUnwrap;
+use crate::{warn, fatal};
+use crate::{NiceUnwrap};
 use crate::spritesheet::SpriteSheet;
 
 pub struct BitmapFont {
@@ -17,6 +17,7 @@ pub struct BitmapFont {
 pub struct ModResources {
 	pub files: Vec<PathBuf>,
 	pub spritesheets: HashMap<String, SpriteSheet>,
+	pub sprites: Vec<PathBuf>,
 	pub fonts: HashMap<String, BitmapFont>
 }
 
@@ -60,6 +61,7 @@ fn collect_globs(value: &Value, value_name: &str, root_path: &Path, out: &mut Ve
 fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 	let mut out = ModResources {
 		files: vec![],
+		sprites: vec![],
 		spritesheets: HashMap::new(),
 		fonts: HashMap::new()
 	};
@@ -71,6 +73,17 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 				"files" => {
 					collect_globs(value, "[mod.json].resources.files", root_path, &mut out.files);
 				},
+
+				"sprites" => {
+					for (i, file) in value.as_array().nice_unwrap("[mod.json].resources.sprites: Expected array").into_iter().enumerate() {
+						let path = PathBuf::from(file.as_str().nice_unwrap(format!("[mod.json].resources.sprites[{}]: Expected string", i)));
+						
+						if path.extension().and_then(|x| x.to_str()).unwrap_or("") != "png" {
+							warn!("[mod.json].resources.sprites[{}]: File extension is not png. Extension will change", i);
+						}
+						out.sprites.push(PathBuf::from(path));
+					}
+				}
 
 				"spritesheets" => {
 					if !value.is_object() {
@@ -86,6 +99,12 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 						let mut sheet_files = Vec::<PathBuf>::new();
 
 						collect_globs(files, &format!("[mod.json].resources.spritesheets.{}", name), root_path, &mut sheet_files);
+
+						for (i, file) in sheet_files.iter().enumerate() {
+							if file.extension().and_then(|x| x.to_str()).unwrap_or("") != "png" {
+								warn!("[mod.json].resources.sprites.{}[{}]: File extension is not png. Extension will change", name, i);
+							}
+						}
 
 						out.spritesheets.insert(name.to_string(), SpriteSheet {
 							name: name.to_string(),
