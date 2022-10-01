@@ -154,9 +154,9 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 
 	// Create fonts
 	for font in mod_file_info.resources.fonts.values() {
-		//let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
-		//new_cache.add_font(font, font_file);
-		warn!("TODO: add fonts");
+		let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
+		new_cache.add_font(font, font_file);
+		//warn!("TODO: add fonts");
 	}
 
 	// Resize sprites
@@ -194,7 +194,6 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	if about_md.exists() {
 		std::fs::copy(about_md, working_dir.join("about.md")).nice_unwrap("Could not copy about.md");
 	}
-
 
 	for binary in &binaries {
 		std::fs::copy(binary, working_dir.join(binary.file_name().unwrap()))
