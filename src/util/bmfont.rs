@@ -4,16 +4,20 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+use fontdue::Font;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::TexturePacker;
 use texture_packer::TexturePackerConfig;
+use texture_packer::texture::Texture;
 
-use crate::{fatal, NiceUnwrap};
+use crate::{done, info, fatal, NiceUnwrap};
 use image::{Rgba, Rgb, RgbaImage, LumaA, EncodableLayout, Pixel, GenericImageView, DynamicImage, GrayAlphaImage};
 use signed_distance_field::prelude::*;
 
+use super::spritesheet::downscale;
+
 struct RenderedChar {
-	id: u32,
+	id: char,
 	img: RgbaImage
 }
 
@@ -107,11 +111,7 @@ fn generate_char(font: &BitmapFont, metrics: fontdue::Metrics, data: Vec<u8>) ->
 	))
 }
 
-fn create_font(font: &BitmapFont, working_dir: &Path) -> PathBuf {
-	// Destination paths
-	let fnt_dst = working_dir.join(font.name.to_owned() + ".fnt");
-	let png_dst = working_dir.join(font.name.to_owned() + ".png");
-
+fn initialize_font_bundle(bundle: &FontBundle, font: &BitmapFont, factor: u32) -> PathBuf {
 	// Get all characters from the charset format
 	let chars: Vec<char> = font.charset
 		.as_deref()
@@ -137,14 +137,12 @@ fn create_font(font: &BitmapFont, working_dir: &Path) -> PathBuf {
 
 	// Rasterize characters from charset using the source font
 	let rasterized_chars: Vec<_> = chars.iter().filter_map(|c| {
-		let (metrics, data) = ttf_font.rasterize(
-			*c,
-			font.size as f32
-		);
+		let (metrics, data) = ttf_font.rasterize(*c, font.size as f32);
 
-		if let Some(img) = generate_char(font, metrics, data) {
+		if let Some(mut img) = generate_char(font, metrics, data) {
+			downscale(&mut img, factor);
 			Some(RenderedChar {
-				id: *c as u32,
+				id: *c,
 				img
 			})
 		} else {
@@ -179,32 +177,169 @@ fn create_font(font: &BitmapFont, working_dir: &Path) -> PathBuf {
 	
 	rasterized_chars.iter().for_each(|x| packer.pack_ref(x.id, &x.img).unwrap());
 
-	// test!
+	// Create .png file
 	let exporter = ImageExporter::export(&packer).unwrap();
-	let mut f = fs::File::create("/Users/jakrillis/cock.png").unwrap();
+	let mut f = fs::File::create(&bundle.png).nice_unwrap("Unable to write font .png file");
 	exporter.write_to(&mut f, image::ImageFormat::Png).unwrap();
 
-	todo!()
-}
+	// Get all characters and their metrics (positions in the png)
+	// Add space explicitly because it's empty and not in the frames
+	// todo: figure out why space isn't there and how to make sure 
+	// other space characters don't get omitted
+	let mut all_chars = vec!(format!(
+		"char id=32 x=0 y=0 width=0 height=0 xoffset=0 yoffset=0 xadvance={} page=0 chln=0",
+		ttf_font.metrics(' ', font.size as f32).advance_width
+	));
+	for (name, frame) in packer.get_frames() {
+		let metrics = ttf_font.metrics(*name, font.size as f32);
+		all_chars.push(format!(
+			"char id={} x={} y={} width={} height={} xoffset={} yoffset={} xadvance={} page=0 chnl=0",
+			*name as i32,
+			frame.frame.x as i32,
+			frame.frame.y as i32,
+			frame.frame.w as i32,
+			frame.frame.h as i32,
+			metrics.xmin,
+			font.size as i32 - metrics.height as i32 - metrics.ymin,
+			metrics.advance_width as i32
+		));
+	}
 
-pub fn get_font(font: &BitmapFont, working_dir: &Path, cache: &mut Option<CacheBundle>) -> PathBuf {
-	if let Some(bundle) = cache {
-		// Cache found
-		if let Some(p) = bundle.cache.fetch_font(font) {
-			let mut cached_file = bundle.archive.by_name(p.to_str().unwrap()).unwrap();
-
-			// Read cached file to buffer
-			let mut buf = String::new();
-			cached_file.read_to_string(&mut buf).unwrap();
-
-			// Write buffer into working directory, same file name
-			let out_path = working_dir.join(p.file_name().unwrap().to_str().unwrap());
-			fs::write(&out_path, buf).unwrap();
-
-			return out_path;
+	// Get all kerning pairs
+	let mut all_kerning_pairs = vec!();
+	for left in &rasterized_chars {
+		for right in &rasterized_chars {
+			if let Some(kern) = ttf_font.horizontal_kern(
+				left.id, right.id, font.size as f32
+			) {
+				all_kerning_pairs.push(format!(
+					"kerning first={} second={} amount={}",
+					left.id, right.id, kern as i32
+				));
+			}
 		}
 	}
 
+	// Create .fnt file
+    let line_metrics = ttf_font.horizontal_line_metrics(font.size as f32).unwrap();
+	let fnt_data = format!(
+		"info face=\"{font_name} size={font_size} bold=0 italic=0 \
+		charset=\"\" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1\n\
+		common lineHeight={common_line_height} base={font_base} \
+		scaleW={scale_w} scaleH={scale_h} pages=1 packed=0\n \
+		page id=0 file=\"{sprite_file_name}.png\"\n\
+		chars count={char_count}\n\
+		{all_chars}\n\
+		kernings count={kerning_count}\n\
+		{all_kernings}\n",
+		font_name = font.path.file_name().unwrap().to_str().unwrap(),
+		font_size = font.size,
+		common_line_height = line_metrics.new_line_size,
+		font_base = (-line_metrics.descent + line_metrics.line_gap) as i32,
+		scale_w = packer.width(),
+		scale_h = packer.height(),
+		sprite_file_name = font.name,
+		char_count = all_chars.len(),
+		all_chars = all_chars.join("\n"),
+		kerning_count = all_kerning_pairs.len(),
+		all_kernings = all_kerning_pairs.join("\n"),
+	);
+	fs::write(&bundle.fnt, fnt_data).nice_unwrap("Unable to write font .fnt file");
+
+	PathBuf::from(font.name.to_owned() + ".png")
+}
+
+pub struct FontBundle {
+	pub png: PathBuf,
+	pub fnt: PathBuf
+}
+
+pub struct FontBundles {
+	pub sd: FontBundle,
+	pub hd: FontBundle,
+	pub uhd: FontBundle
+}
+
+impl FontBundles {
+	fn new_file(base: PathBuf) -> FontBundle {
+		let mut fnt = base.to_owned();
+		fnt.set_extension("fnt");
+
+		FontBundle {
+			png: base,
+			fnt
+		}
+	}
+
+	pub fn new(mut base: PathBuf) -> FontBundles {
+		base.set_extension("png");
+
+		let base_name = base.file_stem().unwrap().to_str().unwrap().to_string();
+
+		let hd = base.with_file_name(base_name.to_string() + "-hd.png");
+		let uhd = base.with_file_name(base_name + "-uhd.png");
+
+		FontBundles {
+			sd: FontBundles::new_file(base),
+			hd: FontBundles::new_file(hd),
+			uhd: FontBundles::new_file(uhd)
+		}
+	}
+
+	pub fn cache_name(&self, working_dir: &Path) -> PathBuf {
+		if self.sd.png.is_relative() {
+			self.sd.png.to_path_buf()
+		} else {
+			self.sd.png.strip_prefix(working_dir).unwrap().to_path_buf()
+		}
+	}
+}
+
+fn extract_from_cache(path: &Path, working_dir: &Path, cache_bundle: &mut CacheBundle) {
+	let path_name = path.to_str().unwrap();
+	info!("Extracting '{}' from cache", path_name);
+	cache_bundle.extract_cached_into(
+		path_name, 
+		&working_dir.join(path.file_name().unwrap().to_str().unwrap())
+	);
+}
+
+pub fn get_font_bundles(font: &BitmapFont, working_dir: &Path, cache: &mut Option<CacheBundle>) -> FontBundles {
+	info!("Fetching font {}", font.name.bright_yellow());
+
+	if let Some(cache_bundle) = cache {
+		// Cache found
+		if let Some(p) = cache_bundle.cache.fetch_font_bundles(font) {
+			info!("Using cached files");
+			let bundles = FontBundles::new(p.to_path_buf());
+
+			// Extract all files
+			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle);
+			extract_from_cache(&bundles.sd.fnt, working_dir, cache_bundle);
+			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle);
+			extract_from_cache(&bundles.hd.fnt, working_dir, cache_bundle);
+			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle);
+			extract_from_cache(&bundles.uhd.fnt, working_dir, cache_bundle);
+
+			done!("Fetched {} from cache", font.name.bright_yellow());
+			return bundles;
+		}
+	}
+	
+	info!("Font is not cached, building from scratch");
+	let mut bundles = FontBundles::new(working_dir.join(font.name.to_string() + ".png"));
+
 	// Create new font
-	create_font(font, working_dir)
+
+	info!("Creating normal font");
+	initialize_font_bundle(&mut bundles.sd, font, 4);
+
+	info!("Creating HD font");
+	initialize_font_bundle(&mut bundles.hd, font, 2);
+
+	info!("Creating UHD font");
+	initialize_font_bundle(&mut bundles.uhd, font, 1);
+
+	done!("Built font {}", font.name.bright_yellow());
+	bundles
 }

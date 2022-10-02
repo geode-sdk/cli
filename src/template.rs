@@ -61,8 +61,7 @@ fn create_template(
 	    "id":           id,
 	    "name":         name,
 	    "developer":    developer,
-	    "description":  description,
-	    "binary": filtered_name
+	    "description":  description
 	});
 
 	// Format neatly

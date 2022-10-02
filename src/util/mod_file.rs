@@ -75,14 +75,7 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 				},
 
 				"sprites" => {
-					for (i, file) in value.as_array().nice_unwrap("[mod.json].resources.sprites: Expected array").into_iter().enumerate() {
-						let path = PathBuf::from(file.as_str().nice_unwrap(format!("[mod.json].resources.sprites[{}]: Expected string", i)));
-						
-						if path.extension().and_then(|x| x.to_str()).unwrap_or("") != "png" {
-							warn!("[mod.json].resources.sprites[{}]: File extension is not png. Extension will change", i);
-						}
-						out.sprites.push(PathBuf::from(path));
-					}
+					collect_globs(value, "[mod.json].resources.files", root_path, &mut out.sprites);
 				}
 
 				"spritesheets" => {

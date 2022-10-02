@@ -478,7 +478,7 @@ dependencies = [
 
 [[package]]
 name = "geode"
-version = "0.3.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "colored",

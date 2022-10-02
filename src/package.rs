@@ -12,6 +12,8 @@ use zip::ZipWriter;
 use zip::write::FileOptions;
 
 use crate::config::Config;
+use crate::util::cache::CacheBundle;
+use crate::util::mod_file::ModFileInfo;
 use crate::util::spritesheet;
 use crate::util::bmfont;
 use crate::{mod_file, cache};
@@ -53,7 +55,16 @@ pub enum Package {
     	/// Strip trailing newline
     	#[clap(long)]
     	raw: bool
-    }
+    },
+
+	/// Process the resources specified by a package
+	Resources {
+    	/// Location of mod's folder
+    	root_path: PathBuf,
+
+		/// Folder to place the created resources in
+		output: PathBuf
+	},
 }
 
 pub fn install(config: &mut Config, pkg_path: &Path) {
@@ -102,6 +113,89 @@ fn zip_folder(path: &Path, output: &Path) {
 	done!("Successfully packaged {}", output.file_name().unwrap().to_str().unwrap().bright_yellow());
 }
 
+fn get_working_dir(id: &String) -> PathBuf {
+	let working_dir = dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", id));
+	fs::remove_dir_all(&working_dir).unwrap_or(());
+	fs::create_dir(&working_dir).unwrap_or(());
+	working_dir
+}
+
+fn create_resources(
+	config: &mut Config,
+	mod_info: &ModFileInfo,
+	mut cache_bundle: &mut Option<CacheBundle>,
+	cache: &mut cache::ResourceCache,
+	working_dir: &PathBuf,
+	output_dir: &PathBuf
+) {
+	// Make sure output directory exists
+	fs::create_dir_all(output_dir).nice_unwrap("Could not create output directory");
+
+	// Create spritesheets
+	for sheet in mod_info.resources.spritesheets.values() {
+		let sheet_file = spritesheet::get_spritesheet_bundles(
+			sheet, &output_dir, &mut cache_bundle, &mod_info
+		);
+		cache.add_sheet(sheet, sheet_file.cache_name(&working_dir));
+	}
+
+	// Create fonts
+	for font in mod_info.resources.fonts.values() {
+		let font_file = bmfont::get_font_bundles(font, &output_dir, &mut cache_bundle);
+		cache.add_font(font, font_file.cache_name(&working_dir));
+	}
+
+	info!("Copying sprites");
+	// Resize sprites
+	for sprite_path in &mod_info.resources.sprites {
+		let mut sprite = spritesheet::read_to_image(sprite_path);
+
+		// Sprite base name
+		let base = sprite_path.file_stem().and_then(|x| x.to_str()).unwrap();
+
+		// Collect all errors
+		(|| {
+			sprite.save(output_dir.join(base.to_string() + "-uhd.png"))?;
+
+			spritesheet::downscale(&mut sprite, 2);
+			sprite.save(output_dir.join(base.to_string() + "-hd.png"))?;
+
+			spritesheet::downscale(&mut sprite, 2);
+			sprite.save(output_dir.join(base.to_string() + ".png"))
+		})().nice_unwrap(format!("Unable to copy sprite at {}", sprite_path.display()));
+	}
+
+	info!("Copying files");
+	// Move other resources
+	for file in &mod_info.resources.files {
+		std::fs::copy(file, output_dir.join(file.file_name().unwrap()))
+			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
+	}
+}
+
+fn create_package_resources_only(config: &mut Config, root_path: &Path, output_dir: &PathBuf) {
+	// Parse mod.json
+	let mod_json: Value = serde_json::from_str(
+		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json")
+	).nice_unwrap("Could not parse mod.json");
+
+	let mod_info = mod_file::get_mod_file_info(&mod_json, &root_path);
+
+	// Setup cache
+	let mut cache_bundle = cache::get_cache_bundle_from_dir(&output_dir);
+	let mut new_cache = cache::ResourceCache::new();
+
+	create_resources(
+		config, &mod_info,
+		&mut cache_bundle, &mut new_cache,
+		&output_dir, output_dir
+	);
+
+	new_cache.save(&output_dir);
+	
+	done!("Resources created at {}", output_dir.to_str().unwrap());
+}
+
 fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>, mut output: PathBuf, do_install: bool) {
 	// If it's a directory, add file path to it
 	if output.is_dir() {
@@ -131,9 +225,7 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	let mod_file_info = mod_file::get_mod_file_info(&mod_json, &root_path);
 
 	// Setup working directory
-	let working_dir = dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", mod_file_info.id));
-	fs::remove_dir_all(&working_dir).unwrap_or(());
-	fs::create_dir(&working_dir).unwrap_or(());
+	let working_dir = get_working_dir(&mod_file_info.id);
 
 	// Move mod.json
 	fs::copy(root_path.join("mod.json"), working_dir.join("mod.json")).unwrap();
@@ -146,44 +238,12 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	let mut cache_bundle = cache::get_cache_bundle(&output);
 	let mut new_cache = cache::ResourceCache::new();
 
-	// Create spritesheets
-	for sheet in mod_file_info.resources.spritesheets.values() {
-		let sheet_file = spritesheet::get_spritesheet_bundles(sheet, &resource_dir, &mut cache_bundle);
-		new_cache.add_sheet(sheet, sheet_file.cache_name(&working_dir));
-	}
-
-	// Create fonts
-	for font in mod_file_info.resources.fonts.values() {
-		let font_file = bmfont::get_font(font, &resource_dir, &mut cache_bundle);
-		new_cache.add_font(font, font_file);
-		//warn!("TODO: add fonts");
-	}
-
-	// Resize sprites
-	for sprite_path in &mod_file_info.resources.sprites {
-		let mut sprite = spritesheet::read_to_image(sprite_path);
-
-		// Sprite base name
-		let base = sprite_path.file_stem().and_then(|x| x.to_str()).unwrap();
-
-		// Collect all errors
-		(|| {
-
-			sprite.save(resource_dir.join(base.to_string() + "-uhd.png"))?;
-
-			spritesheet::downscale(&mut sprite, 2);
-			sprite.save(resource_dir.join(base.to_string() + "-hd.png"))?;
-
-			spritesheet::downscale(&mut sprite, 2);
-			sprite.save(resource_dir.join(base.to_string() + ".png"))
-		})().nice_unwrap(format!("Unable to copy sprite at {}", sprite_path.display()));
-	}
-
-	// Move other resources
-	for file in &mod_file_info.resources.files {
-		std::fs::copy(file, resource_dir.join(file.file_name().unwrap()))
-			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
-	}
+	// Create resources
+	create_resources(
+		config, &mod_file_info,
+		&mut cache_bundle, &mut new_cache,
+		&working_dir, &resource_dir
+	);
 
 	// Custom hardcoded resources
 	let logo_png = root_path.join("logo.png");
@@ -241,6 +301,8 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 
 		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, output, install),
 		
-		Package::GetId { input, raw } => get_id(input, raw)
+		Package::GetId { input, raw } => get_id(input, raw),
+
+		Package::Resources { root_path, output } => create_package_resources_only(config, &root_path, &output),
 	}
 }

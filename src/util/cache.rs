@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Read;
 use std::fs::File;
+use std::fs;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +18,35 @@ pub struct ResourceCache {
 
 pub struct CacheBundle {
 	pub cache: ResourceCache,
-	pub archive: zip::ZipArchive<File>
+	pub src: CacheBundleSource,
+}
+
+impl CacheBundle {
+	pub fn extract_cached_into(&mut self, name: &str, output: &PathBuf) {
+		match &mut self.src {
+			CacheBundleSource::Archive(archive) => {
+				let mut cached_file = archive.by_name(name).unwrap();
+
+				// Read cached file to buffer
+				let mut buf: Vec<u8> = Vec::new();
+				cached_file.read_to_end(&mut buf).unwrap();
+
+				// Write buffer into output directory, same file name
+				std::fs::write(&output, buf).unwrap();
+			},
+
+			CacheBundleSource::Directory(dir) => {
+				if dir.join(name) != *output {
+					std::fs::copy(dir.join(name), output).unwrap();
+				}
+			},
+		}
+	}
+}
+
+pub enum CacheBundleSource {
+	Archive(zip::ZipArchive<File>),
+	Directory(PathBuf),
 }
 
 fn hash_sheet(sheet: &SpriteSheet) -> String {
@@ -35,9 +64,21 @@ fn hash_font(font: &BitmapFont) -> String {
 	))
 }
 
+pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
+	path.join(".geode_cache").exists().then(|| {
+		let cache = ResourceCache::load(
+			fs::read_to_string(path.join(".geode_cache")).nice_unwrap("Unable to read cache")
+		);
+		Some(CacheBundle {
+			cache,
+			src: CacheBundleSource::Directory(path.to_path_buf())
+		})
+	}).flatten()
+}
+
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 	path.exists().then(|| {
-		match zip::ZipArchive::new(File::open(path).unwrap()) {
+		match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cache file")) {
 			Ok(mut archive) => {
 				let cache: ResourceCache;
 
@@ -54,8 +95,8 @@ pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 
 				Some(CacheBundle {
 					cache,
-					archive
-				})			
+					src: CacheBundleSource::Archive(archive)
+				})
 			},
 
 			Err(e) => {
@@ -103,7 +144,7 @@ impl ResourceCache {
 		self.spritesheets.get(&hash_sheet(sheet)).and_then(|x| Some(&**x))
 	}
 
-	pub fn fetch_font(&self, font: &BitmapFont) -> Option<&Path> {
+	pub fn fetch_font_bundles(&self, font: &BitmapFont) -> Option<&Path> {
 		self.fonts.get(&hash_font(font)).and_then(|x| Some(&**x))
 	}
 }

@@ -12,6 +12,8 @@ use crate::rgba4444::RGBA4444;
 use crate::{info, done};
 use crate::NiceUnwrap;
 
+use super::mod_file::ModFileInfo;
+
 pub struct Sprite {
 	pub name: String,
 	pub image: RgbaImage
@@ -88,7 +90,12 @@ pub fn downscale(img: &mut RgbaImage, factor: u32) {
 	imageops::dither(img, &RGBA4444);
 }
 
-fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, factor: u32) {
+fn initialize_spritesheet_bundle(
+	bundle: &SheetBundle,
+	sheet: &SpriteSheet,
+	factor: u32,
+	mod_info: &ModFileInfo
+) {
 	// Convert all files to sprites
 	let mut sprites: Vec<Sprite> = sheet.files.iter().map(|x| {
 		Sprite {
@@ -133,7 +140,7 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, fact
 
 	// Initialize the plist file
 	let frame_info = texture_packer.get_frames().iter().map(|(name, frame)| {
-		(name.to_string(), json!({
+		(mod_info.id.to_owned() + "/" + name + ".png", json!({
 			"textureRotated": frame.rotated,
 			"spriteSourceSize": format!("{{{}, {}}}", frame.source.w, frame.source.h),
 			"spriteSize": format!("{{{}, {}}}", frame.frame.w, frame.frame.h),
@@ -165,20 +172,19 @@ fn initialize_spritesheet_bundle(bundle: &SheetBundle, sheet: &SpriteSheet, fact
 
 fn extract_from_cache(path: &Path, working_dir: &Path, cache_bundle: &mut CacheBundle) {
 	let path_name = path.to_str().unwrap();
-
 	info!("Extracting '{}' from cache", path_name);
-	let mut cached_file = cache_bundle.archive.by_name(path_name).unwrap();
-
-	// Read cached file to buffer
-	let mut buf: Vec<u8> = Vec::new();
-	cached_file.read_to_end(&mut buf).unwrap();
-
-	// Write buffer into working directory, same file name
-	let out_path = working_dir.join(path.file_name().unwrap().to_str().unwrap());
-	std::fs::write(&out_path, buf).unwrap();
+	cache_bundle.extract_cached_into(
+		path_name, 
+		&working_dir.join(path.file_name().unwrap().to_str().unwrap())
+	);
 }
 
-pub fn get_spritesheet_bundles(sheet: &SpriteSheet, working_dir: &Path, cache: &mut Option<CacheBundle>) -> SheetBundles {
+pub fn get_spritesheet_bundles(
+	sheet: &SpriteSheet,
+	working_dir: &Path,
+	cache: &mut Option<CacheBundle>,
+	mod_info: &ModFileInfo
+) -> SheetBundles {
 	info!("Fetching spritesheet {}", sheet.name.bright_yellow());
 
 	if let Some(cache_bundle) = cache {
@@ -206,13 +212,13 @@ pub fn get_spritesheet_bundles(sheet: &SpriteSheet, working_dir: &Path, cache: &
 	// Initialize all files
 
 	info!("Creating normal sheet");
-	initialize_spritesheet_bundle(&mut bundles.sd, sheet, 4);
+	initialize_spritesheet_bundle(&mut bundles.sd, sheet, 4, &mod_info);
 
 	info!("Creating HD sheet");
-	initialize_spritesheet_bundle(&mut bundles.hd, sheet, 2);
+	initialize_spritesheet_bundle(&mut bundles.hd, sheet, 2, &mod_info);
 
 	info!("Creating UHD sheet");
-	initialize_spritesheet_bundle(&mut bundles.uhd, sheet, 1);
+	initialize_spritesheet_bundle(&mut bundles.uhd, sheet, 1, &mod_info);
 
 	done!("Built spritesheet {}", sheet.name.bright_yellow());
 	bundles
