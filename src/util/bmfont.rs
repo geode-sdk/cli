@@ -4,7 +4,6 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
-use fontdue::Font;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::TexturePacker;
 use texture_packer::TexturePackerConfig;
@@ -14,6 +13,7 @@ use crate::{done, info, fatal, NiceUnwrap};
 use image::{Rgba, Rgb, RgbaImage, LumaA, EncodableLayout, Pixel, GenericImageView, DynamicImage, GrayAlphaImage};
 use signed_distance_field::prelude::*;
 
+use super::mod_file::ModFileInfo;
 use super::spritesheet::downscale;
 
 struct RenderedChar {
@@ -111,7 +111,12 @@ fn generate_char(font: &BitmapFont, metrics: fontdue::Metrics, data: Vec<u8>) ->
 	))
 }
 
-fn initialize_font_bundle(bundle: &FontBundle, font: &BitmapFont, factor: u32) -> PathBuf {
+fn initialize_font_bundle(
+	bundle: &FontBundle,
+	font: &BitmapFont,
+	factor: u32,
+	_mod_info: &ModFileInfo
+) -> PathBuf {
 	// Get all characters from the charset format
 	let chars: Vec<char> = font.charset
 		.as_deref()
@@ -206,27 +211,24 @@ fn initialize_font_bundle(bundle: &FontBundle, font: &BitmapFont, factor: u32) -
 	}
 
 	// Get all kerning pairs
-	let mut all_kerning_pairs = vec!();
-	for left in &rasterized_chars {
-		for right in &rasterized_chars {
-			if let Some(kern) = ttf_font.horizontal_kern(
+	let all_kerning_pairs = rasterized_chars.iter().flat_map(
+		|left| rasterized_chars.iter().filter_map(|right| {
+			ttf_font.horizontal_kern(
 				left.id, right.id, font.size as f32
-			) {
-				all_kerning_pairs.push(format!(
-					"kerning first={} second={} amount={}",
-					left.id, right.id, kern as i32
-				));
-			}
-		}
-	}
+			).map(|kern| format!(
+				"kerning first={} second={} amount={}",
+				left.id, right.id, kern as i32
+			))
+		})
+	).collect::<Vec<_>>();
 
 	// Create .fnt file
     let line_metrics = ttf_font.horizontal_line_metrics(font.size as f32).unwrap();
 	let fnt_data = format!(
-		"info face=\"{font_name} size={font_size} bold=0 italic=0 \
+		"info face=\"{font_name}\" size={font_size} bold=0 italic=0 \
 		charset=\"\" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1\n\
 		common lineHeight={common_line_height} base={font_base} \
-		scaleW={scale_w} scaleH={scale_h} pages=1 packed=0\n \
+		scaleW={scale_w} scaleH={scale_h} pages=1 packed=0\n\
 		page id=0 file=\"{sprite_file_name}.png\"\n\
 		chars count={char_count}\n\
 		{all_chars}\n\
@@ -304,7 +306,12 @@ fn extract_from_cache(path: &Path, working_dir: &Path, cache_bundle: &mut CacheB
 	);
 }
 
-pub fn get_font_bundles(font: &BitmapFont, working_dir: &Path, cache: &mut Option<CacheBundle>) -> FontBundles {
+pub fn get_font_bundles(
+	font: &BitmapFont,
+	working_dir: &Path,
+	cache: &mut Option<CacheBundle>,
+	mod_info: &ModFileInfo
+) -> FontBundles {
 	info!("Fetching font {}", font.name.bright_yellow());
 
 	if let Some(cache_bundle) = cache {
@@ -332,13 +339,13 @@ pub fn get_font_bundles(font: &BitmapFont, working_dir: &Path, cache: &mut Optio
 	// Create new font
 
 	info!("Creating normal font");
-	initialize_font_bundle(&mut bundles.sd, font, 4);
+	initialize_font_bundle(&mut bundles.sd, font, 4, mod_info);
 
 	info!("Creating HD font");
-	initialize_font_bundle(&mut bundles.hd, font, 2);
+	initialize_font_bundle(&mut bundles.hd, font, 2, mod_info);
 
 	info!("Creating UHD font");
-	initialize_font_bundle(&mut bundles.uhd, font, 1);
+	initialize_font_bundle(&mut bundles.uhd, font, 1, mod_info);
 
 	done!("Built font {}", font.name.bright_yellow());
 	bundles

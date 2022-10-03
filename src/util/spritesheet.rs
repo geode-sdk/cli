@@ -138,9 +138,19 @@ fn initialize_spritesheet_bundle(
 	sprites.iter().for_each(|x| texture_packer.pack_ref(&x.name, &x.image).unwrap());
 	done!("Packed sprites");
 
+	let sprite_name_in_sheet = |name: &String| {
+		// `mod.id/sprite.png`
+		mod_info.id.to_owned() + "/" +
+			name
+				.strip_suffix("-uhd")
+				.or(name.strip_suffix("-hd"))
+				.unwrap_or(name) +
+			".png"
+	};
+	
 	// Initialize the plist file
 	let frame_info = texture_packer.get_frames().iter().map(|(name, frame)| {
-		(mod_info.id.to_owned() + "/" + name + ".png", json!({
+		(sprite_name_in_sheet(name), json!({
 			"textureRotated": frame.rotated,
 			"spriteSourceSize": format!("{{{}, {}}}", frame.source.w, frame.source.h),
 			"spriteSize": format!("{{{}, {}}}", frame.frame.w, frame.frame.h),

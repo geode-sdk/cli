@@ -141,7 +141,9 @@ fn create_resources(
 
 	// Create fonts
 	for font in mod_info.resources.fonts.values() {
-		let font_file = bmfont::get_font_bundles(font, &output_dir, &mut cache_bundle);
+		let font_file = bmfont::get_font_bundles(
+			font, &output_dir, &mut cache_bundle, mod_info
+		);
 		cache.add_font(font, font_file.cache_name(&working_dir));
 	}
 
