@@ -233,8 +233,8 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	fs::copy(root_path.join("mod.json"), working_dir.join("mod.json")).unwrap();
 
 	// Resource directory
-	let resource_dir = working_dir.join("resources");
-	fs::create_dir(&resource_dir).unwrap();
+	let resource_dir = working_dir.join("resources").join(&mod_file_info.id);
+	fs::create_dir_all(&resource_dir).unwrap();
 
 	// Setup cache
 	let mut cache_bundle = cache::get_cache_bundle(&output);
