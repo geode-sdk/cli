@@ -69,18 +69,18 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		},
 
 		Profile::Switch { profile } => {
-			if config.get_profile(&profile).is_none() {
+			if config.get_profile(&Some(profile.to_owned())).is_none() {
 				fail!("Profile '{}' does not exist", profile);
-			} else if config.current_profile == profile {
+			} else if config.current_profile == Some(profile.to_owned()) {
 				fail!("'{}' is already the current profile", profile);
 			} else {
 				done!("'{}' is now the current profile", &profile);
-				config.current_profile = profile;
+				config.current_profile = Some(profile);
 			}
 		},
 
 		Profile::Add { name, location } => {
-			if config.get_profile(&name).is_some() {
+			if config.get_profile(&Some(name.to_owned())).is_some() {
 				fail!("A profile named '{}' already exists", name);
 			} else if !is_valid_geode_dir(&location) {
 				fail!("The specified path does not point to a valid Geode installation");
@@ -88,11 +88,10 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 				done!("A new profile named '{}' has been created", &name);
 				config.profiles.push(RefCell::new(CfgProfile::new(name, location)));
 			}
-
 		},
 
 		Profile::Remove { name } => {
-			if config.get_profile(&name).is_none() {
+			if config.get_profile(&Some(name.to_owned())).is_none() {
 				fail!("Profile '{}' does not exist", name);
 			} else {
 				config.profiles.retain(|x| x.borrow().name != name);

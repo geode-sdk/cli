@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::{fail, warn, done, info};
+use crate::{fail, warn, done, info, fatal};
 use crate::NiceUnwrap;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -21,13 +21,56 @@ pub struct Profile {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
-	pub current_profile: String,
+	pub current_profile: Option<String>,
 	pub profiles: Vec<RefCell<Profile>>,
 	pub default_developer: Option<String>,
 	pub sdk_path: Option<PathBuf>,
 	pub sdk_nightly: bool,
     #[serde(flatten)]
     other: HashMap<String, Value>,
+}
+
+// old config.json structures for migration
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct OldConfigInstallation {
+	pub path: PathBuf,
+	pub executable: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct OldConfig {
+	pub default_installation: usize,
+	pub working_installation: Option<usize>,
+	pub installations: Option<Vec<OldConfigInstallation>>,
+	pub default_developer: Option<String>,
+}
+
+impl OldConfig {
+	pub fn migrate(&self) -> Config {
+		let profiles = self.installations.as_ref().map(|insts| {
+			insts.iter().map(|inst| RefCell::from(Profile {
+				name: inst.executable
+					.strip_suffix(".exe")
+					.unwrap_or(&inst.executable)
+					.into(),
+				gd_path: inst.path.clone(),
+				other: HashMap::new()
+			})).collect::<Vec<_>>()
+		}).unwrap_or(Vec::new());
+		Config {
+			current_profile: profiles.get(
+				self.working_installation.unwrap_or(self.default_installation)
+			).map(|i| i.borrow().name.clone()),
+			profiles,
+			default_developer: self.default_developer.to_owned(),
+			sdk_path: None,
+			sdk_nightly: false,
+			other: HashMap::new()
+		}
+	}
 }
 
 pub fn geode_root() -> PathBuf {
@@ -57,8 +100,12 @@ impl Profile {
 }
 
 impl Config {
-	pub fn get_profile(&self, name: &str) -> Option<&RefCell<Profile>> {
-		self.profiles.iter().filter(|x| x.borrow().name == name).next()
+	pub fn get_profile(&self, name: &Option<String>) -> Option<&RefCell<Profile>> {
+		if let Some(name) = name {
+			self.profiles.iter().filter(|x| x.borrow().name == name.to_owned()).next()
+		} else {
+			None
+		}
 	}
 
 	pub fn new() -> Config {
@@ -68,7 +115,7 @@ impl Config {
 			info!("At {}", "https://github.com/geode-sdk/installer/releases/latest".bright_cyan());
 
 			return Config {
-				current_profile: String::new(),
+				current_profile: None,
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_path: None,
@@ -82,7 +129,7 @@ impl Config {
 		let mut output: Config = if !config_json.exists() {
 			// Create new config
 			Config {
-				current_profile: String::new(),
+				current_profile: None,
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_path: None,
@@ -90,8 +137,21 @@ impl Config {
 				other: HashMap::<String, Value>::new()
 			}
 		} else {
-			serde_json::from_str(&std::fs::read_to_string(&config_json).unwrap())
-				.nice_unwrap("Unable to parse config.json")
+			// Parse config
+			let config_json_str = &std::fs::read_to_string(&config_json)
+				.nice_unwrap("Unable to read config.json");
+			match serde_json::from_str(config_json_str) {
+				Ok(json) => json,
+				Err(e) => {
+					// Try migrating old config
+					if let Ok(json) = serde_json::from_str::<OldConfig>(config_json_str) {
+						info!("Migrating old config.json");
+						json.migrate()
+					} else {
+						fatal!("Unable to parse config.json: {}", e);
+					}
+				}
+			}
 		};
 
 		output.save();
@@ -99,9 +159,8 @@ impl Config {
 		if output.profiles.is_empty() {
 			warn!("No Geode profiles found! Some operations will be unavailable.");
 			info!("Install Geode using the official installer (https://github.com/geode-sdk/installer/releases/latest)");
-
-		} else if output.get_profile(&output.current_profile.clone()).is_none() {
-			output.current_profile = output.profiles[0].borrow().name.clone();
+		} else if output.get_profile(&output.current_profile).is_none() {
+			output.current_profile = Some(output.profiles[0].borrow().name.clone());
 		}
 
 		output
@@ -115,10 +174,10 @@ impl Config {
 	}
 
 	pub fn rename_profile(&mut self, old: &str, new: String) {
-		let profile = self.get_profile(old)
+		let profile = self.get_profile(&Some(String::from(old)))
 			.nice_unwrap(format!("Profile named '{}' does not exist", old));
 
-		if self.get_profile(&new).is_some() {
+		if self.get_profile(&Some(new.to_owned())).is_some() {
 			fail!("The name '{}' is already taken!", new);
 		} else {
 			done!("Successfully renamed '{}' to '{}'", old, &new);

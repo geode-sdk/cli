@@ -1,9 +1,12 @@
+use std::cell::RefCell;
+use std::io::BufRead;
 /**
  * geode info 
  */
 use std::path::{PathBuf};
 use crate::config::Config;
-use crate::{fail, done};
+use crate::util::config::Profile;
+use crate::{fail, done, info};
 use crate::NiceUnwrap;
 use colored::Colorize;
 use clap::Subcommand;
@@ -30,7 +33,10 @@ pub enum Info {
 	},
 	
 	/// List possible values
-	List
+	List,
+
+	/// Setup config (if you have manually installed Geode)
+	Setup {},
 }
 
 const CONFIGURABLES: [&str; 3] = [
@@ -102,6 +108,92 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 			for i in CONFIGURABLES {
 				println!("{}", i);
 			}
-		}
+		},
+
+		Info::Setup {} => {
+			if config.profiles.is_empty() {
+				info!("Please enter the path to the Geometry Dash folder:");
+				
+				let path = loop {
+					let mut buf = String::new();
+					match std::io::stdin().lock().read_line(&mut buf) {
+						Ok(_) => {},
+						Err(e) => {
+							fail!("Unable to read input: {}", e);
+							continue;
+						}
+					};
+					
+					// Verify path is valid
+					let path = PathBuf::from(buf.trim());
+					if !path.is_dir() {
+						fail!(
+							"The path must point to the Geometry Dash \
+							folder, not the executable"
+						);
+						continue;
+					}
+					if path.read_dir().map(|mut files| files.next().is_none()).unwrap_or(false) {
+						fail!("Given path appears to be empty");
+						continue;
+					}
+					// todo: maybe do some checksum verification 
+					// to make sure GD 2.113 is in the folder
+					break path;
+				};
+
+				info!("Please enter a name for the profile:");
+				let name = loop {
+					let mut buf = String::new();
+					match std::io::stdin().lock().read_line(&mut buf) {
+						Ok(_) => break buf,
+						Err(e) => fail!("Unable to read input: {}", e)
+					};
+				};
+				
+				config.profiles.push(RefCell::new(
+					Profile::new(name.trim().into(), path)
+				));
+				config.current_profile = Some(name.trim().into());
+				done!("Profile added");
+			}
+
+			if config.sdk_path.is_none() {
+				info!(
+					"Please enter the path to the Geode repository folder \
+					(https://github.com/geode-sdk/geode):"
+				);
+				config.sdk_path = Some(loop {
+					let mut buf = String::new();
+					match std::io::stdin().lock().read_line(&mut buf) {
+						Ok(_) => {},
+						Err(e) => {
+							fail!("Unable to read input: {}", e);
+							continue;
+						}
+					};
+					
+					// Verify path is valid
+					let path = PathBuf::from(buf.trim());
+					if !path.is_dir() {
+						fail!("The path must point to a folder");
+						continue;
+					}
+					if !path.join("README.md").exists() {
+						fail!(
+							"Given path doesn't seem to be the Geode repo, \
+							make sure to enter the path to the root (where \
+							README.md is)"
+						);
+						continue;
+					}
+					break path;
+				});
+				config.sdk_nightly = config.sdk_path.as_ref().unwrap().join("bin/nightly").exists();
+				done!("SDK path added");
+			}
+			
+			done!("Config setup finished");
+		},
 	}
 }
