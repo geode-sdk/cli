@@ -111,8 +111,7 @@ impl Config {
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");
-			info!("You can install geode using the official installer");
-			info!("At {}", "https://github.com/geode-sdk/installer/releases/latest".bright_cyan());
+			info!("You can setup Geode using `geode config setup`");
 
 			return Config {
 				current_profile: None,
@@ -127,6 +126,7 @@ impl Config {
 		let config_json = geode_root().join("config.json");
 
 		let mut output: Config = if !config_json.exists() {
+			info!("Setup Geode using `geode config setup`");
 			// Create new config
 			Config {
 				current_profile: None,
@@ -158,7 +158,7 @@ impl Config {
 
 		if output.profiles.is_empty() {
 			warn!("No Geode profiles found! Some operations will be unavailable.");
-			info!("Install Geode using the official installer (https://github.com/geode-sdk/installer/releases/latest)");
+			info!("Setup Geode using `geode config setup`");
 		} else if output.get_profile(&output.current_profile).is_none() {
 			output.current_profile = Some(output.profiles[0].borrow().name.clone());
 		}
@@ -167,6 +167,7 @@ impl Config {
 	}
 
 	pub fn save(&self) {
+		std::fs::create_dir_all(geode_root()).nice_unwrap("Unable to create Geode directory");
 		std::fs::write(
 			geode_root().join("config.json"),
 			serde_json::to_string(self).unwrap()
