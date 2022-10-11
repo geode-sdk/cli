@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::io::{stdout, stdin, Write};
 use std::path::{PathBuf, Path};
 use crate::config::Config;
@@ -5,9 +6,47 @@ use clap::Subcommand;
 use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository};
 use colored::Colorize;
+use std::fs;
 
 use crate::{fail, warn, info, done};
 use crate::NiceUnwrap;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Version {
+	pub major: u32,
+	pub minor: u32,
+	pub patch: u32,
+}
+
+impl Version {
+	pub fn to_string(&self) -> String {
+		self.into()
+	}
+}
+
+impl From<String> for Version {
+	fn from(str: String) -> Self {
+		let mut iter = str.split(".");
+		let (major, minor, patch) = (
+			iter.next().and_then(|n| n.parse::<u32>().ok()).nice_unwrap("Invalid major part in version"),
+			iter.next().and_then(|n| n.parse::<u32>().ok()).nice_unwrap("Invalid minor part in version"),
+			iter.next().and_then(|n| n.parse::<u32>().ok()).nice_unwrap("Invalid patch part in version")
+		);
+		Version { major, minor, patch }
+	}
+}
+
+impl From<&Version> for String {
+	fn from(ver: &Version) -> Self {
+		format!("v{}.{}.{}", ver.major, ver.minor, ver.patch)
+	}
+}
+
+impl Display for Version {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_fmt(format_args!("v{}.{}.{}", self.major, self.minor, self.patch))
+	}
+}
 
 #[derive(Subcommand, Debug)]
 pub enum Sdk {
@@ -32,7 +71,10 @@ pub enum Sdk {
 		/// Set update branch to stable
 		#[clap(conflicts_with("nightly"))]
 		stable: bool
-	}
+	},
+
+	/// Get SDK version
+	Version,
 }
 
 fn uninstall(config: &mut Config) -> bool {
@@ -161,6 +203,14 @@ fn update(config: &mut Config, nightly: bool, stable: bool) {
 	}
 }
 
+pub fn get_version(config: &mut Config) -> Version {
+	Version::from(
+		fs::read_to_string(
+			config.sdk_path.as_ref().nice_unwrap("SDK not installed!").join("VERSION")
+		).nice_unwrap("Unable to read SDK version, make sure you are using SDK v0.4.2 or later")
+	)
+}
+
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
 	match cmd {
 		Sdk::Install { reinstall, path } => {
@@ -179,6 +229,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 			install(config, path.unwrap_or(default_path));
 		},
 		Sdk::Uninstall => { uninstall(config); },
-		Sdk::Update { nightly, stable } => update(config, nightly, stable)
+		Sdk::Update { nightly, stable } => update(config, nightly, stable),
+		Sdk::Version => info!("Geode SDK version: {}", get_version(config))
 	}
 }

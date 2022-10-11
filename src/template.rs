@@ -8,8 +8,10 @@ use serde_json::json;
 use serde::Serialize;
 use crate::{fail, fatal, warn, info, done};
 use crate::config::Config;
+use crate::sdk::get_version;
 
 fn create_template(
+    config: &mut Config, 
     project_location: PathBuf,
     name: String,
     version: String,
@@ -56,7 +58,7 @@ fn create_template(
 
 	// Default mod.json
 	let mod_json = json!({
-	    "geode":        "3", // TODO: fix
+	    "geode":        get_version(config).to_string(),
 	    "version":      version,
 	    "id":           id,
 	    "name":         name,
@@ -131,6 +133,7 @@ pub fn build_template(config: &mut Config, name: Option<String>, location: Optio
     info!("Creating project {}", mod_id);
 
     create_template(
+        config,
     	final_location,
     	final_name,
     	final_version,
