@@ -335,13 +335,15 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 				}
 			}
 
-			let default_path = if cfg!(target_os = "macos") {
+			install(config, path.unwrap_or(if cfg!(target_os = "macos") {
 				PathBuf::from("/Users/Shared/Geode/sdk")
 			} else {
-				todo!();
-			};
-
-			install(config, path.unwrap_or(default_path));
+				dirs::document_dir()
+					.nice_unwrap(
+						"No default path available! \
+						Please provide a path manually"
+					).join("Geode")
+			}));
 		},
 		Sdk::Uninstall => { uninstall(config); },
 		Sdk::Update { branch } => update(config, branch),
