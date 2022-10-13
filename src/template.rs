@@ -125,7 +125,7 @@ pub fn build_template(config: &mut Config, name: Option<String>, location: Optio
     let final_location = PathBuf::from(ask_value("Location", Some(&location.to_string_lossy()), true));
 
     let mod_id = format!(
-        "com.{}.{}",
+        "{}.{}",
         final_developer.to_lowercase().replace(' ', "_"),
         final_name.to_lowercase().replace(' ', "_")
     );

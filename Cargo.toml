@@ -1,6 +1,6 @@
 [package]
 name = "geode"
-version = "1.0.4"
+version = "1.0.5"
 authors = ["HJfod <dreadrollmusic@gmail.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2021"
 build = "build.rs"
