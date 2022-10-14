@@ -24,7 +24,6 @@ pub struct Config {
 	pub current_profile: Option<String>,
 	pub profiles: Vec<RefCell<Profile>>,
 	pub default_developer: Option<String>,
-	pub sdk_path: Option<PathBuf>,
 	pub sdk_nightly: bool,
     #[serde(flatten)]
     other: HashMap<String, Value>,
@@ -66,7 +65,6 @@ impl OldConfig {
 			).map(|i| i.borrow().name.clone()),
 			profiles,
 			default_developer: self.default_developer.to_owned(),
-			sdk_path: None,
 			sdk_nightly: false,
 			other: HashMap::new()
 		}
@@ -108,6 +106,27 @@ impl Config {
 		}
 	}
 
+	pub fn sdk_path() -> PathBuf {
+		let sdk_var = std::env::var("GEODE_SDK")
+			.nice_unwrap("Unable to find Geode SDK. Please define the GEODE_SDK enviroment variable to point to the Geode SDK");
+		
+		let path = PathBuf::from(sdk_var);
+		if !path.is_dir() {
+			fail!("The GEODE_SDK enviroment variable must point to the folder containing the Geode SDK");
+			std::process::exit(1)
+		}
+		if !path.join("VERSION").exists() {
+			fail!(
+				"The GEODE_SDK enviroment variable doesn't seem to point to the Geode SDK (Could not find VERSION)
+Perhaps you are on a version older than v0.4.2?"
+			);
+			std::process::exit(1)
+		}
+
+		path
+	}
+
+
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");
@@ -117,7 +136,6 @@ impl Config {
 				current_profile: None,
 				profiles: Vec::new(),
 				default_developer: None,
-				sdk_path: None,
 				sdk_nightly: false,
 				other: HashMap::<String, Value>::new()
 			};
@@ -132,7 +150,6 @@ impl Config {
 				current_profile: None,
 				profiles: Vec::new(),
 				default_developer: None,
-				sdk_path: None,
 				sdk_nightly: false,
 				other: HashMap::<String, Value>::new()
 			}

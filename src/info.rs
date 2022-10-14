@@ -64,8 +64,6 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 			if field == "default-developer" {
 				config.default_developer = Some(value);
-			} else if field == "sdk-path" {
-				config.sdk_path = Some(PathBuf::from(value));
 			} else if field == "sdk-nightly" {
 				config.sdk_nightly = get_bool(&value)
 					.nice_unwrap(format!("'{}' cannot be parsed as a bool", value));
@@ -78,10 +76,13 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 		},
 
 		Info::Get { field, raw } => {
+			let sdk_path;
+
 			let out = if field == "default-developer" {
 				config.default_developer.as_deref().unwrap_or("")
 			} else if field == "sdk-path" {
-				config.sdk_path.as_ref().and_then(|x| Some(x.to_str().unwrap())).unwrap_or("")
+				sdk_path = Config::sdk_path();
+				sdk_path.to_str().unwrap_or("")
 			} else if field == "sdk-nightly" {
 				if config.sdk_nightly {
 					"true"
@@ -158,40 +159,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				done!("Profile added");
 			}
 
-			if config.sdk_path.is_none() {
-				info!(
-					"Please enter the path to the Geode repository folder \
-					(https://github.com/geode-sdk/geode):"
-				);
-				config.sdk_path = Some(loop {
-					let mut buf = String::new();
-					match std::io::stdin().lock().read_line(&mut buf) {
-						Ok(_) => {},
-						Err(e) => {
-							fail!("Unable to read input: {}", e);
-							continue;
-						}
-					};
-					
-					// Verify path is valid
-					let path = PathBuf::from(buf.trim());
-					if !path.is_dir() {
-						fail!("The path must point to a folder");
-						continue;
-					}
-					if !path.join("README.md").exists() {
-						fail!(
-							"Given path doesn't seem to be the Geode repo, \
-							make sure to enter the path to the root (where \
-							README.md is)"
-						);
-						continue;
-					}
-					break path;
-				});
-				config.sdk_nightly = config.sdk_path.as_ref().unwrap().join("bin/nightly").exists();
-				done!("SDK path added");
-			}
+			config.sdk_nightly = Config::sdk_path().join("bin/nightly").exists();
 			
 			done!("Config setup finished");
 		},

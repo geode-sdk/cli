@@ -76,17 +76,7 @@ fn parse_version(str: &str) -> Result<Version, semver::Error> {
 }
 
 fn uninstall(config: &mut Config) -> bool {
-	let sdk_path: &Path = if let Some(p) = &config.sdk_path {
-		if !p.exists() {
-			fail!("SDK path \"{}\" does not exist", p.display());
-			return false;
-		}
-
-		p
-	} else {
-		fail!("Unable to uninstall SDK as it is not installed");
-		return false;
-	};
+	let sdk_path = Config::sdk_path();
 
 	warn!("Are you sure you want to uninstall SDK?");
 	print!("         (type 'Yes' to proceed) ");
@@ -106,7 +96,6 @@ fn uninstall(config: &mut Config) -> bool {
 		return false;
 	}
 
-	config.sdk_path = None;
 	done!("Uninstalled Geode SDK");
 	return true;
 }
@@ -115,7 +104,7 @@ fn install(config: &mut Config, path: PathBuf) {
 
 	let parent = path.parent().unwrap();
 
-	if config.sdk_path.is_some() {
+	if std::env::var("GEODE_SDK").is_ok() {
 		fail!("SDK is already installed");
 		info!("Use --reinstall if you want to remove the existing installation");
 	} else if !parent.exists() {
@@ -140,7 +129,9 @@ fn install(config: &mut Config, path: PathBuf) {
 		let repo = builder.clone("https://github.com/geode-sdk/geode", &path)
 			.nice_unwrap("Could not download SDK");
 
-		config.sdk_path = Some(path);
+		// TODO: set GEODE_SDK enviroment var
+
+		info!("Please set the GEODE_SDK enviroment variable to {}", path.to_str().unwrap());
 
 		switch_to_tag(config, &repo);
 
@@ -167,7 +158,7 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 	
 	// Initialize repository
 	let repo = Repository::open(
-		config.sdk_path.as_ref().nice_unwrap("Unable to update SDK as it is not installed")
+		Config::sdk_path()
 	).nice_unwrap("Could not initialize local SDK repository");
 
 	// Fetch
@@ -200,7 +191,7 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 	} else if !merge_analysis.is_fast_forward() {
 		fail!("Cannot update SDK, it has local changes");
 		info!("Go into the repository at {} and manually run `git pull`",
-			config.sdk_path.as_ref().unwrap().to_str().unwrap()
+			Config::sdk_path().to_str().unwrap()
 		);
 	} else {
 		// Change head and checkout
@@ -252,22 +243,18 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 }
 
 fn install_binaries(config: &mut Config) {
-	config.sdk_path.as_ref().nice_unwrap(
-		"SDK not installed! Use `geode sdk install` to install \
-		Geode or `geode config setup` to set up the CLI."
-	);
 	update(config, None);
 	let release_tag: String;
 	let target_dir: PathBuf;
 	if config.sdk_nightly {
 		info!("Installing nightly binaries");
 		release_tag = "Nightly".into();
-		target_dir = config.sdk_path.as_ref().unwrap().join("bin/nightly");
+		target_dir = Config::sdk_path().join("bin/nightly");
 	} else {
-		let ver = get_version(config);
+		let ver = get_version();
 		info!("Installing binaries for {}", ver);
 		release_tag = format!("v{}", ver);
-		target_dir = config.sdk_path.as_ref().unwrap().join(format!("bin/{}", ver));
+		target_dir = Config::sdk_path().join(format!("bin/{}", ver));
 	}
 	let url = format!("https://api.github.com/repos/geode-sdk/geode/releases/tags/{}", release_tag);
 
@@ -317,10 +304,10 @@ fn install_binaries(config: &mut Config) {
 	done!("Binaries installed");
 }
 
-pub fn get_version(config: &mut Config) -> Version {
+pub fn get_version() -> Version {
 	Version::parse(
 		fs::read_to_string(
-			config.sdk_path.as_ref().nice_unwrap("SDK not installed!").join("VERSION")
+			Config::sdk_path().join("VERSION")
 		).nice_unwrap("Unable to read SDK version, make sure you are using SDK v0.4.2 or later").as_str()
 	).nice_unwrap("Invalid SDK version")
 }
@@ -346,7 +333,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		},
 		Sdk::Uninstall => { uninstall(config); },
 		Sdk::Update { branch } => update(config, branch),
-		Sdk::Version => info!("Geode SDK version: {}", get_version(config)),
+		Sdk::Version => info!("Geode SDK version: {}", get_version()),
 		Sdk::InstallBinaries => install_binaries(config),
 	}
 }

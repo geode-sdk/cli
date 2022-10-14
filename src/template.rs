@@ -58,7 +58,7 @@ fn create_template(
 
 	// Default mod.json
 	let mod_json = json!({
-	    "geode":        get_version(config).to_string(),
+	    "geode":        get_version().to_string(),
 	    "version":      version,
 	    "id":           id,
 	    "name":         name,
