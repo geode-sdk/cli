@@ -87,7 +87,7 @@ fn main() {
 
         GeodeCommands::Sdk { commands } => sdk::subcommand(&mut config, commands),
 
-        GeodeCommands::Package { commands } => package::subcommand(&mut config, commands)
+        GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
     }
 
     config.save();

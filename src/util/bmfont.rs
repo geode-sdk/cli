@@ -297,9 +297,16 @@ impl FontBundles {
 	}
 }
 
-fn extract_from_cache(path: &Path, working_dir: &Path, cache_bundle: &mut CacheBundle) {
+fn extract_from_cache(
+	path: &Path,
+	working_dir: &Path,
+	cache_bundle: &mut CacheBundle,
+	shut_up: bool,
+) {
 	let path_name = path.to_str().unwrap();
-	info!("Extracting '{}' from cache", path_name);
+	if !shut_up {
+		info!("Extracting '{}' from cache", path_name);
+	}
 	cache_bundle.extract_cached_into(
 		path_name, 
 		&working_dir.join(path.file_name().unwrap().to_str().unwrap())
@@ -310,30 +317,39 @@ pub fn get_font_bundles(
 	font: &BitmapFont,
 	working_dir: &Path,
 	cache: &mut Option<CacheBundle>,
-	mod_info: &ModFileInfo
+	mod_info: &ModFileInfo,
+	shut_up: bool
 ) -> FontBundles {
-	info!("Fetching font {}", font.name.bright_yellow());
+	// todo: we really should add a global verbosity option and logging levels for that
+
+	if !shut_up {
+		info!("Fetching font {}", font.name.bright_yellow());
+	}
 
 	if let Some(cache_bundle) = cache {
 		// Cache found
 		if let Some(p) = cache_bundle.cache.fetch_font_bundles(font) {
-			info!("Using cached files");
+			if !shut_up {
+				info!("Using cached files");
+			}
 			let bundles = FontBundles::new(p.to_path_buf());
 
 			// Extract all files
-			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.sd.fnt, working_dir, cache_bundle);
-			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.hd.fnt, working_dir, cache_bundle);
-			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.uhd.fnt, working_dir, cache_bundle);
+			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.sd.fnt, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.hd.fnt, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.uhd.fnt, working_dir, cache_bundle, shut_up);
 
 			done!("Fetched {} from cache", font.name.bright_yellow());
 			return bundles;
 		}
 	}
 	
-	info!("Font is not cached, building from scratch");
+	if !shut_up {
+		info!("Font is not cached, building from scratch");
+	}
 	let mut bundles = FontBundles::new(working_dir.join(font.name.to_string() + ".png"));
 
 	// Create new font

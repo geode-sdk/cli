@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::io::{stdout, stdin, Write};
 use std::path::{PathBuf, Path};
 use crate::config::Config;

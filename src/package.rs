@@ -63,7 +63,11 @@ pub enum Package {
     	root_path: PathBuf,
 
 		/// Folder to place the created resources in
-		output: PathBuf
+		output: PathBuf,
+
+		/// Less verbose output
+		#[clap(long)]
+		shut_up: bool,
 	},
 }
 
@@ -126,7 +130,8 @@ fn create_resources(
 	mut cache_bundle: &mut Option<CacheBundle>,
 	cache: &mut cache::ResourceCache,
 	working_dir: &PathBuf,
-	output_dir: &PathBuf
+	output_dir: &PathBuf,
+	shut_up: bool
 ) {
 	// Make sure output directory exists
 	fs::create_dir_all(output_dir).nice_unwrap("Could not create output directory");
@@ -134,7 +139,7 @@ fn create_resources(
 	// Create spritesheets
 	for sheet in mod_info.resources.spritesheets.values() {
 		let sheet_file = spritesheet::get_spritesheet_bundles(
-			sheet, &output_dir, &mut cache_bundle, &mod_info
+			sheet, &output_dir, &mut cache_bundle, &mod_info, shut_up
 		);
 		cache.add_sheet(sheet, sheet_file.cache_name(&working_dir));
 	}
@@ -142,12 +147,14 @@ fn create_resources(
 	// Create fonts
 	for font in mod_info.resources.fonts.values() {
 		let font_file = bmfont::get_font_bundles(
-			font, &output_dir, &mut cache_bundle, mod_info
+			font, &output_dir, &mut cache_bundle, mod_info, shut_up
 		);
 		cache.add_font(font, font_file.cache_name(&working_dir));
 	}
 
-	info!("Copying sprites");
+	if !&mod_info.resources.sprites.is_empty() {
+		info!("Copying sprites");
+	}
 	// Resize sprites
 	for sprite_path in &mod_info.resources.sprites {
 		let mut sprite = spritesheet::read_to_image(sprite_path);
@@ -167,7 +174,9 @@ fn create_resources(
 		})().nice_unwrap(format!("Unable to copy sprite at {}", sprite_path.display()));
 	}
 
-	info!("Copying files");
+	if !&mod_info.resources.files.is_empty() {
+		info!("Copying files");
+	}
 	// Move other resources
 	for file in &mod_info.resources.files {
 		std::fs::copy(file, output_dir.join(file.file_name().unwrap()))
@@ -175,7 +184,12 @@ fn create_resources(
 	}
 }
 
-fn create_package_resources_only(config: &mut Config, root_path: &Path, output_dir: &PathBuf) {
+fn create_package_resources_only(
+	config: &mut Config,
+	root_path: &Path,
+	output_dir: &PathBuf,
+	shut_up: bool
+) {
 	// Parse mod.json
 	let mod_json: Value = serde_json::from_str(
 		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json")
@@ -190,7 +204,8 @@ fn create_package_resources_only(config: &mut Config, root_path: &Path, output_d
 	create_resources(
 		config, &mod_info,
 		&mut cache_bundle, &mut new_cache,
-		&output_dir, output_dir
+		&output_dir, output_dir,
+		shut_up
 	);
 
 	new_cache.save(&output_dir);
@@ -198,7 +213,13 @@ fn create_package_resources_only(config: &mut Config, root_path: &Path, output_d
 	done!("Resources created at {}", output_dir.to_str().unwrap());
 }
 
-fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>, mut output: PathBuf, do_install: bool) {
+fn create_package(
+	config: &mut Config,
+	root_path: &Path,
+	binaries: Vec<PathBuf>,
+	mut output: PathBuf,
+	do_install: bool
+) {
 	// If it's a directory, add file path to it
 	if output.is_dir() {
 		output.push(root_path.file_name().unwrap());
@@ -244,7 +265,8 @@ fn create_package(config: &mut Config, root_path: &Path, binaries: Vec<PathBuf>,
 	create_resources(
 		config, &mod_file_info,
 		&mut cache_bundle, &mut new_cache,
-		&working_dir, &resource_dir
+		&working_dir, &resource_dir,
+		false
 	);
 
 	// Custom hardcoded resources
@@ -305,6 +327,6 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 		
 		Package::GetId { input, raw } => get_id(input, raw),
 
-		Package::Resources { root_path, output } => create_package_resources_only(config, &root_path, &output),
+		Package::Resources { root_path, output, shut_up } => create_package_resources_only(config, &root_path, &output, shut_up),
 	}
 }

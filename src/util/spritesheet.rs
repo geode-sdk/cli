@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use image::{RgbaImage, imageops, ImageFormat};
@@ -180,9 +179,16 @@ fn initialize_spritesheet_bundle(
 	done!("Successfully packed {}", bundle.png.with_extension("").file_name().unwrap().to_str().unwrap().bright_yellow());
 }
 
-fn extract_from_cache(path: &Path, working_dir: &Path, cache_bundle: &mut CacheBundle) {
+fn extract_from_cache(
+	path: &Path,
+	working_dir: &Path,
+	cache_bundle: &mut CacheBundle,
+	shut_up: bool
+) {
 	let path_name = path.to_str().unwrap();
-	info!("Extracting '{}' from cache", path_name);
+	if !shut_up {
+		info!("Extracting '{}' from cache", path_name);
+	}
 	cache_bundle.extract_cached_into(
 		path_name, 
 		&working_dir.join(path.file_name().unwrap().to_str().unwrap())
@@ -193,30 +199,37 @@ pub fn get_spritesheet_bundles(
 	sheet: &SpriteSheet,
 	working_dir: &Path,
 	cache: &mut Option<CacheBundle>,
-	mod_info: &ModFileInfo
+	mod_info: &ModFileInfo,
+	shut_up: bool
 ) -> SheetBundles {
-	info!("Fetching spritesheet {}", sheet.name.bright_yellow());
+	if !shut_up {
+		info!("Fetching spritesheet {}", sheet.name.bright_yellow());
+	}
 
 	if let Some(cache_bundle) = cache {
 		// Cache found
 		if let Some(p) = cache_bundle.cache.fetch_spritesheet_bundles(sheet) {
-			info!("Using cached files");
+			if !shut_up {
+				info!("Using cached files");
+			}
 			let bundles = SheetBundles::new(p.to_path_buf());
 
 			// Extract all files
-			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle);
-			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle);
-			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle);
-			extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle);
+			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up);
+			extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle, shut_up);
 
 			done!("Fetched {} from cache", sheet.name.bright_yellow());
 			return bundles;
 		}
 	}
 
-	info!("Sheet is not cached, building from scratch");
+	if !shut_up {
+		info!("Sheet is not cached, building from scratch");
+	}
 	let mut bundles = SheetBundles::new(working_dir.join(sheet.name.to_string() + ".png"));
 	
 	// Initialize all files
