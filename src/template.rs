@@ -47,14 +47,12 @@ fn create_template(
 	// Replace "Template" with project name (no spaces)
 	let filtered_name: String = name.chars().filter(|c| !c.is_whitespace()).collect();
 
-	for entry in fs::read_dir(&project_location).unwrap() {
-	    if !entry.as_ref().unwrap().metadata().unwrap().is_dir() {
-	        let file = entry.unwrap().path();
-	        
-	        let contents = fs::read_to_string(&file).unwrap().replace("Template", &filtered_name);
-	        fs::write(file, contents).unwrap();
-	    }
-	}
+    for file in vec!["README.md", "CMakeLists.txt"] {
+        let file = project_location.join(file);
+        
+        let contents = fs::read_to_string(&file).unwrap().replace("Template", &filtered_name);
+        fs::write(file, contents).unwrap();
+    }
 
 	// Default mod.json
 	let mod_json = json!({
