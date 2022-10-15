@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use image::{RgbaImage, imageops, ImageFormat};
@@ -146,7 +146,7 @@ fn initialize_spritesheet_bundle(
 				.unwrap_or(name) +
 			".png"
 	};
-	
+
 	// Initialize the plist file
 	let frame_info = texture_packer.get_frames().iter().map(|(name, frame)| {
 		(sprite_name_in_sheet(name), json!({
@@ -156,7 +156,9 @@ fn initialize_spritesheet_bundle(
 			"textureRect": format!("{{{{{}, {}}}, {{{}, {}}}}}", frame.frame.x, frame.frame.y, frame.frame.w, frame.frame.h),
 			"spriteOffset": format!("{{{}, {}}}", frame.source.x, -(frame.source.y as i32)),
 		}))
-	}).collect::<HashMap<_, _>>();
+	}).collect::<BTreeMap<_, _>>();
+	// Using BTreeMap to make sure all packings for the same input produce 
+	// identical output via sorted keys
 
 	// Write plist
 	let plist_file = json!({

@@ -209,9 +209,12 @@ fn initialize_font_bundle(
 			metrics.advance_width as i32
 		));
 	}
+	// Make sure all packings for the same input produce identical output by 
+	// sorting
+	all_chars.sort();
 
 	// Get all kerning pairs
-	let all_kerning_pairs = rasterized_chars.iter().flat_map(
+	let mut all_kerning_pairs = rasterized_chars.iter().flat_map(
 		|left| rasterized_chars.iter().filter_map(|right| {
 			ttf_font.horizontal_kern(
 				left.id, right.id, font.size as f32
@@ -221,6 +224,9 @@ fn initialize_font_bundle(
 			))
 		})
 	).collect::<Vec<_>>();
+	// Make sure all packings for the same input produce identical output by 
+	// sorting
+	all_kerning_pairs.sort();
 
 	// Create .fnt file
     let line_metrics = ttf_font.horizontal_line_metrics(font.size as f32).unwrap();
