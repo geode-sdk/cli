@@ -49,24 +49,27 @@ macro_rules! confirm {
 }
 
 pub fn ask_confirm(text: &String, default: bool) -> bool {
-    use ::colored::Colorize;
-    // print question
-    print!("{}{} {} ", "| Okay | ".bright_purple(), text, if default { "(Y/n)" } else { "(N/y)" });
-    std::io::stdout().flush().unwrap();
-    let mut yes = String::new();
-    match std::io::stdin().read_line(&mut yes) {
-        Ok(_) => {
-            match yes.trim().to_lowercase().as_str() {
-                "yes" => true,
-                "ye"  => true,
-                "y"   => true,
-                "no"  => false,
-                "n"   => false,
-                _     => default,
-            }
-        },
-        Err(_) => default
-    }
+	use ::colored::Colorize;
+	// print question
+	print!(
+		"{}{} {} ",
+		"| Okay | ".bright_purple(),
+		text,
+		if default { "(Y/n)" } else { "(N/y)" }
+	);
+	std::io::stdout().flush().unwrap();
+	let mut yes = String::new();
+	match std::io::stdin().read_line(&mut yes) {
+		Ok(_) => match yes.trim().to_lowercase().as_str() {
+			"yes" => true,
+			"ye" => true,
+			"y" => true,
+			"no" => false,
+			"n" => false,
+			_ => default,
+		},
+		Err(_) => default,
+	}
 }
 
 pub trait NiceUnwrap<T> {

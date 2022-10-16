@@ -12,7 +12,7 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use winreg::RegKey;
 
-use crate::{NiceUnwrap, confirm};
+use crate::{confirm, NiceUnwrap};
 use crate::{done, fail, fatal, info, warn};
 
 #[derive(Deserialize)]
@@ -107,7 +107,9 @@ fn uninstall(_config: &mut Config) -> bool {
 
 fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
 	for mut subm in repo.submodules()? {
-		let name = subm.name().as_ref()
+		let name = subm
+			.name()
+			.as_ref()
 			.map(|s| String::from(*s))
 			.unwrap_or("<Unknown>".into());
 
@@ -115,7 +117,8 @@ fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
 		callbacks.sideband_progress(|x| {
 			print!(
 				"{} Cloning submodule {}: {}",
-				"| Info |".bright_cyan(), name,
+				"| Info |".bright_cyan(),
+				name,
 				std::str::from_utf8(x).unwrap()
 			);
 			true
@@ -165,17 +168,18 @@ fn install(config: &mut Config, path: PathBuf) {
 		let repo = builder
 			.clone("https://github.com/geode-sdk/geode", &path)
 			.nice_unwrap("Could not download SDK");
-		
-		// update submodules, because for some reason 
+
+		// update submodules, because for some reason
 		// Repository::update_submodules is private
 		update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
 		// set GEODE_SDK environment variable
 		if cfg!(windows) {
 			let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-			if let Err(_) = hklm.create_subkey("Environment").map(|(env, _)| {
-				env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string())
-			}) {
+			if let Err(_) = hklm
+				.create_subkey("Environment")
+				.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
+			{
 				warn!(
 					"Unable to set the GEODE_SDK enviroment variable to {}, \
 					you will have to set it manually! (You may be missing Admin priviledges)",
@@ -402,7 +406,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 							.nice_unwrap(
 								"No default path available! \
 								Please provide the path manually as an\
-								argument to `geode sdk install`"
+								argument to `geode sdk install`",
 							)
 							.join("Geode")
 					};
@@ -416,7 +420,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 						);
 					}
 					default_path
-				},
+				}
 			};
 
 			install(config, actual_path);
