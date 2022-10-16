@@ -174,26 +174,28 @@ fn install(config: &mut Config, path: PathBuf) {
 		update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
 		// set GEODE_SDK environment variable
-		if cfg!(windows) {
-			let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-			if let Err(_) = hklm
-				.create_subkey("Environment")
-				.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
-			{
-				warn!(
-					"Unable to set the GEODE_SDK enviroment variable to {}, \
-					you will have to set it manually! (You may be missing Admin priviledges)",
+		cfg_if::cfg_if!(
+			if #[cfg(windows)] {
+				let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+				if let Err(_) = hklm
+					.create_subkey("Environment")
+					.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
+				{
+					warn!(
+						"Unable to set the GEODE_SDK enviroment variable to {}, \
+						you will have to set it manually! (You may be missing Admin priviledges)",
+						path.to_str().unwrap()
+					);
+				} else {
+					info!("Set GEODE_SDK environment variable automatically");
+				}
+			} else {
+				info!(
+					"Please set the GEODE_SDK enviroment variable to {}",
 					path.to_str().unwrap()
 				);
-			} else {
-				info!("Set GEODE_SDK environment variable automatically");
 			}
-		} else {
-			info!(
-				"Please set the GEODE_SDK enviroment variable to {}",
-				path.to_str().unwrap()
-			);
-		}
+		);
 
 		switch_to_tag(config, &repo);
 
