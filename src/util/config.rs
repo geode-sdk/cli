@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::{fail, warn, done, info, fatal};
 use crate::NiceUnwrap;
+use crate::{done, fail, fatal, info, warn};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -14,8 +14,8 @@ pub struct Profile {
 	pub name: String,
 	pub gd_path: PathBuf,
 
-    #[serde(flatten)]
-    other: HashMap<String, Value>
+	#[serde(flatten)]
+	other: HashMap<String, Value>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -25,8 +25,8 @@ pub struct Config {
 	pub profiles: Vec<RefCell<Profile>>,
 	pub default_developer: Option<String>,
 	pub sdk_nightly: bool,
-    #[serde(flatten)]
-    other: HashMap<String, Value>,
+	#[serde(flatten)]
+	other: HashMap<String, Value>,
 }
 
 // old config.json structures for migration
@@ -49,24 +49,37 @@ pub struct OldConfig {
 
 impl OldConfig {
 	pub fn migrate(&self) -> Config {
-		let profiles = self.installations.as_ref().map(|insts| {
-			insts.iter().map(|inst| RefCell::from(Profile {
-				name: inst.executable
-					.strip_suffix(".exe")
-					.unwrap_or(&inst.executable)
-					.into(),
-				gd_path: inst.path.clone(),
-				other: HashMap::new()
-			})).collect::<Vec<_>>()
-		}).unwrap_or(Vec::new());
+		let profiles = self
+			.installations
+			.as_ref()
+			.map(|insts| {
+				insts
+					.iter()
+					.map(|inst| {
+						RefCell::from(Profile {
+							name: inst
+								.executable
+								.strip_suffix(".exe")
+								.unwrap_or(&inst.executable)
+								.into(),
+							gd_path: inst.path.clone(),
+							other: HashMap::new(),
+						})
+					})
+					.collect::<Vec<_>>()
+			})
+			.unwrap_or_default();
 		Config {
-			current_profile: profiles.get(
-				self.working_installation.unwrap_or(self.default_installation)
-			).map(|i| i.borrow().name.clone()),
+			current_profile: profiles
+				.get(
+					self.working_installation
+						.unwrap_or(self.default_installation),
+				)
+				.map(|i| i.borrow().name.clone()),
 			profiles,
 			default_developer: self.default_developer.to_owned(),
 			sdk_nightly: false,
-			other: HashMap::new()
+			other: HashMap::new(),
 		}
 	}
 }
@@ -74,13 +87,16 @@ impl OldConfig {
 pub fn geode_root() -> PathBuf {
 	// get data dir per-platform
 	let data_dir: PathBuf;
-	#[cfg(windows)] {
+	#[cfg(windows)]
+	{
 		data_dir = dirs::data_local_dir().unwrap().join("Geode");
 	};
-	#[cfg(target_os = "macos")] {
+	#[cfg(target_os = "macos")]
+	{
 		data_dir = PathBuf::from("/Users/Shared/Geode");
 	};
-	#[cfg(not(any(windows, target_os = "macos")))] {
+	#[cfg(not(any(windows, target_os = "macos")))]
+	{
 		use std::compile_error;
 		compile_error!("implement root directory");
 	};
@@ -92,7 +108,7 @@ impl Profile {
 		Profile {
 			name,
 			gd_path: location,
-			other: HashMap::<String, Value>::new()
+			other: HashMap::<String, Value>::new(),
 		}
 	}
 }
@@ -100,7 +116,7 @@ impl Profile {
 impl Config {
 	pub fn get_profile(&self, name: &Option<String>) -> Option<&RefCell<Profile>> {
 		if let Some(name) = name {
-			self.profiles.iter().filter(|x| x.borrow().name == name.to_owned()).next()
+			self.profiles.iter().find(|x| &x.borrow().name == name)
 		} else {
 			None
 		}
@@ -109,7 +125,7 @@ impl Config {
 	pub fn sdk_path() -> PathBuf {
 		let sdk_var = std::env::var("GEODE_SDK")
 			.nice_unwrap("Unable to find Geode SDK. Please define the GEODE_SDK enviroment variable to point to the Geode SDK");
-		
+
 		let path = PathBuf::from(sdk_var);
 		if !path.is_dir() {
 			fail!("The GEODE_SDK enviroment variable must point to the folder containing the Geode SDK");
@@ -126,7 +142,6 @@ Perhaps you are on a version older than v0.4.2?"
 		path
 	}
 
-
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");
@@ -137,7 +152,7 @@ Perhaps you are on a version older than v0.4.2?"
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_nightly: false,
-				other: HashMap::<String, Value>::new()
+				other: HashMap::<String, Value>::new(),
 			};
 		}
 
@@ -151,12 +166,12 @@ Perhaps you are on a version older than v0.4.2?"
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_nightly: false,
-				other: HashMap::<String, Value>::new()
+				other: HashMap::<String, Value>::new(),
 			}
 		} else {
 			// Parse config
-			let config_json_str = &std::fs::read_to_string(&config_json)
-				.nice_unwrap("Unable to read config.json");
+			let config_json_str =
+				&std::fs::read_to_string(&config_json).nice_unwrap("Unable to read config.json");
 			match serde_json::from_str(config_json_str) {
 				Ok(json) => json,
 				Err(e) => {
@@ -187,12 +202,14 @@ Perhaps you are on a version older than v0.4.2?"
 		std::fs::create_dir_all(geode_root()).nice_unwrap("Unable to create Geode directory");
 		std::fs::write(
 			geode_root().join("config.json"),
-			serde_json::to_string(self).unwrap()
-		).nice_unwrap("Unable to save config");
+			serde_json::to_string(self).unwrap(),
+		)
+		.nice_unwrap("Unable to save config");
 	}
 
 	pub fn rename_profile(&mut self, old: &str, new: String) {
-		let profile = self.get_profile(&Some(String::from(old)))
+		let profile = self
+			.get_profile(&Some(String::from(old)))
 			.nice_unwrap(format!("Profile named '{}' does not exist", old));
 
 		if self.get_profile(&Some(new.to_owned())).is_some() {

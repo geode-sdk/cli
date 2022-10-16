@@ -1,26 +1,26 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use image::{RgbaImage, imageops, ImageFormat};
+use image::{imageops, ImageFormat, RgbaImage};
 use serde_json::json;
-use texture_packer::{TexturePacker, TexturePackerConfig};
 use texture_packer::exporter::ImageExporter;
+use texture_packer::{TexturePacker, TexturePackerConfig};
 
 use crate::cache::CacheBundle;
 use crate::rgba4444::RGBA4444;
-use crate::{info, done};
 use crate::NiceUnwrap;
+use crate::{done, info};
 
 use super::mod_file::ModFileInfo;
 
 pub struct Sprite {
 	pub name: String,
-	pub image: RgbaImage
+	pub image: RgbaImage,
 }
 
 pub struct SheetBundle {
 	pub png: PathBuf,
-	pub plist: PathBuf
+	pub plist: PathBuf,
 }
 
 pub struct SpriteSheet {
@@ -31,7 +31,7 @@ pub struct SpriteSheet {
 pub struct SheetBundles {
 	pub sd: SheetBundle,
 	pub hd: SheetBundle,
-	pub uhd: SheetBundle
+	pub uhd: SheetBundle,
 }
 
 impl SheetBundles {
@@ -39,10 +39,7 @@ impl SheetBundles {
 		let mut plist = base.to_owned();
 		plist.set_extension("plist");
 
-		SheetBundle {
-			png: base,
-			plist
-		}
+		SheetBundle { png: base, plist }
 	}
 
 	pub fn new(mut base: PathBuf) -> SheetBundles {
@@ -56,7 +53,7 @@ impl SheetBundles {
 		SheetBundles {
 			sd: SheetBundles::new_file(base),
 			hd: SheetBundles::new_file(hd),
-			uhd: SheetBundles::new_file(uhd)
+			uhd: SheetBundles::new_file(uhd),
 		}
 	}
 
@@ -79,10 +76,10 @@ pub fn read_to_image(path: &Path) -> RgbaImage {
 
 pub fn downscale(img: &mut RgbaImage, factor: u32) {
 	*img = imageops::resize(
-		img, 
+		img,
 		img.width() / factor,
 		img.height() / factor,
-		imageops::FilterType::Lanczos3
+		imageops::FilterType::Lanczos3,
 	);
 
 	// Dither
@@ -93,16 +90,17 @@ fn initialize_spritesheet_bundle(
 	bundle: &SheetBundle,
 	sheet: &SpriteSheet,
 	factor: u32,
-	mod_info: &ModFileInfo
+	mod_info: &ModFileInfo,
 ) {
 	// Convert all files to sprites
-	let mut sprites: Vec<Sprite> = sheet.files.iter().map(|x| {
-		Sprite {
+	let mut sprites: Vec<Sprite> = sheet
+		.files
+		.iter()
+		.map(|x| Sprite {
 			name: x.file_stem().unwrap().to_str().unwrap().to_string(),
-			image: read_to_image(x)
-
-		}
-	}).collect();
+			image: read_to_image(x),
+		})
+		.collect();
 
 	// Resize
 	for sprite in &mut sprites {
@@ -112,39 +110,42 @@ fn initialize_spritesheet_bundle(
 	// Determine maximum dimensions of sprite sheet
 	let largest_width: u32 = sprites.iter().map(|x| x.image.width()).max().unwrap();
 
-	let mean_height = sprites.iter().map(|x| x.image.height() as f64).sum::<f64>() / sprites.len() as f64;
+	let mean_height =
+		sprites.iter().map(|x| x.image.height() as f64).sum::<f64>() / sprites.len() as f64;
 	let width_sum = sprites.iter().map(|x| x.image.width()).sum::<u32>() as f64;
 
 	let mut max_width = (width_sum * mean_height).sqrt() as u32;
 
 	if max_width < largest_width {
-	    max_width = largest_width + 2;
+		max_width = largest_width + 2;
 	}
 
 	// Setup texture packer
 	let config = TexturePackerConfig {
-	    max_width,
-	    max_height: u32::MAX,
-	    allow_rotation: false,
-	    texture_outlines: false,
-	    border_padding: 0,
-	    ..Default::default()
+		max_width,
+		max_height: u32::MAX,
+		allow_rotation: false,
+		texture_outlines: false,
+		border_padding: 0,
+		..Default::default()
 	};
 	let mut texture_packer = TexturePacker::new_skyline(config);
 
 	// Pack textures
 	info!("Packing sprites");
-	sprites.iter().for_each(|x| texture_packer.pack_ref(&x.name, &x.image).unwrap());
+	sprites
+		.iter()
+		.for_each(|x| texture_packer.pack_ref(&x.name, &x.image).unwrap());
 	done!("Packed sprites");
 
 	let sprite_name_in_sheet = |name: &String| {
 		// `mod.id/sprite.png`
-		mod_info.id.to_owned() + "/" +
-			name
-				.strip_suffix("-uhd")
-				.or(name.strip_suffix("-hd"))
-				.unwrap_or(name) +
-			".png"
+		mod_info.id.to_owned()
+			+ "/" + name
+			.strip_suffix("-uhd")
+			.or_else(|| name.strip_suffix("-hd"))
+			.unwrap_or(name)
+			+ ".png"
 	};
 
 	// Initialize the plist file
@@ -157,7 +158,7 @@ fn initialize_spritesheet_bundle(
 			"spriteOffset": format!("{{{}, {}}}", frame.source.x, -(frame.source.y as i32)),
 		}))
 	}).collect::<BTreeMap<_, _>>();
-	// Using BTreeMap to make sure all packings for the same input produce 
+	// Using BTreeMap to make sure all packings for the same input produce
 	// identical output via sorted keys
 
 	// Write plist
@@ -176,24 +177,36 @@ fn initialize_spritesheet_bundle(
 	info!("Exporting");
 
 	let exporter = ImageExporter::export(&texture_packer).unwrap();
-	exporter.write_to(&mut file, ImageFormat::Png).nice_unwrap("Unable to write to png file");
+	exporter
+		.write_to(&mut file, ImageFormat::Png)
+		.nice_unwrap("Unable to write to png file");
 
-	done!("Successfully packed {}", bundle.png.with_extension("").file_name().unwrap().to_str().unwrap().bright_yellow());
+	done!(
+		"Successfully packed {}",
+		bundle
+			.png
+			.with_extension("")
+			.file_name()
+			.unwrap()
+			.to_str()
+			.unwrap()
+			.bright_yellow()
+	);
 }
 
 fn extract_from_cache(
 	path: &Path,
 	working_dir: &Path,
 	cache_bundle: &mut CacheBundle,
-	shut_up: bool
+	shut_up: bool,
 ) {
 	let path_name = path.to_str().unwrap();
 	if !shut_up {
 		info!("Extracting '{}' from cache", path_name);
 	}
 	cache_bundle.extract_cached_into(
-		path_name, 
-		&working_dir.join(path.file_name().unwrap().to_str().unwrap())
+		path_name,
+		&working_dir.join(path.file_name().unwrap().to_str().unwrap()),
 	);
 }
 
@@ -202,7 +215,7 @@ pub fn get_spritesheet_bundles(
 	working_dir: &Path,
 	cache: &mut Option<CacheBundle>,
 	mod_info: &ModFileInfo,
-	shut_up: bool
+	shut_up: bool,
 ) -> SheetBundles {
 	if !shut_up {
 		info!("Fetching spritesheet {}", sheet.name.bright_yellow());
@@ -232,18 +245,18 @@ pub fn get_spritesheet_bundles(
 	if !shut_up {
 		info!("Sheet is not cached, building from scratch");
 	}
-	let mut bundles = SheetBundles::new(working_dir.join(sheet.name.to_string() + ".png"));
-	
+	let bundles = SheetBundles::new(working_dir.join(sheet.name.to_string() + ".png"));
+
 	// Initialize all files
 
 	info!("Creating normal sheet");
-	initialize_spritesheet_bundle(&mut bundles.sd, sheet, 4, &mod_info);
+	initialize_spritesheet_bundle(&bundles.sd, sheet, 4, mod_info);
 
 	info!("Creating HD sheet");
-	initialize_spritesheet_bundle(&mut bundles.hd, sheet, 2, &mod_info);
+	initialize_spritesheet_bundle(&bundles.hd, sheet, 2, mod_info);
 
 	info!("Creating UHD sheet");
-	initialize_spritesheet_bundle(&mut bundles.uhd, sheet, 1, &mod_info);
+	initialize_spritesheet_bundle(&bundles.uhd, sheet, 1, mod_info);
 
 	done!("Built spritesheet {}", sheet.name.bright_yellow());
 	bundles

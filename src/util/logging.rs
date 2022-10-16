@@ -42,17 +42,17 @@ macro_rules! done {
 }
 
 pub trait NiceUnwrap<T> {
-    fn nice_unwrap<S: Display>(self, text: S) -> T;
+	fn nice_unwrap<S: Display>(self, text: S) -> T;
 }
 
 impl<T, E: Display> NiceUnwrap<T> for Result<T, E> {
-    fn nice_unwrap<S: Display>(self, text: S) -> T {
-        self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
-    }
+	fn nice_unwrap<S: Display>(self, text: S) -> T {
+		self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
+	}
 }
 
 impl<T> NiceUnwrap<T> for Option<T> {
-    fn nice_unwrap<S: Display>(self, text: S) -> T {
-        self.unwrap_or_else(|| fatal!("{}", text))
-    }
+	fn nice_unwrap<S: Display>(self, text: S) -> T {
+		self.unwrap_or_else(|| fatal!("{}", text))
+	}
 }

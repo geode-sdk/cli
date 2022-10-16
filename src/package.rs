@@ -1,66 +1,66 @@
 #![allow(unused_variables)]
 #![allow(unused_mut)]
 
+use std::fs;
 use std::io::Read;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::fs;
 
 use clap::Subcommand;
-use serde_json::{Value};
-use zip::ZipWriter;
+use serde_json::Value;
 use zip::write::FileOptions;
+use zip::ZipWriter;
 
 use crate::config::Config;
+use crate::util::bmfont;
 use crate::util::cache::CacheBundle;
 use crate::util::mod_file::ModFileInfo;
 use crate::util::spritesheet;
-use crate::util::bmfont;
-use crate::{mod_file, cache};
-use crate::{fail, warn, info, done};
 use crate::NiceUnwrap;
+use crate::{cache, mod_file};
+use crate::{done, fail, info, warn};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub enum Package {
 	/// Install a .geode package to the current profile
-    Install {
-        /// Location of the .geode package to install
-        path: PathBuf
-    },
+	Install {
+		/// Location of the .geode package to install
+		path: PathBuf,
+	},
 
-    /// Create a .geode package
-    New {
-    	/// Location of mod's folder
-    	root_path: PathBuf,
+	/// Create a .geode package
+	New {
+		/// Location of mod's folder
+		root_path: PathBuf,
 
-    	/// Add binary file
-    	#[clap(short, long)]
-    	binary: Vec<PathBuf>,
+		/// Add binary file
+		#[clap(short, long)]
+		binary: Vec<PathBuf>,
 
-    	/// Location of output file
-    	#[clap(short, long)]
-    	output: PathBuf,
+		/// Location of output file
+		#[clap(short, long)]
+		output: PathBuf,
 
-    	/// Whether to install the generated package after creation
-    	#[clap(short, long)]
-    	install: bool
-    },
+		/// Whether to install the generated package after creation
+		#[clap(short, long)]
+		install: bool,
+	},
 
-    /// Fetch mod id from a package
-    GetId {
-    	/// Location of package
-    	input: PathBuf,
+	/// Fetch mod id from a package
+	GetId {
+		/// Location of package
+		input: PathBuf,
 
-    	/// Strip trailing newline
-    	#[clap(long)]
-    	raw: bool
-    },
+		/// Strip trailing newline
+		#[clap(long)]
+		raw: bool,
+	},
 
 	/// Process the resources specified by a package
 	Resources {
-    	/// Location of mod's folder
-    	root_path: PathBuf,
+		/// Location of mod's folder
+		root_path: PathBuf,
 
 		/// Folder to place the created resources in
 		output: PathBuf,
@@ -72,18 +72,24 @@ pub enum Package {
 }
 
 pub fn install(config: &mut Config, pkg_path: &Path) {
-    let mod_path = config.get_profile(&config.current_profile)
-    	.nice_unwrap("No current profile to install to!")
-    	.borrow().gd_path
-    	.join("geode")
-    	.join("mods");
+	let mod_path = config
+		.get_profile(&config.current_profile)
+		.nice_unwrap("No current profile to install to!")
+		.borrow()
+		.gd_path
+		.join("geode")
+		.join("mods");
 
-    if !mod_path.exists() {
-        fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
-    }
-	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap())).nice_unwrap("Could not install mod");
+	if !mod_path.exists() {
+		fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
+	}
+	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
+		.nice_unwrap("Could not install mod");
 
-    done!("Installed {}", pkg_path.file_name().unwrap().to_str().unwrap());
+	done!(
+		"Installed {}",
+		pkg_path.file_name().unwrap().to_str().unwrap()
+	);
 }
 
 fn zip_folder(path: &Path, output: &Path) {
@@ -100,11 +106,17 @@ fn zip_folder(path: &Path, output: &Path) {
 		// Only look at files
 		if item.metadata().unwrap().is_file() {
 			// Relativize
-			let mut relative_path = item.path().strip_prefix(path).unwrap().to_str().unwrap().to_string();
-			
+			let mut relative_path = item
+				.path()
+				.strip_prefix(path)
+				.unwrap()
+				.to_str()
+				.unwrap()
+				.to_string();
+
 			// Windows is weird and needs this change
 			if cfg!(windows) {
-			    relative_path = relative_path.replace('/', "\\");
+				relative_path = relative_path.replace('/', "\\");
 			}
 
 			zip_file.start_file(relative_path, zip_options).unwrap();
@@ -114,7 +126,15 @@ fn zip_folder(path: &Path, output: &Path) {
 
 	zip_file.finish().nice_unwrap("Unable to zip");
 
-	done!("Successfully packaged {}", output.file_name().unwrap().to_str().unwrap().bright_yellow());
+	done!(
+		"Successfully packaged {}",
+		output
+			.file_name()
+			.unwrap()
+			.to_str()
+			.unwrap()
+			.bright_yellow()
+	);
 }
 
 fn get_working_dir(id: &String) -> PathBuf {
@@ -129,9 +149,9 @@ fn create_resources(
 	mod_info: &ModFileInfo,
 	mut cache_bundle: &mut Option<CacheBundle>,
 	cache: &mut cache::ResourceCache,
-	working_dir: &PathBuf,
+	working_dir: &Path,
 	output_dir: &PathBuf,
-	shut_up: bool
+	shut_up: bool,
 ) {
 	// Make sure output directory exists
 	fs::create_dir_all(output_dir).nice_unwrap("Could not create output directory");
@@ -139,17 +159,19 @@ fn create_resources(
 	// Create spritesheets
 	for sheet in mod_info.resources.spritesheets.values() {
 		let sheet_file = spritesheet::get_spritesheet_bundles(
-			sheet, &output_dir, &mut cache_bundle, &mod_info, shut_up
+			sheet,
+			output_dir,
+			cache_bundle,
+			mod_info,
+			shut_up,
 		);
-		cache.add_sheet(sheet, sheet_file.cache_name(&working_dir));
+		cache.add_sheet(sheet, sheet_file.cache_name(working_dir));
 	}
 
 	// Create fonts
 	for font in mod_info.resources.fonts.values() {
-		let font_file = bmfont::get_font_bundles(
-			font, &output_dir, &mut cache_bundle, mod_info, shut_up
-		);
-		cache.add_font(font, font_file.cache_name(&working_dir));
+		let font_file = bmfont::get_font_bundles(font, output_dir, cache_bundle, mod_info, shut_up);
+		cache.add_font(font, font_file.cache_name(working_dir));
 	}
 
 	if !&mod_info.resources.sprites.is_empty() {
@@ -171,7 +193,11 @@ fn create_resources(
 
 			spritesheet::downscale(&mut sprite, 2);
 			sprite.save(output_dir.join(base.to_string() + ".png"))
-		})().nice_unwrap(format!("Unable to copy sprite at {}", sprite_path.display()));
+		})()
+		.nice_unwrap(format!(
+			"Unable to copy sprite at {}",
+			sprite_path.display()
+		));
 	}
 
 	if !&mod_info.resources.files.is_empty() {
@@ -188,28 +214,32 @@ fn create_package_resources_only(
 	config: &mut Config,
 	root_path: &Path,
 	output_dir: &PathBuf,
-	shut_up: bool
+	shut_up: bool,
 ) {
 	// Parse mod.json
 	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json")
-	).nice_unwrap("Could not parse mod.json");
+		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json"),
+	)
+	.nice_unwrap("Could not parse mod.json");
 
-	let mod_info = mod_file::get_mod_file_info(&mod_json, &root_path);
+	let mod_info = mod_file::get_mod_file_info(&mod_json, root_path);
 
 	// Setup cache
-	let mut cache_bundle = cache::get_cache_bundle_from_dir(&output_dir);
+	let mut cache_bundle = cache::get_cache_bundle_from_dir(output_dir);
 	let mut new_cache = cache::ResourceCache::new();
 
 	create_resources(
-		config, &mod_info,
-		&mut cache_bundle, &mut new_cache,
-		&output_dir, output_dir,
-		shut_up
+		config,
+		&mod_info,
+		&mut cache_bundle,
+		&mut new_cache,
+		output_dir,
+		output_dir,
+		shut_up,
 	);
 
-	new_cache.save(&output_dir);
-	
+	new_cache.save(output_dir);
+
 	done!("Resources created at {}", output_dir.to_str().unwrap());
 }
 
@@ -218,13 +248,16 @@ fn create_package(
 	root_path: &Path,
 	binaries: Vec<PathBuf>,
 	mut output: PathBuf,
-	do_install: bool
+	do_install: bool,
 ) {
 	// If it's a directory, add file path to it
 	if output.is_dir() {
 		output.push(root_path.file_name().unwrap());
 		output.set_extension("geode");
-		warn!("Specified output is a directory. Creating package at {}", output.display());
+		warn!(
+			"Specified output is a directory. Creating package at {}",
+			output.display()
+		);
 	}
 
 	// Ensure at least one binary
@@ -242,10 +275,11 @@ fn create_package(
 
 	// Parse mod.json
 	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json")
-	).nice_unwrap("Could not parse mod.json");
+		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json"),
+	)
+	.nice_unwrap("Could not parse mod.json");
 
-	let mod_file_info = mod_file::get_mod_file_info(&mod_json, &root_path);
+	let mod_file_info = mod_file::get_mod_file_info(&mod_json, root_path);
 
 	// Setup working directory
 	let working_dir = get_working_dir(&mod_file_info.id);
@@ -263,20 +297,25 @@ fn create_package(
 
 	// Create resources
 	create_resources(
-		config, &mod_file_info,
-		&mut cache_bundle, &mut new_cache,
-		&working_dir, &resource_dir,
-		false
+		config,
+		&mod_file_info,
+		&mut cache_bundle,
+		&mut new_cache,
+		&working_dir,
+		&resource_dir,
+		false,
 	);
 
 	// Custom hardcoded resources
 	let logo_png = root_path.join("logo.png");
 	if logo_png.exists() {
-		std::fs::copy(logo_png, working_dir.join("logo.png")).nice_unwrap("Could not copy logo.png");
+		std::fs::copy(logo_png, working_dir.join("logo.png"))
+			.nice_unwrap("Could not copy logo.png");
 	}
 	let about_md = root_path.join("about.md");
 	if about_md.exists() {
-		std::fs::copy(about_md, working_dir.join("about.md")).nice_unwrap("Could not copy about.md");
+		std::fs::copy(about_md, working_dir.join("about.md"))
+			.nice_unwrap("Could not copy about.md");
 	}
 
 	for binary in &binaries {
@@ -299,18 +338,24 @@ fn get_id(input: PathBuf, raw: bool) {
 	} else {
 		let mut out = String::new();
 
-		zip::ZipArchive::new(fs::File::open(input).unwrap()).nice_unwrap("Unable to unzip")
-			.by_name("mod.json").nice_unwrap("Unable to find mod.json in package")
-			.read_to_string(&mut out).nice_unwrap("Unable to read mod.json");
+		zip::ZipArchive::new(fs::File::open(input).unwrap())
+			.nice_unwrap("Unable to unzip")
+			.by_name("mod.json")
+			.nice_unwrap("Unable to find mod.json in package")
+			.read_to_string(&mut out)
+			.nice_unwrap("Unable to read mod.json");
 
 		out
 	};
 
-	let json = serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json");
+	let json =
+		serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json");
 
 	let id = json
-		.get("id").nice_unwrap("[mod.json]: Missing key 'id'")
-		.as_str().nice_unwrap("[mod.json].id: Expected string");
+		.get("id")
+		.nice_unwrap("[mod.json]: Missing key 'id'")
+		.as_str()
+		.nice_unwrap("[mod.json].id: Expected string");
 
 	if raw {
 		print!("{}", id);
@@ -323,10 +368,19 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 	match cmd {
 		Package::Install { path } => install(config, &path),
 
-		Package::New { root_path, binary: binaries, output, install } => create_package(config, &root_path, binaries, output, install),
-		
+		Package::New {
+			root_path,
+			binary: binaries,
+			output,
+			install,
+		} => create_package(config, &root_path, binaries, output, install),
+
 		Package::GetId { input, raw } => get_id(input, raw),
 
-		Package::Resources { root_path, output, shut_up } => create_package_resources_only(config, &root_path, &output, shut_up),
+		Package::Resources {
+			root_path,
+			output,
+			shut_up,
+		} => create_package_resources_only(config, &root_path, &output, shut_up),
 	}
 }

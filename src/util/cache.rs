@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::io::Read;
-use std::fs::File;
-use std::fs;
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io::Read;
+use std::path::{Path, PathBuf};
 
 use crate::mod_file::BitmapFont;
 use crate::spritesheet::SpriteSheet;
@@ -13,7 +13,7 @@ use crate::NiceUnwrap;
 #[derive(Serialize, Deserialize)]
 pub struct ResourceCache {
 	pub spritesheets: HashMap<String, PathBuf>,
-	pub fonts: HashMap<String, PathBuf>
+	pub fonts: HashMap<String, PathBuf>,
 }
 
 pub struct CacheBundle {
@@ -32,14 +32,14 @@ impl CacheBundle {
 				cached_file.read_to_end(&mut buf).unwrap();
 
 				// Write buffer into output directory, same file name
-				std::fs::write(&output, buf).unwrap();
-			},
+				std::fs::write(output, buf).unwrap();
+			}
 
 			CacheBundleSource::Directory(dir) => {
 				if dir.join(name) != *output {
 					std::fs::copy(dir.join(name), output).unwrap();
 				}
-			},
+			}
 		}
 	}
 }
@@ -50,80 +50,97 @@ pub enum CacheBundleSource {
 }
 
 fn hash_sheet(sheet: &SpriteSheet) -> String {
-	let mut hashes: Vec<String> = sheet.files.iter().map(|x| sha256::digest_file(x).unwrap()).collect();
+	let mut hashes: Vec<String> = sheet
+		.files
+		.iter()
+		.map(|x| sha256::digest_file(x).unwrap())
+		.collect();
 	hashes.sort();
 	sha256::digest(hashes.into_iter().collect::<String>())
 }
 
 fn hash_font(font: &BitmapFont) -> String {
-	sha256::digest(format!("{}|{}|{}|{}",
+	sha256::digest(format!(
+		"{}|{}|{}|{}",
 		font.size,
 		font.outline,
-		font.charset.clone().unwrap_or(String::new()),
+		font.charset.clone().unwrap_or_default(),
 		sha256::digest_file(font.path.clone()).unwrap()
 	))
 }
 
 pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
-	path.join(".geode_cache").exists().then(|| {
-		let cache = ResourceCache::load(
-			fs::read_to_string(path.join(".geode_cache")).nice_unwrap("Unable to read cache")
-		);
-		Some(CacheBundle {
-			cache,
-			src: CacheBundleSource::Directory(path.to_path_buf())
+	path.join(".geode_cache")
+		.exists()
+		.then(|| {
+			let cache = ResourceCache::load(
+				fs::read_to_string(path.join(".geode_cache")).nice_unwrap("Unable to read cache"),
+			);
+			Some(CacheBundle {
+				cache,
+				src: CacheBundleSource::Directory(path.to_path_buf()),
+			})
 		})
-	}).flatten()
+		.flatten()
 }
 
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
-	path.exists().then(|| {
-		match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cache file")) {
-			Ok(mut archive) => {
-				let cache: ResourceCache;
+	path.exists()
+		.then(|| {
+			match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cache file")) {
+				Ok(mut archive) => {
+					let cache: ResourceCache;
 
-				if archive.by_name(".geode_cache").is_ok() {
-					let mut cache_data = String::new();
-					if archive.by_name(".geode_cache").unwrap().read_to_string(&mut cache_data).is_err() {
-						return None;
+					if archive.by_name(".geode_cache").is_ok() {
+						let mut cache_data = String::new();
+						if archive
+							.by_name(".geode_cache")
+							.unwrap()
+							.read_to_string(&mut cache_data)
+							.is_err()
+						{
+							return None;
+						}
+
+						cache = ResourceCache::load(cache_data);
+					} else {
+						cache = ResourceCache::new();
 					}
 
-					cache = ResourceCache::load(cache_data);
-				} else {
-					cache = ResourceCache::new();
+					Some(CacheBundle {
+						cache,
+						src: CacheBundleSource::Archive(archive),
+					})
 				}
 
-				Some(CacheBundle {
-					cache,
-					src: CacheBundleSource::Archive(archive)
-				})
-			},
-
-			Err(e) => {
-				warn!("Error reading cache from previous build: {}. Disabling cache for this build", e);
-				None
+				Err(e) => {
+					warn!("Error reading cache from previous build: {}. Disabling cache for this build", e);
+					None
+				}
 			}
-		}
-	}).flatten()
+		})
+		.flatten()
 }
 
 impl ResourceCache {
 	pub fn new() -> ResourceCache {
 		ResourceCache {
 			spritesheets: HashMap::new(),
-			fonts: HashMap::new()
+			fonts: HashMap::new(),
 		}
 	}
 
 	pub fn load(cache_data: String) -> ResourceCache {
-		serde_json::from_str::<ResourceCache>(&cache_data).nice_unwrap("Unable to parse cache file: {}")
+		serde_json::from_str::<ResourceCache>(&cache_data)
+			.nice_unwrap("Unable to parse cache file: {}")
 	}
 
 	pub fn save(&self, path: &Path) {
 		std::fs::write(
 			path.join(".geode_cache"),
-			serde_json::to_string(self).unwrap()
-		).unwrap()
+			serde_json::to_string(self).unwrap(),
+		)
+		.unwrap()
 	}
 
 	pub fn add_sheet(&mut self, sheet: &SpriteSheet, path: PathBuf) {
@@ -141,10 +158,10 @@ impl ResourceCache {
 	}
 
 	pub fn fetch_spritesheet_bundles(&self, sheet: &SpriteSheet) -> Option<&Path> {
-		self.spritesheets.get(&hash_sheet(sheet)).and_then(|x| Some(&**x))
+		self.spritesheets.get(&hash_sheet(sheet)).map(|x| &**x)
 	}
 
 	pub fn fetch_font_bundles(&self, font: &BitmapFont) -> Option<&Path> {
-		self.fonts.get(&hash_font(font)).and_then(|x| Some(&**x))
+		self.fonts.get(&hash_font(font)).map(|x| &**x)
 	}
 }
