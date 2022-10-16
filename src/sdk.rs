@@ -2,7 +2,7 @@ use crate::config::Config;
 use clap::Subcommand;
 use colored::Colorize;
 use git2::build::RepoBuilder;
-use git2::{FetchOptions, RemoteCallbacks, Repository};
+use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use semver::Version;
 use serde::Deserialize;
@@ -105,6 +105,34 @@ fn uninstall(_config: &mut Config) -> bool {
 	true
 }
 
+fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
+	for mut subm in repo.submodules()? {
+		let name = subm.name().as_ref()
+			.map(|s| String::from(*s))
+			.unwrap_or("<Unknown>".into());
+
+		let mut callbacks = RemoteCallbacks::new();
+		callbacks.sideband_progress(|x| {
+			print!(
+				"{} Cloning submodule {}: {}",
+				"| Info |".bright_cyan(), name,
+				std::str::from_utf8(x).unwrap()
+			);
+			true
+		});
+
+		let mut opts = FetchOptions::new();
+		opts.remote_callbacks(callbacks);
+
+		let mut sopts = SubmoduleUpdateOptions::new();
+		sopts.fetch(opts);
+
+		subm.update(true, Some(&mut sopts))?;
+		update_submodules_recurse(&subm.open()?)?;
+	}
+	Ok(())
+}
+
 fn install(config: &mut Config, path: PathBuf) {
 	let parent = path.parent().unwrap();
 
@@ -137,13 +165,15 @@ fn install(config: &mut Config, path: PathBuf) {
 		let repo = builder
 			.clone("https://github.com/geode-sdk/geode", &path)
 			.nice_unwrap("Could not download SDK");
+		
+		// update submodules, because for some reason 
+		// Repository::update_submodules is private
+		update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
 		// set GEODE_SDK environment variable
 		if cfg!(windows) {
-			let hklm = RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
-			if let Err(_) = hklm.create_subkey(
-				"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
-			).map(|(env, _)| {
+			let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+			if let Err(_) = hklm.create_subkey("Environment").map(|(env, _)| {
 				env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string())
 			}) {
 				warn!(
@@ -151,6 +181,8 @@ fn install(config: &mut Config, path: PathBuf) {
 					you will have to set it manually! (You may be missing Admin priviledges)",
 					path.to_str().unwrap()
 				);
+			} else {
+				info!("Set GEODE_SDK environment variable automatically");
 			}
 		} else {
 			info!(
@@ -269,11 +301,11 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	}
 
 	// Change head and checkout
-	let refname = format!("refs/tags/v{}", latest_version.unwrap());
+	let refname = format!("refs/tags/v{}", latest_version.as_ref().unwrap());
 	repo.set_head(&refname).unwrap();
 	repo.checkout_head(None).unwrap();
 
-	done!("Updated head");
+	done!("Updated head to v{}", latest_version.unwrap());
 }
 
 fn install_binaries(config: &mut Config) {
