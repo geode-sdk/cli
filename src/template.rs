@@ -11,7 +11,7 @@ use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
 
 fn create_template(
-	config: &mut Config,
+	_config: &mut Config,
 	project_location: PathBuf,
 	name: String,
 	version: String,

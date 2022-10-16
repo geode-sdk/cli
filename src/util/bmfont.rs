@@ -73,7 +73,7 @@ fn gen_outline<T: DistanceStorage>(sdf: SignedDistanceField<T>, size: f32) -> im
 	img
 }*/
 
-fn generate_char(font: &BitmapFont, metrics: fontdue::Metrics, data: Vec<u8>) -> Option<RgbaImage> {
+fn generate_char(_font: &BitmapFont, metrics: fontdue::Metrics, data: Vec<u8>) -> Option<RgbaImage> {
 	if data.is_empty() {
 		return None;
 	}

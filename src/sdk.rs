@@ -10,7 +10,7 @@ use std::fs;
 use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
 
-use crate::NiceUnwrap;
+use crate::{NiceUnwrap, confirm};
 use crate::{done, fail, fatal, info, warn};
 
 #[derive(Deserialize)]
@@ -71,14 +71,14 @@ pub enum Sdk {
 }
 
 fn parse_version(str: &str) -> Result<Version, semver::Error> {
-	if str.starts_with('v') {
-		Version::parse(&str[1..])
+	if let Some(s) = str.strip_prefix('v') {
+		Version::parse(s)
 	} else {
 		Version::parse(str)
 	}
 }
 
-fn uninstall(config: &mut Config) -> bool {
+fn uninstall(_config: &mut Config) -> bool {
 	let sdk_path = Config::sdk_path();
 
 	warn!("Are you sure you want to uninstall SDK?");
@@ -137,6 +137,8 @@ fn install(config: &mut Config, path: PathBuf) {
 			.nice_unwrap("Could not download SDK");
 
 		// TODO: set GEODE_SDK enviroment var
+
+		std::env::set_var("GEODE_SDK", path.to_str().unwrap());
 
 		info!(
 			"Please set the GEODE_SDK enviroment variable to {}",
@@ -344,19 +346,34 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 				return;
 			}
 
-			install(
-				config,
-				path.unwrap_or(if cfg!(target_os = "macos") {
-					PathBuf::from("/Users/Shared/Geode/sdk")
-				} else {
-					dirs::document_dir()
-						.nice_unwrap(
-							"No default path available! \
-						Please provide a path manually",
-						)
-						.join("Geode")
-				}),
-			);
+			let actual_path = match path {
+				Some(p) => p,
+				None => {
+					let default_path = if cfg!(target_os = "macos") {
+						PathBuf::from("/Users/Shared/Geode/sdk")
+					} else {
+						dirs::document_dir()
+							.nice_unwrap(
+								"No default path available! \
+								Please provide the path manually as an\
+								argument to `geode sdk install`"
+							)
+							.join("Geode")
+					};
+					if !confirm!(
+						"Installing at default path {}. Is this okay?",
+						&default_path.to_str().unwrap()
+					) {
+						fatal!(
+							"Please provide the path as an argument \
+							to `geode sdk install`"
+						);
+					}
+					default_path
+				},
+			};
+
+			install(config, actual_path);
 		}
 		Sdk::Uninstall => {
 			uninstall(config);

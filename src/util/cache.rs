@@ -89,9 +89,7 @@ pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 		.then(|| {
 			match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cache file")) {
 				Ok(mut archive) => {
-					let cache: ResourceCache;
-
-					if archive.by_name(".geode_cache").is_ok() {
+					let cache: ResourceCache = if archive.by_name(".geode_cache").is_ok() {
 						let mut cache_data = String::new();
 						if archive
 							.by_name(".geode_cache")
@@ -102,10 +100,10 @@ pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 							return None;
 						}
 
-						cache = ResourceCache::load(cache_data);
+						ResourceCache::load(cache_data)
 					} else {
-						cache = ResourceCache::new();
-					}
+						ResourceCache::new()
+					};
 
 					Some(CacheBundle {
 						cache,
