@@ -9,6 +9,8 @@ use serde::Deserialize;
 use std::fs;
 use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
+#[cfg(windows)]
+use winreg::RegKey;
 
 use crate::{NiceUnwrap, confirm};
 use crate::{done, fail, fatal, info, warn};
@@ -136,14 +138,26 @@ fn install(config: &mut Config, path: PathBuf) {
 			.clone("https://github.com/geode-sdk/geode", &path)
 			.nice_unwrap("Could not download SDK");
 
-		// TODO: set GEODE_SDK enviroment var
-
-		std::env::set_var("GEODE_SDK", path.to_str().unwrap());
-
-		info!(
-			"Please set the GEODE_SDK enviroment variable to {}",
-			path.to_str().unwrap()
-		);
+		// set GEODE_SDK environment variable
+		if cfg!(windows) {
+			let hklm = RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
+			if let Err(_) = hklm.create_subkey(
+				"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"
+			).map(|(env, _)| {
+				env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string())
+			}) {
+				warn!(
+					"Unable to set the GEODE_SDK enviroment variable to {}, \
+					you will have to set it manually! (You may be missing Admin priviledges)",
+					path.to_str().unwrap()
+				);
+			}
+		} else {
+			info!(
+				"Please set the GEODE_SDK enviroment variable to {}",
+				path.to_str().unwrap()
+			);
+		}
 
 		switch_to_tag(config, &repo);
 
