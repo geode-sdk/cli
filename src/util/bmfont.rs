@@ -12,7 +12,6 @@ use crate::{done, fatal, info, NiceUnwrap};
 use image::{Rgba, RgbaImage};
 
 use super::mod_file::ModFileInfo;
-use super::spritesheet::downscale;
 
 struct RenderedChar {
 	id: char,
@@ -136,6 +135,9 @@ fn initialize_font_bundle(
 		.map(|c| char::from_u32(c).unwrap())
 		.collect();
 
+	// Scaled font size
+	let scaled_size = font.size / factor;
+
 	// Read & parse source .ttf file
 	let ttf_font = fontdue::Font::from_bytes(
 		fs::read(&font.path).unwrap(),
@@ -147,10 +149,9 @@ fn initialize_font_bundle(
 	let rasterized_chars: Vec<_> = chars
 		.iter()
 		.filter_map(|c| {
-			let (metrics, data) = ttf_font.rasterize(*c, font.size as f32);
+			let (metrics, data) = ttf_font.rasterize(*c, scaled_size as f32);
 
 			if let Some(mut img) = generate_char(font, metrics, data) {
-				downscale(&mut img, factor);
 				Some(RenderedChar { id: *c, img })
 			} else {
 				None
@@ -199,10 +200,10 @@ fn initialize_font_bundle(
 	// other space characters don't get omitted
 	let mut all_chars = vec![format!(
 		"char id=32 x=0 y=0 width=0 height=0 xoffset=0 yoffset=0 xadvance={} page=0 chln=0",
-		ttf_font.metrics(' ', font.size as f32).advance_width
+		ttf_font.metrics(' ', scaled_size as f32).advance_width
 	)];
 	for (name, frame) in packer.get_frames() {
-		let metrics = ttf_font.metrics(*name, font.size as f32);
+		let metrics = ttf_font.metrics(*name, scaled_size as f32);
 		all_chars.push(format!(
 			"char id={} x={} y={} width={} height={} xoffset={} yoffset={} xadvance={} page=0 chnl=0",
 			*name as i32,
@@ -211,7 +212,7 @@ fn initialize_font_bundle(
 			frame.frame.w as i32,
 			frame.frame.h as i32,
 			metrics.xmin,
-			font.size as i32 - metrics.height as i32 - metrics.ymin,
+			scaled_size as i32 - metrics.height as i32 - metrics.ymin,
 			metrics.advance_width as i32
 		));
 	}
@@ -225,7 +226,7 @@ fn initialize_font_bundle(
 		.flat_map(|left| {
 			rasterized_chars.iter().filter_map(|right| {
 				ttf_font
-					.horizontal_kern(left.id, right.id, font.size as f32)
+					.horizontal_kern(left.id, right.id, scaled_size as f32)
 					.map(|kern| {
 						format!(
 							"kerning first={} second={} amount={}",
@@ -240,7 +241,9 @@ fn initialize_font_bundle(
 	all_kerning_pairs.sort();
 
 	// Create .fnt file
-	let line_metrics = ttf_font.horizontal_line_metrics(font.size as f32).unwrap();
+	let line_metrics = ttf_font
+		.horizontal_line_metrics(scaled_size as f32)
+		.unwrap();
 	let fnt_data = format!(
 		"info face=\"{font_name}\" size={font_size} bold=0 italic=0 \
 		charset=\"\" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1\n\
@@ -252,7 +255,7 @@ fn initialize_font_bundle(
 		kernings count={kerning_count}\n\
 		{all_kernings}\n",
 		font_name = font.path.file_name().unwrap().to_str().unwrap(),
-		font_size = font.size,
+		font_size = scaled_size,
 		common_line_height = line_metrics.new_line_size,
 		font_base = (-line_metrics.descent + line_metrics.line_gap) as i32,
 		scale_w = packer.width(),
