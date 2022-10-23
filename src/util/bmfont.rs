@@ -151,11 +151,7 @@ fn initialize_font_bundle(
 		.filter_map(|c| {
 			let (metrics, data) = ttf_font.rasterize(*c, scaled_size as f32);
 
-			if let Some(mut img) = generate_char(font, metrics, data) {
-				Some(RenderedChar { id: *c, img })
-			} else {
-				None
-			}
+			generate_char(font, metrics, data).map(|img| RenderedChar { id: *c, img })
 		})
 		.collect();
 

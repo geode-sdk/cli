@@ -111,7 +111,7 @@ fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
 			.name()
 			.as_ref()
 			.map(|s| String::from(*s))
-			.unwrap_or("<Unknown>".into());
+			.unwrap_or_else(|| "<Unknown>".into());
 
 		let mut callbacks = RemoteCallbacks::new();
 		callbacks.sideband_progress(|x| {
@@ -177,9 +177,10 @@ fn install(config: &mut Config, path: PathBuf) {
 		cfg_if::cfg_if!(
 			if #[cfg(windows)] {
 				let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-				if let Err(_) = hklm
+				if hklm
 					.create_subkey("Environment")
 					.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
+					.is_err()
 				{
 					warn!(
 						"Unable to set the GEODE_SDK enviroment variable to {}, \

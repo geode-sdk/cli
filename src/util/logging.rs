@@ -44,7 +44,7 @@ macro_rules! done {
 #[macro_export]
 macro_rules! confirm {
     ($x:expr $(, $more:expr)*) => {
-        crate::logging::ask_confirm(&format!($x, $($more),*), false)
+        $crate::logging::ask_confirm(&format!($x, $($more),*), false)
     };
 }
 
