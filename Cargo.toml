@@ -1,6 +1,6 @@
 [package]
 name = "geode"
-version = "1.1.1"
+version = "1.1.2"
 authors = ["HJfod <dreadrollmusic@gmail.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -32,6 +32,7 @@ cfg-if = "1.0.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.7.0"
+ansi_term = "0.12"
 
 [build-dependencies]
 winres = "0.1.12"

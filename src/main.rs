@@ -71,6 +71,12 @@ enum GeodeCommands {
 }
 
 fn main() {
+	#[cfg(windows)]
+	match ansi_term::enable_ansi_support() {
+		Ok(_) => {},
+		Err(_) => println!("Unable to enable color support, output may look weird!")
+	};
+
 	let args = Args::parse();
 
 	let mut config = config::Config::new();
