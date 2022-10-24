@@ -1,6 +1,6 @@
-use crate::config::Config;
 use clap::Subcommand;
 use colored::Colorize;
+use crate::config::Config;
 use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
@@ -8,7 +8,11 @@ use semver::Version;
 use serde::Deserialize;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+#[cfg(target_os = "macos")]
+use crate::launchctl;
+
 #[cfg(windows)]
 use winreg::RegKey;
 
@@ -68,16 +72,18 @@ pub enum Sdk {
 		branch: Option<Branch>,
 	},
 
+	/// Change SDK path.
+	SetPath {
+		/// Move old SDK to new directory
+		#[clap(long)]
+		r#move: bool,
+
+		/// New SDK path
+		path: PathBuf
+	},
+
 	/// Get SDK version
 	Version,
-}
-
-fn parse_version(str: &str) -> Result<Version, semver::Error> {
-	if let Some(s) = str.strip_prefix('v') {
-		Version::parse(s)
-	} else {
-		Version::parse(str)
-	}
 }
 
 fn uninstall(_config: &mut Config) -> bool {
@@ -136,6 +142,33 @@ fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
 	Ok(())
 }
 
+fn set_sdk_env(path: &Path) -> bool {
+	let env_success: bool;
+
+	#[cfg(windows)] {
+		let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
+		if hklm
+			.create_subkey("Environment")
+			.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
+			.is_err()
+		{
+			warn!(
+				"Unable to set the GEODE_SDK enviroment variable to {}",
+				path.to_str().unwrap()
+			);
+			env_success = false;
+		} else {
+			env_success = true;
+		}
+	}
+
+	#[cfg(target_os = "macos")] {
+		env_success = launchctl::set_sdk_env(path.to_str().unwrap());
+	}
+
+	env_success
+}
+
 fn install(config: &mut Config, path: PathBuf) {
 	let parent = path.parent().unwrap();
 
@@ -173,30 +206,16 @@ fn install(config: &mut Config, path: PathBuf) {
 		// Repository::update_submodules is private
 		update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
-		// set GEODE_SDK environment variable
-		cfg_if::cfg_if!(
-			if #[cfg(windows)] {
-				let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
-				if hklm
-					.create_subkey("Environment")
-					.map(|(env, _)| env.set_value("GEODE_SDK", &path.to_str().unwrap().to_string()))
-					.is_err()
-				{
-					warn!(
-						"Unable to set the GEODE_SDK enviroment variable to {}, \
-						you will have to set it manually! (You may be missing Admin priviledges)",
-						path.to_str().unwrap()
-					);
-				} else {
-					info!("Set GEODE_SDK environment variable automatically");
-				}
-			} else {
-				info!(
-					"Please set the GEODE_SDK enviroment variable to {}",
-					path.to_str().unwrap()
-				);
-			}
-		);
+		// set GEODE_SDK environment variable;
+		if set_sdk_env(&path) {
+			info!("Set GEODE_SDK environment variable automatically");
+		} else {
+			warn!("Unable to set GEODE_SDK environment variable automatically");
+			info!(
+				"Please set the GEODE_SDK enviroment variable to {}",
+				path.to_str().unwrap()
+			);
+		}
 
 		switch_to_tag(config, &repo);
 
@@ -295,7 +314,7 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 		.iter()
 		.flatten()
 	{
-		if let Ok(version) = parse_version(tag) {
+		if let Ok(version) = Version::parse(tag.strip_prefix('v').unwrap_or(tag)) {
 			if latest_version.as_ref().is_none() || &version > latest_version.as_ref().unwrap() {
 				latest_version = Some(version);
 			}
@@ -383,6 +402,42 @@ fn install_binaries(config: &mut Config) {
 	done!("Binaries installed");
 }
 
+fn set_sdk_path(path: PathBuf, do_move: bool) {
+
+	if do_move {
+		let old = std::env::var("GEODE_SDK").ok().and_then(|x| Some(PathBuf::from(x)))
+			.nice_unwrap("Cannot locate SDK.");
+
+		if !old.is_dir() {
+			fatal!("Internal Error: $GEODE_SDK doesn't point to a directory. Please reinstall the Geode SDK");
+		}
+		if !old.join("VERSION").exists() {
+			fatal!("Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.")
+		}
+		if path.exists() {
+			fatal!("Cannot move SDK to existing path {}", path.to_str().unwrap());
+		}
+
+		fs::rename(old, &path).nice_unwrap("Unable to move SDK");
+	} else {
+		if !path.exists() {
+			fatal!("Cannot set SDK path to nonexistent directory {}", path.to_str().unwrap());
+		}
+		if !path.is_dir() {
+			fatal!("Cannot set SDK path to non-directory {}", path.to_str().unwrap());
+		}
+		if !path.join("VERSION").exists() {
+			fatal!("{} is either malformed or not a Geode SDK installation", path.to_str().unwrap());
+		}
+	}
+
+	if set_sdk_env(&path) {
+		done!("Successfully set SDK path to {}", path.to_str().unwrap());
+	} else {
+		fatal!("Unable to change SDK path");
+	}
+}
+
 pub fn get_version() -> Version {
 	Version::parse(
 		fs::read_to_string(Config::sdk_path().join("VERSION"))
@@ -431,6 +486,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::Uninstall => {
 			uninstall(config);
 		}
+		Sdk::SetPath { path, r#move } => set_sdk_path(path, r#move),
 		Sdk::Update { branch } => update(config, branch),
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
 		Sdk::InstallBinaries => install_binaries(config),

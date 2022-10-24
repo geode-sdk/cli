@@ -124,17 +124,16 @@ impl Config {
 
 	pub fn sdk_path() -> PathBuf {
 		let sdk_var = std::env::var("GEODE_SDK")
-			.nice_unwrap("Unable to find Geode SDK. Please define the GEODE_SDK enviroment variable to point to the Geode SDK");
+			.nice_unwrap("Unable to find Geode SDK. Please install the Geode SDK or use `geode sdk set-path` to make it visible");
 
 		let path = PathBuf::from(sdk_var);
 		if !path.is_dir() {
-			fail!("The GEODE_SDK enviroment variable must point to the folder containing the Geode SDK");
+			fail!("Internal Error: GEODE_SDK doesn't point to a directory");
 			std::process::exit(1)
 		}
 		if !path.join("VERSION").exists() {
 			fail!(
-				"The GEODE_SDK enviroment variable doesn't seem to point to the Geode SDK (Could not find VERSION)
-Perhaps you are on a version older than v0.4.2?"
+				"Internal Error: GEODE_SDK/VERSION not found. Please reinstall the Geode SDK."
 			);
 			std::process::exit(1)
 		}
