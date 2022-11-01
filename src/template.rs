@@ -57,6 +57,7 @@ fn create_template(
 		fs::write(file, contents).unwrap();
 	}
 
+	// Strip comments from template
 	if strip {
 		let cmake_path = project_location.join("CMakeLists.txt");
 		let cpp_path = project_location.join("src/main.cpp");
