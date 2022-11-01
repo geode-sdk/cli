@@ -1,23 +1,24 @@
 use crate::config::Config;
 use crate::sdk::get_version;
-use crate::{done, fail, fatal, info, warn};
+use crate::{done, fail, info, warn, NiceUnwrap};
 use git2::Repository;
 use path_absolutize::Absolutize;
+use regex::Regex;
 use rustyline::Editor;
 use serde::Serialize;
 use serde_json::json;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 
 fn create_template(
-	_config: &mut Config,
 	project_location: PathBuf,
 	name: String,
 	version: String,
 	id: String,
 	developer: String,
 	description: String,
+	strip: bool
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
@@ -33,16 +34,14 @@ fn create_template(
 			return;
 		}
 	} else {
-		fs::create_dir_all(&project_location)
-			.unwrap_or_else(|e| fatal!("Unable to create project directory: {}", e));
+		fs::create_dir_all(&project_location).nice_unwrap("Unable to create project directory");
 	}
 
 	// Clone repository
 	Repository::clone(
 		"https://github.com/geode-sdk/example-mod",
 		&project_location,
-	)
-	.unwrap_or_else(|e| fatal!("Unable to clone repository: {}", e));
+	).nice_unwrap("Unable to clone repository");
 
 	fs::remove_dir_all(project_location.join(".git")).unwrap();
 
@@ -56,6 +55,20 @@ fn create_template(
 			.unwrap()
 			.replace("Template", &filtered_name);
 		fs::write(file, contents).unwrap();
+	}
+
+	if strip {
+		let cmake_path = project_location.join("CMakeLists.txt");
+		let cpp_path = project_location.join("src/main.cpp");
+
+		let cmake_regex = Regex::new(r"\n#.*").unwrap();
+		let cpp_regex = Regex::new(r".*/\*\*\n(?:\s*\* .*\n)*\s*\*/\n?").unwrap();
+
+		let cmake_text = fs::read_to_string(&cmake_path).nice_unwrap("Unable to read template file CMakeLists.txt");
+		let cpp_text = fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
+
+		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, "")).nice_unwrap("Unable to access template file CMakeLists.txt");
+		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, "")).nice_unwrap("Unable to access template file main.cpp");
 	}
 
 	// Default mod.json
@@ -78,8 +91,7 @@ fn create_template(
 	fs::write(
 		&project_location.join("mod.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
-	)
-	.unwrap_or_else(|e| fatal!("Unable to write to project: {}", e));
+	).nice_unwrap("Unable to write to project");
 
 	done!("Succesfully initialized project! Happy modding :)");
 }
@@ -91,7 +103,7 @@ fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
 	loop {
 		let line = line_reader
 			.readline_with_initial(&text, (default.unwrap_or(""), ""))
-			.unwrap();
+			.nice_unwrap("Error reading line");
 		line_reader.add_history_entry(&line);
 
 		if line.is_empty() {
@@ -106,7 +118,7 @@ fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
 	}
 }
 
-pub fn build_template(config: &mut Config, name: Option<String>, location: Option<PathBuf>) {
+pub fn build_template(config: &mut Config, name: Option<String>, location: Option<PathBuf>, strip: bool) {
 	let final_name = ask_value("Name", name.as_deref(), true);
 
 	let location = location.unwrap_or_else(|| std::env::current_dir().unwrap().join(&final_name));
@@ -140,12 +152,12 @@ pub fn build_template(config: &mut Config, name: Option<String>, location: Optio
 	info!("Creating project {}", mod_id);
 
 	create_template(
-		config,
 		final_location,
 		final_name,
 		final_version,
 		mod_id,
 		final_developer,
 		final_description,
+		strip
 	);
 }

@@ -86,7 +86,7 @@ pub enum Sdk {
 	Version,
 }
 
-fn uninstall(_config: &mut Config) -> bool {
+fn uninstall() -> bool {
 	let sdk_path = Config::sdk_path();
 
 	warn!("Are you sure you want to uninstall SDK?");
@@ -450,7 +450,7 @@ pub fn get_version() -> Version {
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
 	match cmd {
 		Sdk::Install { reinstall, path } => {
-			if reinstall && !uninstall(config) {
+			if reinstall && !uninstall() {
 				return;
 			}
 
@@ -484,7 +484,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 			install(config, actual_path);
 		}
 		Sdk::Uninstall => {
-			uninstall(config);
+			uninstall();
 		}
 		Sdk::SetPath { path, r#move } => set_sdk_path(path, r#move),
 		Sdk::Update { branch } => update(config, branch),

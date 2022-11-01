@@ -37,6 +37,10 @@ enum GeodeCommands {
 		/// Mod name
 		#[clap(short, long)]
 		name: Option<String>,
+
+		/// Remove all tutorial comments from template
+		#[clap(short, long)]
+		strip: bool
 	},
 
 	/// Install a .geode package to current profile, alias of `geode package install`
@@ -82,7 +86,7 @@ fn main() {
 	let mut config = config::Config::new();
 
 	match args.command {
-		GeodeCommands::New { name, path } => template::build_template(&mut config, name, path),
+		GeodeCommands::New { name, path, strip } => template::build_template(&mut config, name, path, strip),
 
 		GeodeCommands::Install { path } => package::install(&mut config, &path),
 
