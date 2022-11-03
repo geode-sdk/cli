@@ -1,15 +1,16 @@
+use crate::input::ask_value;
 use crate::config::Config;
 use crate::sdk::get_version;
-use crate::{done, fail, info, warn, NiceUnwrap};
+use crate::{done, info, warn, NiceUnwrap};
 use git2::Repository;
 use path_absolutize::Absolutize;
 use regex::Regex;
-use rustyline::Editor;
+
 use serde::Serialize;
 use serde_json::json;
 use std::fs;
 use std::io::{stdin, stdout, Write};
-use std::path::{PathBuf, Path};
+use std::path::PathBuf;
 
 fn create_template(
 	project_location: PathBuf,
@@ -95,28 +96,6 @@ fn create_template(
 	).nice_unwrap("Unable to write to project");
 
 	done!("Succesfully initialized project! Happy modding :)");
-}
-
-// fix this
-fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
-	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
-	let mut line_reader = Editor::<()>::new();
-	loop {
-		let line = line_reader
-			.readline_with_initial(&text, (default.unwrap_or(""), ""))
-			.nice_unwrap("Error reading line");
-		line_reader.add_history_entry(&line);
-
-		if line.is_empty() {
-			if required {
-				fail!("Please enter a value");
-			} else {
-				return default.unwrap_or("").to_string();
-			}
-		} else {
-			return line.trim().to_string();
-		}
-	}
 }
 
 pub fn build_template(config: &mut Config, name: Option<String>, location: Option<PathBuf>, strip: bool) {
