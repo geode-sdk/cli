@@ -1,16 +1,17 @@
-use serde_json::Value;
-use std::path::PathBuf;
-use serde::Serialize;
-use std::path::Path;
-use crate::config::Config;
 use clap::Subcommand;
+use zip::ZipArchive;
+use crate::config::{geode_root, Config};
 use crate::input::ask_value;
-use serde_json::json;
-use crate::{fatal, warn, NiceUnwrap};
-use crypto::digest::Digest;
 use crate::mod_file;
+use crate::{fatal, done, info, warn, geode_assert, NiceUnwrap};
+use crypto::digest::Digest;
 use crypto::sha3::Sha3;
+use serde::Serialize;
+use serde_json::{json, Value};
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::io;
+use colored::Colorize;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -19,7 +20,106 @@ pub enum Index {
 	New {
 		/// Output folder of entry
 		output: PathBuf
+	},
+
+	/// Updates the index cache
+	Update
+}
+
+fn update_index() {
+	let index_dir = geode_root().join("geode/index");
+	let current_sha = fs::read_to_string(index_dir.join("current")).unwrap_or(String::new());
+
+	let client = reqwest::blocking::Client::new();
+
+	let response = client.get("https://api.github.com/repos/geode-sdk/mods/commits/main")
+		.header("Accept", "application/vnd.github.sha")
+		.header("If-None-Match", format!("\"{}\"", current_sha))
+		.header("User-Agent", "GeodeCli")
+		.send()
+		.nice_unwrap("Unable to fetch index version");
+
+	if response.status() == 304 {
+		done!("Index is already latest version");
+		return;
 	}
+	geode_assert!(response.status() == 200, "Version check received status code {}", response.status());
+	let latest_sha = response.text().nice_unwrap("Unable to decode index version");
+
+	let mut zip_data = io::Cursor::new(Vec::new());
+
+	client.get("https://github.com/geode-sdk/mods/zipball/main")
+		.send().nice_unwrap("Unable to download index")
+		.copy_to(&mut zip_data).nice_unwrap("Unable to write to index");
+
+	let mut zip_archive = ZipArchive::new(zip_data).nice_unwrap("Unable to decode index zip");
+
+
+	let before_items = if index_dir.join("index").exists() {
+		let mut items = fs::read_dir(index_dir.join("index"))
+			.unwrap()
+			.into_iter()
+			.map(|x| x.unwrap().path())
+			.collect::<Vec<_>>();
+		items.sort();
+
+		fs::remove_dir_all(index_dir.join("index")).nice_unwrap("Unable to remove old index version");
+		Some(items)
+	} else {
+		None
+	};
+
+	let extract_dir = std::env::temp_dir().join("zip");
+	if extract_dir.exists() {
+		fs::remove_dir_all(&extract_dir).nice_unwrap("Unable to prepare new index");
+	}
+	fs::create_dir(&extract_dir).unwrap();
+	zip_archive.extract(&extract_dir).nice_unwrap("Unable to extract new index");
+
+	let new_root_dir = fs::read_dir(extract_dir).unwrap().next().unwrap().unwrap().path();
+	for item in fs::read_dir(new_root_dir).unwrap() {
+		let item_path = item.unwrap().path();
+		let dest_path = index_dir.join(item_path.file_name().unwrap());
+
+		if dest_path.exists() {
+			if dest_path.is_dir() {
+				fs::remove_dir_all(&dest_path).unwrap();
+			} else {
+				fs::remove_file(&dest_path).unwrap();
+			}
+		}
+
+		fs::rename(item_path, dest_path).nice_unwrap("Unable to copy new index");
+	}
+	
+	
+	let mut after_items = fs::read_dir(index_dir.join("index"))
+		.unwrap()
+		.into_iter()
+		.map(|x| x.unwrap().path())
+		.collect::<Vec<_>>();
+	after_items.sort();
+
+	if let Some(before_items) = before_items {
+		if before_items != after_items {
+			info!("Changelog:");
+
+			for i in &before_items {
+				if !after_items.contains(i) {
+					println!("            {} {}", "-".red(), i.file_name().unwrap().to_str().unwrap());
+				}
+			}
+
+			for i in &after_items {
+				if !before_items.contains(i) {
+					println!("            {} {}", "+".green(), i.file_name().unwrap().to_str().unwrap());
+				}
+			}
+		}
+	}
+
+	fs::write(index_dir.join("current"), latest_sha).nice_unwrap("Unable to save version");
+	done!("Successfully updated index")
 }
 
 fn create_index_json(path: &Path) {
@@ -47,7 +147,6 @@ fn create_index_json(path: &Path) {
 	let category_str = ask_value("Categories (comma separated)", None, true);
 	let categories = category_str.split(",").collect::<Vec<_>>();
 
-
 	let index_json = json!({
 		"download": {
 			"url": url,
@@ -72,12 +171,8 @@ fn create_index_json(path: &Path) {
 }
 
 fn create_entry(out_path: &Path) {
-	if !out_path.exists() {
-		fatal!("Path does not exist");
-	}
-	if out_path.is_file() {
-		fatal!("Path is a file");
-	}
+	geode_assert!(out_path.exists(), "Path does not exist");
+	geode_assert!(out_path.is_dir(), "Path is not a directory");
 
 	let root_path = PathBuf::from(ask_value("Project root directory", Some("."), true));
 
@@ -85,9 +180,7 @@ fn create_entry(out_path: &Path) {
 	let about_path = root_path.join("about.md");
 	let logo_path = root_path.join("logo.png");
 
-	if !mod_json_path.exists() {
-		fatal!("Unable to find project mod.json");
-	}
+	geode_assert!(mod_json_path.exists(), "Unable to find project mod.json");
 
 	// Get mod id
 	let mod_json: Value = serde_json::from_str(
@@ -120,6 +213,8 @@ fn create_entry(out_path: &Path) {
 
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
-		Index::New { output } => create_entry(&output)
+		Index::New { output } => create_entry(&output),
+
+		Index::Update => update_index()
 	}
 }

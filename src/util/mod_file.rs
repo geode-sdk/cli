@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::spritesheet::SpriteSheet;
 use crate::NiceUnwrap;
-use crate::{fatal, warn};
+use crate::{geode_assert, fatal, warn};
 
 pub struct BitmapFont {
 	pub name: String,
@@ -29,9 +29,7 @@ pub struct ModFileInfo {
 
 /// Reusability for get_mod_resources
 fn collect_globs(value: &Value, value_name: &str, root_path: &Path, out: &mut Vec<PathBuf>) {
-	if !value.is_array() {
-		fatal!("{}: Expected array", value_name);
-	}
+	geode_assert!(value.is_array(), "{}: Expected array", value_name);
 
 	// Iterate paths
 	for (i, entry) in value.as_array().unwrap().iter().enumerate() {
@@ -93,18 +91,15 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 				}
 
 				"spritesheets" => {
-					if !value.is_object() {
-						fatal!("[mod.json].resources.spritesheets: Expected object");
-					}
+					geode_assert!(value.is_object(), "[mod.json].resources.spritesheets: Expected object");
 
 					// Iterate spritesheets
 					for (name, files) in value.as_object().unwrap() {
-						if out.spritesheets.get(name).is_some() {
-							fatal!(
-								"[mod.json].resources.spritesheets: Duplicate name '{}'",
-								name
-							);
-						}
+						geode_assert!(
+							out.spritesheets.get(name).is_none(),
+							"[mod.json].resources.spritesheets: Duplicate name '{}'",
+							name
+						);
 
 						let mut sheet_files = Vec::<PathBuf>::new();
 
@@ -137,16 +132,12 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 						.as_object()
 						.nice_unwrap("[mod.json].resources.font: Expected object")
 					{
-						if out.fonts.get(name).is_some() {
-							fatal!("[mod.json].resources.fonts: Duplicate name '{}'", name);
-						}
+						geode_assert!(out.fonts.get(name).is_none(), "[mod.json].resources.fonts: Duplicate name '{}'", name);
 
 						// Convenience variable
 						let info_name = format!("[mod.json].resources.font.{}", name);
 
-						if !info.is_object() {
-							fatal!("{}: Expected object", info_name);
-						}
+						geode_assert!(info.is_object(), "{}: Expected object", info_name);
 
 						let mut font = BitmapFont {
 							name: name.to_string(),
@@ -177,9 +168,7 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 										info_name
 									)) as u32;
 
-									if font.size == 0 {
-										fatal!("{}.size: Font size cannot be 0", info_name);
-									}
+									geode_assert!(font.size != 0, "{}.size: Font size cannot be 0", info_name);
 								}
 
 								"outline" => {
@@ -206,12 +195,8 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 						}
 
 						// Ensure required attributes are filled in
-						if font.path.as_os_str().is_empty() {
-							fatal!("{}: Missing required key 'path'", info_name);
-						}
-						if font.size == 0 {
-							fatal!("{}: Missing required key 'size'", info_name);
-						}
+						geode_assert!(!font.path.as_os_str().is_empty(), "{}: Missing required key 'path'", info_name);
+						geode_assert!(font.size != 0, "{}: Missing required key 'size'", info_name);
 
 						out.fonts.insert(name.to_string(), font);
 					}

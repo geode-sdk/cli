@@ -8,7 +8,7 @@ use texture_packer::texture::Texture;
 use texture_packer::TexturePacker;
 use texture_packer::TexturePackerConfig;
 
-use crate::{done, fatal, info, NiceUnwrap};
+use crate::{done, geode_assert, info, NiceUnwrap};
 use image::{Rgba, RgbaImage};
 
 use super::mod_file::ModFileInfo;
@@ -126,11 +126,8 @@ fn initialize_font_bundle(
 				.collect::<Vec<u32>>()
 		})
 		.flat_map(|x| {
-			if x.len() <= 2 {
-				*x.first().unwrap()..*x.last().unwrap() + 1
-			} else {
-				fatal!("Invalid charset '{}'", font.charset.as_ref().unwrap());
-			}
+			geode_assert!(x.len() <= 2, "Invalid charset '{}'", font.charset.as_ref().unwrap());
+			*x.first().unwrap()..*x.last().unwrap() + 1
 		})
 		.map(|c| char::from_u32(c).unwrap())
 		.collect();

@@ -48,6 +48,16 @@ macro_rules! confirm {
     };
 }
 
+#[macro_export]
+macro_rules! geode_assert {
+	($cond:expr, $x:expr $(, $more:expr)*) => {
+		if !$cond {
+			use crate::fatal;
+			fatal!($x $(, $more)*);
+		}
+	}
+}
+
 pub fn ask_confirm(text: &String, default: bool) -> bool {
 	use ::colored::Colorize;
 	// print question

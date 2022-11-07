@@ -17,7 +17,7 @@ use crate::launchctl;
 use winreg::RegKey;
 
 use crate::{confirm, NiceUnwrap};
-use crate::{done, fail, fatal, info, warn};
+use crate::{done, fail, fatal, info, warn, geode_assert};
 
 #[derive(Deserialize)]
 struct GithubReleaseAsset {
@@ -381,9 +381,7 @@ fn install_binaries(config: &mut Config) {
 		}
 	}
 
-	if target_url.is_none() {
-		fatal!("No binaries found for current platform");
-	}
+	geode_assert!(target_url.is_some(), "No binaries found for current platform!");
 
 	fs::create_dir_all(&target_dir).nice_unwrap("Unable to create directory for binaries");
 
@@ -408,27 +406,15 @@ fn set_sdk_path(path: PathBuf, do_move: bool) {
 		let old = std::env::var("GEODE_SDK").ok().and_then(|x| Some(PathBuf::from(x)))
 			.nice_unwrap("Cannot locate SDK.");
 
-		if !old.is_dir() {
-			fatal!("Internal Error: $GEODE_SDK doesn't point to a directory. Please reinstall the Geode SDK");
-		}
-		if !old.join("VERSION").exists() {
-			fatal!("Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.")
-		}
-		if path.exists() {
-			fatal!("Cannot move SDK to existing path {}", path.to_str().unwrap());
-		}
+		geode_assert!(old.is_dir(), "Internal Error: $GEODE_SDK doesn't point to a directory. Please reinstall the Geode SDK");
+		geode_assert!(old.join("VERSION").exists(), "Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.");
+		geode_assert!(!path.exists(), "Cannot move SDK to existing path {}", path.to_str().unwrap());
 
 		fs::rename(old, &path).nice_unwrap("Unable to move SDK");
 	} else {
-		if !path.exists() {
-			fatal!("Cannot set SDK path to nonexistent directory {}", path.to_str().unwrap());
-		}
-		if !path.is_dir() {
-			fatal!("Cannot set SDK path to non-directory {}", path.to_str().unwrap());
-		}
-		if !path.join("VERSION").exists() {
-			fatal!("{} is either malformed or not a Geode SDK installation", path.to_str().unwrap());
-		}
+		geode_assert!(path.exists(), "Cannot set SDK path to nonexistent directory {}", path.to_str().unwrap());
+		geode_assert!(path.is_dir(), "Cannot set SDK path to non-directory {}", path.to_str().unwrap());
+		geode_assert!(path.join("VERSION").exists(), "{} is either malformed or not a Geode SDK installation", path.to_str().unwrap());
 	}
 
 	if set_sdk_env(&path) {
