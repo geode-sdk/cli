@@ -29,7 +29,7 @@ macro_rules! fatal {
 macro_rules! warn {
     ($x:expr $(, $more:expr)*) => {{
     	use ::colored::Colorize;
-        println!("{}{}", "| Warn | ".bright_yellow(), format!($x, $($more),*));
+        eprintln!("{}{}", "| Warn | ".bright_yellow(), format!($x, $($more),*));
     }}
 }
 
