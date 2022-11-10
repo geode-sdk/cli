@@ -12,6 +12,7 @@ pub struct BitmapFont {
 	pub charset: Option<String>,
 	pub size: u32,
 	pub outline: u32,
+	pub color: [u8; 3],
 }
 
 pub struct ModResources {
@@ -145,6 +146,7 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 							charset: None,
 							size: 0,
 							outline: 0,
+							color: [255, 255, 255],
 						};
 
 						// Iterate font attributes
@@ -176,6 +178,23 @@ fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
 										"{}.outline: Expected unsigned integer",
 										info_name
 									)) as u32;
+								}
+
+								"color" => {
+									let color = value
+										.as_str()
+										.nice_unwrap(format!("{}.color: Expected string", info_name));
+
+									let col = u32::from_str_radix(color, 16).nice_unwrap(format!(
+										"{}.color: Expected hexadecimal color",
+										info_name
+									));
+
+									font.color = [
+										((col >> 16) & 0xFF) as u8,
+										((col >> 8) & 0xFF) as u8,
+										(col & 0xFF) as u8,
+									];
 								}
 
 								"charset" => {
