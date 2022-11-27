@@ -211,7 +211,7 @@ fn create_entry(out_path: &Path) {
 	}
 }
 
-pub fn subcommand(config: &mut Config, cmd: Index) {
+pub fn subcommand(_config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
 

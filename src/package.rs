@@ -2,8 +2,7 @@
 #![allow(unused_mut)]
 
 use std::fs;
-use std::io::Read;
-use std::io::Write;
+use std::io::{Read, Write, Seek};
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
@@ -18,7 +17,7 @@ use crate::util::mod_file::ModFileInfo;
 use crate::util::spritesheet;
 use crate::NiceUnwrap;
 use crate::{cache, mod_file};
-use crate::{done, fail, info, warn};
+use crate::{done, fail, info, warn, fatal};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -45,6 +44,12 @@ pub enum Package {
 		/// Whether to install the generated package after creation
 		#[clap(short, long)]
 		install: bool,
+	},
+
+	/// Merge multiple packages
+	Merge {
+		/// Packages to merge
+		packages: Vec<PathBuf>
 	},
 
 	/// Fetch mod id from a package
@@ -332,6 +337,64 @@ fn create_package(
 	}
 }
 
+fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
+	let mut text = String::new();
+
+	input.by_name("mod.json")
+		 .nice_unwrap("Unable to find mod.json in package")
+		 .read_to_string(&mut text)
+		 .nice_unwrap("Unable to read mod.json");
+
+	serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json")
+}
+
+fn merge_packages(inputs: Vec<PathBuf>) {
+	let mut archives: Vec<_> = inputs.iter().map(|x| {
+		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).nice_unwrap("Unable to unzip")
+	}).collect();
+
+	// Sanity check
+	let mut mod_ids: Vec<_> = archives.iter_mut().map(|x|
+		mod_json_from_archive(x)
+			.get("id")
+			.nice_unwrap("[mod.json]: Missing key 'id'")
+			.as_str()
+			.nice_unwrap("[mod.json].id: Expected string")
+			.to_string()
+	).collect();
+
+	let mod_id = mod_ids.remove(0);
+
+	// They have to be the same mod
+	mod_ids.iter().for_each(|x| {
+		if *x != mod_id {
+			fatal!("Cannot merge packages with different mod id: {} and {}", x, mod_id);
+		}
+	});
+
+	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).nice_unwrap("Unable to create zip writer");
+
+	for mut archive in &mut archives {
+		let potential_names = [".dylib", ".so", ".dll", ".lib"];
+		
+		// Rust borrow checker lol xd
+		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
+
+		for file in files {
+			if potential_names.iter().filter(|x| file.ends_with(*x)).next().is_some() {
+				println!("{}", file);
+
+				out_archive.raw_copy_file(
+					archive.by_name(&file).nice_unwrap("Unable to fetch file")
+				).nice_unwrap("Unable to transfer binary");
+			}
+		}
+	}
+
+	out_archive.finish().nice_unwrap("Unable to write to zip");
+	done!("Successfully merged binaries into {}", inputs[0].to_str().unwrap());
+}
+
 fn get_id(input: PathBuf, raw: bool) {
 	let text = if input.is_dir() {
 		std::fs::read_to_string(input.join("mod.json")).nice_unwrap("Unable to read mod.json")
@@ -374,6 +437,13 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			output,
 			install,
 		} => create_package(config, &root_path, binaries, output, install),
+
+		Package::Merge { packages } => {
+			if packages.len() < 2 {
+				fatal!("Merging requires at least two packages");
+			}
+			merge_packages(packages)
+		},
 
 		Package::GetId { input, raw } => get_id(input, raw),
 
