@@ -324,7 +324,12 @@ fn create_package(
 	}
 
 	for binary in &binaries {
-		std::fs::copy(binary, working_dir.join(binary.file_name().unwrap()))
+		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
+		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| **x == binary_name) {
+			binary_name = mod_file_info.id.to_string() + ext;
+		}
+
+		std::fs::copy(binary, working_dir.join(binary_name))
 			.nice_unwrap(format!("Unable to copy binary at '{}'", binary.display()));
 	}
 
