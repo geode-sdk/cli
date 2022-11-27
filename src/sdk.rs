@@ -162,6 +162,11 @@ fn set_sdk_env(path: &Path) -> bool {
 		}
 	}
 
+	#[cfg(target_os = "linux")] {
+		warn!("set_sdk_env is uninmplemented on linux");
+		env_success = false;
+	}
+
 	#[cfg(target_os = "macos")] {
 		env_success = launchctl::set_sdk_env(path.to_str().unwrap());
 	}

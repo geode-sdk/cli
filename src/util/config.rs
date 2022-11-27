@@ -87,7 +87,7 @@ impl OldConfig {
 pub fn geode_root() -> PathBuf {
 	// get data dir per-platform
 	let data_dir: PathBuf;
-	#[cfg(windows)]
+	#[cfg(any(windows, target_os = "linux"))]
 	{
 		data_dir = dirs::data_local_dir().unwrap().join("Geode");
 	};
@@ -95,7 +95,7 @@ pub fn geode_root() -> PathBuf {
 	{
 		data_dir = PathBuf::from("/Users/Shared/Geode");
 	};
-	#[cfg(not(any(windows, target_os = "macos")))]
+	#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 	{
 		use std::compile_error;
 		compile_error!("implement root directory");
@@ -144,7 +144,7 @@ impl Config {
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");
-			info!("You can setup Geode using `geode config setup`");
+			warn!("You can setup Geode using `geode config setup`");
 
 			return Config {
 				current_profile: None,
@@ -189,7 +189,7 @@ impl Config {
 
 		if output.profiles.is_empty() {
 			warn!("No Geode profiles found! Some operations will be unavailable.");
-			info!("Setup Geode using `geode config setup`");
+			warn!("Setup Geode using `geode config setup`");
 		} else if output.get_profile(&output.current_profile).is_none() {
 			output.current_profile = Some(output.profiles[0].borrow().name.clone());
 		}

@@ -73,7 +73,7 @@ fn gen_outline<T: DistanceStorage>(sdf: SignedDistanceField<T>, size: f32) -> im
 }*/
 
 fn generate_char(
-	_font: &BitmapFont,
+	font: &BitmapFont,
 	metrics: fontdue::Metrics,
 	data: Vec<u8>,
 ) -> Option<RgbaImage> {
@@ -104,7 +104,7 @@ fn generate_char(
 	let height = metrics.height as u32;
 
 	Some(RgbaImage::from_fn(width, height, |x, y| {
-		Rgba::<u8>([255, 255, 255, data[(x + width * y) as usize]])
+		Rgba::<u8>([font.color[0], font.color[1], font.color[2], data[(x + width * y) as usize]])
 	}))
 }
 
