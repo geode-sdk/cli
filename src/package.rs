@@ -342,7 +342,7 @@ fn create_package(
 	}
 }
 
-fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
+pub fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
 	let mut text = String::new();
 
 	input.by_name("mod.json")
