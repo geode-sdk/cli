@@ -55,6 +55,10 @@ pub enum Sdk {
 		#[clap(long)]
 		reinstall: bool,
 
+		/// Force install, even if another location exists
+		#[clap(long)]
+		force: bool,
+
 		/// Path to install
 		path: Option<PathBuf>,
 	},
@@ -174,10 +178,10 @@ fn set_sdk_env(path: &Path) -> bool {
 	env_success
 }
 
-fn install(config: &mut Config, path: PathBuf) {
+fn install(config: &mut Config, path: PathBuf, force: bool) {
 	let parent = path.parent().unwrap();
 
-	if std::env::var("GEODE_SDK").is_ok() {
+	if !force && std::env::var("GEODE_SDK").is_ok() {
 		fail!("SDK is already installed");
 		info!("Use --reinstall if you want to remove the existing installation");
 	} else if !parent.exists() {
@@ -440,8 +444,8 @@ pub fn get_version() -> Version {
 
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
 	match cmd {
-		Sdk::Install { reinstall, path } => {
-			if reinstall && !uninstall() {
+		Sdk::Install { reinstall, force, path } => {
+			if reinstall && !uninstall() && !force {
 				return;
 			}
 
@@ -472,7 +476,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 				}
 			};
 
-			install(config, actual_path);
+			install(config, actual_path, force);
 		}
 		Sdk::Uninstall => {
 			uninstall();
