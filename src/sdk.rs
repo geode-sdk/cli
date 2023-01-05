@@ -89,7 +89,7 @@ pub enum Sdk {
 fn uninstall() -> bool {
 	let sdk_path = Config::sdk_path();
 
-	warn!("Are you sure you want to uninstall SDK?");
+	warn!("Are you sure you want to uninstall SDK? (GEODE_SDK={sdk_path:?})");
 	print!("         (type 'Yes' to proceed) ");
 
 	stdout().flush().unwrap();
@@ -163,7 +163,7 @@ fn set_sdk_env(path: &Path) -> bool {
 	}
 
 	#[cfg(target_os = "linux")] {
-		warn!("set_sdk_env is uninmplemented on linux");
+		warn!("set_sdk_env is not implemented on linux");
 		env_success = false;
 	}
 
@@ -177,56 +177,66 @@ fn set_sdk_env(path: &Path) -> bool {
 fn install(config: &mut Config, path: PathBuf) {
 	let parent = path.parent().unwrap();
 
-	if std::env::var("GEODE_SDK").is_ok() {
-		fail!("SDK is already installed");
-		info!("Use --reinstall if you want to remove the existing installation");
+	if let Ok(env_sdk_path) = std::env::var("GEODE_SDK") {
+		if Config::try_sdk_path().is_ok() {
+			fail!("SDK is already installed");
+			info!("Use --reinstall if you want to remove the existing installation");
+			return;
+		} else {
+			info!("GEODE_SDK ({env_sdk_path}) is already set, but seems to point to an invalid sdk installation.");
+			if !crate::logging::ask_confirm(&"Do you wish to proceed?".into(), true) {
+				fatal!("Aborting");
+			}
+		}
 	} else if !parent.exists() {
 		fail!("Parent folder {} does not exist", parent.display());
+		return;
 	} else if path.exists() {
 		fail!("Target path already exists");
-	} else {
-		info!("Downloading SDK");
-
-		let mut callbacks = RemoteCallbacks::new();
-		callbacks.sideband_progress(|x| {
-			print!(
-				"{} {}",
-				"| Info |".bright_cyan(),
-				std::str::from_utf8(x).unwrap()
-			);
-			true
-		});
-
-		let mut fetch = FetchOptions::new();
-		fetch.remote_callbacks(callbacks);
-
-		let mut builder = RepoBuilder::new();
-		builder.fetch_options(fetch);
-
-		let repo = builder
-			.clone("https://github.com/geode-sdk/geode", &path)
-			.nice_unwrap("Could not download SDK");
-
-		// update submodules, because for some reason
-		// Repository::update_submodules is private
-		update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
-
-		// set GEODE_SDK environment variable;
-		if set_sdk_env(&path) {
-			info!("Set GEODE_SDK environment variable automatically");
-		} else {
-			warn!("Unable to set GEODE_SDK environment variable automatically");
-			info!(
-				"Please set the GEODE_SDK enviroment variable to {}",
-				path.to_str().unwrap()
-			);
-		}
-
-		switch_to_tag(config, &repo);
-
-		done!("Successfully installed SDK");
-		info!("Use `geode sdk install-binaries` to install pre-built binaries");
+		return;
 	}
+
+	info!("Downloading SDK");
+
+	let mut callbacks = RemoteCallbacks::new();
+	callbacks.sideband_progress(|x| {
+		print!(
+			"{} {}",
+			"| Info |".bright_cyan(),
+			std::str::from_utf8(x).unwrap()
+		);
+		true
+	});
+
+	let mut fetch = FetchOptions::new();
+	fetch.remote_callbacks(callbacks);
+
+	let mut builder = RepoBuilder::new();
+	builder.fetch_options(fetch);
+
+	let repo = builder
+		.clone("https://github.com/geode-sdk/geode", &path)
+		.nice_unwrap("Could not download SDK");
+
+	// update submodules, because for some reason
+	// Repository::update_submodules is private
+	update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
+
+	// set GEODE_SDK environment variable;
+	if set_sdk_env(&path) {
+		info!("Set GEODE_SDK environment variable automatically");
+	} else {
+		warn!("Unable to set GEODE_SDK environment variable automatically");
+		info!(
+			"Please set the GEODE_SDK enviroment variable to {}",
+			path.to_str().unwrap()
+		);
+	}
+
+	switch_to_tag(config, &repo);
+
+	done!("Successfully installed SDK");
+	info!("Use `geode sdk install-binaries` to install pre-built binaries");
 }
 
 fn update(config: &mut Config, branch: Option<Branch>) {
@@ -406,9 +416,8 @@ fn install_binaries(config: &mut Config) {
 }
 
 fn set_sdk_path(path: PathBuf, do_move: bool) {
-
 	if do_move {
-		let old = std::env::var("GEODE_SDK").ok().and_then(|x| Some(PathBuf::from(x)))
+		let old = std::env::var("GEODE_SDK").map(PathBuf::from)
 			.nice_unwrap("Cannot locate SDK.");
 
 		geode_assert!(old.is_dir(), "Internal Error: $GEODE_SDK doesn't point to a directory. Please reinstall the Geode SDK");
