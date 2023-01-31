@@ -23,7 +23,7 @@ pub enum Index {
 	},
 
 	/// Updates the index cache
-	Update
+	Update,
 }
 
 fn update_index() {

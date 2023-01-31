@@ -95,6 +95,19 @@ fn create_template(
 		String::from_utf8(ser.into_inner()).unwrap(),
 	).nice_unwrap("Unable to write to project");
 
+	// Generate build folder and compiler_commands.json
+	if let Ok(path) = which::which("cmake") {
+		std::process::Command::new(path)
+			.current_dir(&project_location)
+			.arg("-B")
+			.arg("build")
+			.arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=1")
+			.output()
+			.nice_unwrap("Unable to initialize project with CMake");
+	} else {
+		warn!("CMake not found. CMake is required to build Geode projects.");
+	}
+
 	done!("Succesfully initialized project! Happy modding :)");
 }
 
