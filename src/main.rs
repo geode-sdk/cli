@@ -1,6 +1,4 @@
 
-#![feature(panic_info_message)]
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -92,7 +90,7 @@ fn main() {
 	};
 
 	std::panic::set_hook(Box::new(|info| {
-		if let Some(msg) = info.message() {
+		if let Some(msg) = info.payload().downcast_ref::<&str>() {
 			fatal!(
 				"{} {}",
 				msg,
