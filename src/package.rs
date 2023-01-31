@@ -36,7 +36,7 @@ pub enum Package {
 		root_path: PathBuf,
 
 		/// Add binary file
-		#[clap(short, long, num_args(0..))]
+		#[clap(short, long, num_args(1..))]
 		binary: Vec<PathBuf>,
 
 		/// Location of output file
@@ -333,8 +333,10 @@ fn create_package(
 	// Copy headers
 	if let Some(ref api) = mod_file_info.api {
 		for header in &api.include {
-			fs::copy(root_path.join(&header), working_dir.join(header))
-				.expect("Unable to copy headers");
+			let out = working_dir.join(header.strip_prefix(&root_path).unwrap_or(header));
+			out.parent().map(fs::create_dir_all);
+			fs::copy(root_path.join(&header), &out)
+				.expect(&format!("Unable to copy header {} to {}", header.to_string_lossy(), out.display()));
 		}
 	}
 
@@ -344,8 +346,6 @@ fn create_package(
 		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| binary_name.contains(**x)) {
 			binary_name = mod_file_info.id.to_string() + ext;
 		}
-
-		println!("name {}", binary_name);
 
 		std::fs::copy(binary, working_dir.join(binary_name))
 			.expect(&format!("Unable to copy binary at '{}'", binary.display()));
@@ -538,6 +538,23 @@ fn find_dependency(
 fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String>) {
 	let mod_info = parse_mod_info(&input);
 
+	// if let Some(ref api) = mod_info.api {
+	// 	// copy headers elsewhere because they are still used by the build tool 
+	// 	// when package new
+	// 	let api_dir = output.join(format!("{}.geode_build", mod_info.id));
+	// 	if api_dir.exists() {
+	// 		fs::remove_dir_all(&api_dir).expect("Unable to clear directory for mod headers");
+	// 	}
+	// 	fs::create_dir_all(&api_dir).expect("Unable to create directory for mod headers");
+
+	// 	for header in &api.include {
+	// 		let out = api_dir.join(header);
+	// 		out.parent().map(fs::create_dir_all);
+	// 		fs::copy(input.join(&header), out)
+	// 			.expect(&format!("Unable to copy header {}", header.to_string_lossy()));
+	// 	}
+	// }
+
 	// If no dependencies, skippy wippy
 	if mod_info.dependencies.is_empty() {
 		return;
@@ -697,7 +714,7 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 
 		let path_to_dep_geode;
 		let geode_info;
-		match (found_in_index, found_in_installed) {
+		match (found_in_installed, found_in_index) {
 			(Found::Some(inst_path, inst_info), Found::Some(_, _)) => {
 				info!("Dependency '{}' found", dep.id);
 				path_to_dep_geode = inst_path;
@@ -754,7 +771,7 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 				);
 				path_to_dep_geode = install_mod(
 					config, &indx_info.id,
-					&VersionReq::parse(&format!("=={}", indx_info.version.to_string())).unwrap()
+					&VersionReq::parse(&format!("={}", indx_info.version.to_string())).unwrap()
 				);
 				geode_info = indx_info;
 			}
