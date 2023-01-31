@@ -48,7 +48,7 @@ fn reset_and_commit(repo: &Repository, msg: &str) {
 	index.add_all(["."].iter(), IndexAddOption::DEFAULT, None).nice_unwrap("Unable to add changes");
 	index.write().nice_unwrap("Unable to write changes");
 
-	let sig = Signature::now("Geode CLI", "ilaca314@gmail.com").unwrap();
+	let sig = Signature::now("GeodeBot", "hjfodgames@gmail.com").unwrap();
 
 	let tree = repo.find_tree(index.write_tree().nice_unwrap("Unable to get write tree")).unwrap();
 	repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &[&commit]).nice_unwrap("Unable to commit");
