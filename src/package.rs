@@ -341,9 +341,11 @@ fn create_package(
 	// Copy binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
-		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| **x == binary_name) {
+		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| binary_name.contains(**x)) {
 			binary_name = mod_file_info.id.to_string() + ext;
 		}
+
+		println!("name {}", binary_name);
 
 		std::fs::copy(binary, working_dir.join(binary_name))
 			.expect(&format!("Unable to copy binary at '{}'", binary.display()));
@@ -358,7 +360,7 @@ fn create_package(
 	}
 }
 
-fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
+pub fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
 	let mut text = String::new();
 
 	input.by_name("mod.json")

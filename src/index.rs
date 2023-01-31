@@ -25,7 +25,7 @@ pub enum Index {
 	},
 
 	/// Updates the index cache
-	Update
+	Update,
 }
 
 #[allow(unused)]

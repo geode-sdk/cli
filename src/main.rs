@@ -12,6 +12,7 @@ mod template;
 mod util;
 mod index;
 mod file;
+mod indexer;
 
 use util::*;
 
@@ -75,6 +76,12 @@ enum GeodeCommands {
 		#[clap(subcommand)]
 		commands: crate::index::Index,
 	},
+
+	/// Subcommand for interacting with your indexer
+	Indexer {
+		#[clap(subcommand)]
+		commands: crate::indexer::Indexer,
+	}
 }
 
 fn main() {
@@ -115,6 +122,8 @@ fn main() {
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
 		
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
+
+		GeodeCommands::Indexer { commands } => indexer::subcommand(&mut config, commands),
 	}
 
 	config.save();
