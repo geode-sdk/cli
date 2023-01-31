@@ -11,20 +11,20 @@ use colored::Colorize;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
-pub enum Database {
-	/// Initializes your database
+pub enum Indexer {
+	/// Initializes your indexer
 	Init,
 
-	/// Lists all entries in your database
+	/// Lists all entries in your indexer
 	List,
 
-	/// Removes an entry from your database
+	/// Removes an entry from your indexer
 	Remove {
 		/// Mod ID that you want to remove
 		id: String
 	},
 
-	/// Exports an entry to your database, updating if it always exists
+	/// Exports an entry to your indexer, updating if it always exists
 	Export {
 		/// Path to the .geode file
 		package: PathBuf
@@ -55,30 +55,30 @@ fn reset_and_commit(repo: &Repository, msg: &str) {
 }
 
 fn initialize() {
-	let database_path = geode_root().join("database");
-	if database_path.exists() {
-		warn!("Database is already initialized. Exiting.");
+	let indexer_path = geode_root().join("indexer");
+	if indexer_path.exists() {
+		warn!("Indexer is already initialized. Exiting.");
 		return;
 	}
 
-	info!("Welcome to the Database Setup. Here, we will set up your database to be compatible with the Geode index.");
-	info!("Before continuing, make a github fork of https://github.com/geode-sdk/database.");
+	info!("Welcome to the Indexer Setup. Here, we will set up your indexer to be compatible with the Geode index.");
+	info!("Before continuing, make a github fork of https://github.com/geode-sdk/indexer.");
 
 	let fork_url = ask_value("Enter your forked URL", None, true);
-	Repository::clone(&fork_url, database_path).nice_unwrap("Unable to clone your repository.");
+	Repository::clone(&fork_url, indexer_path).nice_unwrap("Unable to clone your repository.");
 
 	done!("Successfully initialized");
 }
 
 fn list_mods() {
-	let database_path = geode_root().join("database");
-	if !database_path.exists() {
-		fatal!("Database has not yet been initialized.");
+	let indexer_path = geode_root().join("indexer");
+	if !indexer_path.exists() {
+		fatal!("Indexer has not yet been initialized.");
 	}
 
 	println!("Mod list:");
 
-	for dir in fs::read_dir(database_path).unwrap() {
+	for dir in fs::read_dir(indexer_path).unwrap() {
 		let path = dir.unwrap().path();
 
 		if path.is_dir() && path.join("mod.geode").exists() {
@@ -88,30 +88,30 @@ fn list_mods() {
 }
 
 fn remove_mod(id: String) {
-	let database_path = geode_root().join("database");
-	if !database_path.exists() {
-		fatal!("Database has not yet been initialized.");
+	let indexer_path = geode_root().join("indexer");
+	if !indexer_path.exists() {
+		fatal!("Indexer has not yet been initialized.");
 	}
 
-	let mod_path = database_path.join(&id);
+	let mod_path = indexer_path.join(&id);
 	if !mod_path.exists() {
 		fatal!("Cannot remove mod {}: does not exist", id);
 	}
 
 	fs::remove_dir_all(mod_path).nice_unwrap("Unable to remove mod");
 
-	let repo = Repository::open(&database_path).nice_unwrap("Unable to open repository");
+	let repo = Repository::open(&indexer_path).nice_unwrap("Unable to open repository");
 	reset_and_commit(&repo, &format!("Remove {}", &id));
 
 	done!("Succesfully removed {}\n", id);
 	info!("You will need to force-push this commit yourself. Type: ");
-	info!("git -C {} push -f", database_path.to_str().unwrap());
+	info!("git -C {} push -f", indexer_path.to_str().unwrap());
 }
 
 fn export_mod(package: PathBuf) {
-	let database_path = geode_root().join("database");
-	if !database_path.exists() {
-		fatal!("Database has not yet been initialized.");
+	let indexer_path = geode_root().join("indexer");
+	if !indexer_path.exists() {
+		fatal!("Indexer has not yet been initialized.");
 	}
 
 	if !package.exists() {
@@ -141,31 +141,31 @@ fn export_mod(package: PathBuf) {
 		.nice_unwrap("[mod.json].id: Expected string")
 		.to_string();
 
-	let mod_path = database_path.join(format!("{}@{}", &mod_id, &major_version));
+	let mod_path = indexer_path.join(format!("{}@{}", &mod_id, &major_version));
 	if !mod_path.exists() {
 		fs::create_dir(&mod_path).nice_unwrap("Unable to create folder");
 	}
 
 	fs::copy(package, mod_path.join("mod.geode")).nice_unwrap("Unable to copy mod");
 
-	let repo = Repository::open(&database_path).nice_unwrap("Unable to open repository");
+	let repo = Repository::open(&indexer_path).nice_unwrap("Unable to open repository");
 	reset_and_commit(&repo, &format!("Add/Update {}", &mod_id));
 
-	done!("Successfully exported {}@{} to your database\n", mod_id, major_version);
+	done!("Successfully exported {}@{} to your indexer\n", mod_id, major_version);
 	
 	info!("You will need to force-push this commit yourself. Type: ");
-	info!("git -C {} push -f", database_path.to_str().unwrap());
+	info!("git -C {} push -f", indexer_path.to_str().unwrap());
 }
 
 
-pub fn subcommand(_config: &mut Config, cmd: Database) {
+pub fn subcommand(_config: &mut Config, cmd: Indexer) {
 	match cmd {
-		Database::Init => initialize(),
+		Indexer::Init => initialize(),
 		
-		Database::List => list_mods(),
+		Indexer::List => list_mods(),
 
-		Database::Remove { id } => remove_mod(id),
+		Indexer::Remove { id } => remove_mod(id),
 
-		Database::Export { package } => export_mod(package)
+		Indexer::Export { package } => export_mod(package)
 	}
 }

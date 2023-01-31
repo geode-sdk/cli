@@ -16,7 +16,7 @@ mod sdk;
 mod template;
 mod util;
 mod index;
-mod database;
+mod indexer;
 
 use util::*;
 
@@ -81,10 +81,10 @@ enum GeodeCommands {
 		commands: crate::index::Index,
 	},
 
-	/// Subcommand for interacting with your database
-	Database {
+	/// Subcommand for interacting with your indexer
+	Indexer {
 		#[clap(subcommand)]
-		commands: crate::database::Database,
+		commands: crate::indexer::Indexer,
 	}
 }
 
@@ -114,7 +114,7 @@ fn main() {
 		
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
 
-		GeodeCommands::Database { commands } => database::subcommand(&mut config, commands),
+		GeodeCommands::Indexer { commands } => indexer::subcommand(&mut config, commands),
 	}
 
 	config.save();
