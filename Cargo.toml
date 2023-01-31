@@ -1,6 +1,6 @@
 [package]
 name = "geode"
-version = "1.2.0"
+version = "1.4.0"
 authors = ["HJfod <dreadrollmusic@gmail.com>", "Camila314 <ilaca314@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -8,7 +8,7 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "3.2.16", features = ["derive"] }
+clap = { version = "4.1.4", features = ["derive"] }
 colored = "2"
 dirs = "4.0.0"
 fontdue = "0.7.2"
@@ -30,7 +30,9 @@ semver = "1.0.14"
 reqwest = { version = "0.11.12", features = ["json", "blocking"] }
 cfg-if = "1.0.0"
 regex = "1.6.0"
-rust-crypto = "0.2.36"
+sha3 = "0.10.6"
+hex = "0.4.3"
+edit-distance = "2.1.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.7.0"

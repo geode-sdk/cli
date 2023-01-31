@@ -8,7 +8,7 @@ use texture_packer::texture::Texture;
 use texture_packer::TexturePacker;
 use texture_packer::TexturePackerConfig;
 
-use crate::{done, geode_assert, info, NiceUnwrap};
+use crate::{done, info};
 use image::{Rgba, RgbaImage};
 
 use super::mod_file::ModFileInfo;
@@ -104,7 +104,12 @@ fn generate_char(
 	let height = metrics.height as u32;
 
 	Some(RgbaImage::from_fn(width, height, |x, y| {
-		Rgba::<u8>([font.color[0], font.color[1], font.color[2], data[(x + width * y) as usize]])
+		Rgba::<u8>([
+			font.color.red,
+			font.color.green,
+			font.color.blue,
+			data[(x + width * y) as usize]
+		])
 	}))
 }
 
@@ -126,7 +131,7 @@ fn initialize_font_bundle(
 				.collect::<Vec<u32>>()
 		})
 		.flat_map(|x| {
-			geode_assert!(x.len() <= 2, "Invalid charset '{}'", font.charset.as_ref().unwrap());
+			assert!(x.len() <= 2, "Invalid charset '{}'", font.charset.as_ref().unwrap());
 			*x.first().unwrap()..*x.last().unwrap() + 1
 		})
 		.map(|c| char::from_u32(c).unwrap())
@@ -184,7 +189,7 @@ fn initialize_font_bundle(
 
 	// Create .png file
 	let exporter = ImageExporter::export(&packer).unwrap();
-	let mut f = fs::File::create(&bundle.png).nice_unwrap("Unable to write font .png file");
+	let mut f = fs::File::create(&bundle.png).expect("Unable to write font .png file");
 	exporter.write_to(&mut f, image::ImageFormat::Png).unwrap();
 
 	// Get all characters and their metrics (positions in the png)
@@ -259,7 +264,7 @@ fn initialize_font_bundle(
 		kerning_count = all_kerning_pairs.len(),
 		all_kernings = all_kerning_pairs.join("\n"),
 	);
-	fs::write(&bundle.fnt, fnt_data).nice_unwrap("Unable to write font .fnt file");
+	fs::write(&bundle.fnt, fnt_data).expect("Unable to write font .fnt file");
 
 	PathBuf::from(font.name.to_owned() + ".png")
 }

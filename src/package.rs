@@ -1,22 +1,24 @@
-#![allow(unused_variables)]
-#![allow(unused_mut)]
 
+
+use std::collections::HashMap;
 use std::fs;
 use std::io::{Read, Write, Seek};
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
-use serde_json::Value;
+use edit_distance::edit_distance;
+use semver::{Version, VersionReq};
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
 use crate::config::Config;
+use crate::file::read_dir_recursive;
+use crate::index::{update_index, index_mods_dir, install_mod};
 use crate::util::bmfont;
 use crate::util::cache::CacheBundle;
-use crate::util::mod_file::ModFileInfo;
+use crate::util::mod_file::{ModFileInfo, parse_mod_info, try_parse_mod_info, Dependency};
 use crate::util::spritesheet;
-use crate::NiceUnwrap;
-use crate::{cache, mod_file};
+use crate::cache;
 use crate::{done, fail, info, warn, fatal};
 
 #[derive(Subcommand, Debug)]
@@ -34,7 +36,7 @@ pub enum Package {
 		root_path: PathBuf,
 
 		/// Add binary file
-		#[clap(short, long)]
+		#[clap(short, long, num_args(0..))]
 		binary: Vec<PathBuf>,
 
 		/// Location of output file
@@ -50,6 +52,23 @@ pub enum Package {
 	Merge {
 		/// Packages to merge
 		packages: Vec<PathBuf>
+	},
+
+	/// Check the dependencies & other information from a package; 
+	/// output is returned as JSON
+	Setup {
+		/// Location of package
+		input: PathBuf,
+
+		/// Package build directory
+		output: PathBuf,
+
+		/// Any external dependencies as a list in the form of `mod.id:version`. 
+		/// An external dependency is one that the CLI will not verify exists in 
+		/// any way; it will just assume you have it installed through some 
+		/// other means (usually through building it as part of the same project)
+		#[clap(long, num_args(0..))]
+		externals: Vec<String>,
 	},
 
 	/// Fetch mod id from a package
@@ -77,19 +96,13 @@ pub enum Package {
 }
 
 pub fn install(config: &mut Config, pkg_path: &Path) {
-	let mod_path = config
-		.get_profile(&config.current_profile)
-		.nice_unwrap("No current profile to install to!")
-		.borrow()
-		.gd_path
-		.join("geode")
-		.join("mods");
+	let mod_path = config.get_current_profile().mods_dir();
 
 	if !mod_path.exists() {
-		fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
+		fs::create_dir_all(&mod_path).expect("Could not setup mod installation");
 	}
 	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
-		.nice_unwrap("Could not install mod");
+		.expect("Could not install mod");
 
 	done!(
 		"Installed {}",
@@ -129,7 +142,7 @@ fn zip_folder(path: &Path, output: &Path) {
 		}
 	}
 
-	zip_file.finish().nice_unwrap("Unable to zip");
+	zip_file.finish().expect("Unable to zip");
 
 	done!(
 		"Successfully packaged {}",
@@ -150,8 +163,10 @@ fn get_working_dir(id: &String) -> PathBuf {
 }
 
 fn create_resources(
+	#[allow(unused)]
 	config: &mut Config,
 	mod_info: &ModFileInfo,
+	#[allow(unused_mut)]
 	mut cache_bundle: &mut Option<CacheBundle>,
 	cache: &mut cache::ResourceCache,
 	working_dir: &Path,
@@ -159,7 +174,7 @@ fn create_resources(
 	shut_up: bool,
 ) {
 	// Make sure output directory exists
-	fs::create_dir_all(output_dir).nice_unwrap("Could not create output directory");
+	fs::create_dir_all(output_dir).expect("Could not create output directory");
 
 	// Create spritesheets
 	for sheet in mod_info.resources.spritesheets.values() {
@@ -199,7 +214,7 @@ fn create_resources(
 			spritesheet::downscale(&mut sprite, 2);
 			sprite.save(output_dir.join(base.to_string() + ".png"))
 		})()
-		.nice_unwrap(format!(
+		.expect(&format!(
 			"Unable to copy sprite at {}",
 			sprite_path.display()
 		));
@@ -211,7 +226,7 @@ fn create_resources(
 	// Move other resources
 	for file in &mod_info.resources.files {
 		std::fs::copy(file, output_dir.join(file.file_name().unwrap()))
-			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
+			.expect(&format!("Unable to copy file at '{}'", file.display()));
 	}
 }
 
@@ -222,12 +237,7 @@ fn create_package_resources_only(
 	shut_up: bool,
 ) {
 	// Parse mod.json
-	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json"),
-	)
-	.nice_unwrap("Could not parse mod.json");
-
-	let mod_info = mod_file::get_mod_file_info(&mod_json, root_path);
+	let mod_info = parse_mod_info(root_path);
 
 	// Setup cache
 	let mut cache_bundle = cache::get_cache_bundle_from_dir(output_dir);
@@ -274,17 +284,12 @@ fn create_package(
 
 	// Test if possible to create file
 	if !output.exists() || output.is_dir() {
-		fs::write(&output, "").nice_unwrap("Could not create package");
+		fs::write(&output, "").expect("Could not create package");
 		fs::remove_file(&output).unwrap();
 	}
 
 	// Parse mod.json
-	let mod_json: Value = serde_json::from_str(
-		&fs::read_to_string(root_path.join("mod.json")).nice_unwrap("Could not read mod.json"),
-	)
-	.nice_unwrap("Could not parse mod.json");
-
-	let mod_file_info = mod_file::get_mod_file_info(&mod_json, root_path);
+	let mod_file_info = parse_mod_info(root_path);
 
 	// Setup working directory
 	let working_dir = get_working_dir(&mod_file_info.id);
@@ -312,17 +317,28 @@ fn create_package(
 	);
 
 	// Custom hardcoded resources
-	let logo_png = root_path.join("logo.png");
-	if logo_png.exists() {
-		std::fs::copy(logo_png, working_dir.join("logo.png"))
-			.nice_unwrap("Could not copy logo.png");
-	}
-	let about_md = root_path.join("about.md");
-	if about_md.exists() {
-		std::fs::copy(about_md, working_dir.join("about.md"))
-			.nice_unwrap("Could not copy about.md");
+	for file in &[
+		"logo.png",
+		"about.md",
+		"changelog.md",
+		"support.md"
+	] {
+		let path = root_path.join(file);
+		if path.exists() {
+			std::fs::copy(path, working_dir.join(file))
+				.expect(&format!("Could not copy {file}"));
+		}
 	}
 
+	// Copy headers
+	if let Some(ref api) = mod_file_info.api {
+		for header in &api.include {
+			fs::copy(root_path.join(&header), working_dir.join(header))
+				.expect("Unable to copy headers");
+		}
+	}
+
+	// Copy binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
 		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| **x == binary_name) {
@@ -330,7 +346,7 @@ fn create_package(
 		}
 
 		std::fs::copy(binary, working_dir.join(binary_name))
-			.nice_unwrap(format!("Unable to copy binary at '{}'", binary.display()));
+			.expect(&format!("Unable to copy binary at '{}'", binary.display()));
 	}
 
 	new_cache.save(&working_dir);
@@ -346,25 +362,25 @@ fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serd
 	let mut text = String::new();
 
 	input.by_name("mod.json")
-		 .nice_unwrap("Unable to find mod.json in package")
+		 .expect("Unable to find mod.json in package")
 		 .read_to_string(&mut text)
-		 .nice_unwrap("Unable to read mod.json");
+		 .expect("Unable to read mod.json");
 
-	serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json")
+	serde_json::from_str::<serde_json::Value>(&text).expect("Unable to parse mod.json")
 }
 
 fn merge_packages(inputs: Vec<PathBuf>) {
 	let mut archives: Vec<_> = inputs.iter().map(|x| {
-		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).nice_unwrap("Unable to unzip")
+		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).expect("Unable to unzip")
 	}).collect();
 
 	// Sanity check
 	let mut mod_ids: Vec<_> = archives.iter_mut().map(|x|
 		mod_json_from_archive(x)
 			.get("id")
-			.nice_unwrap("[mod.json]: Missing key 'id'")
+			.expect("[mod.json]: Missing key 'id'")
 			.as_str()
-			.nice_unwrap("[mod.json].id: Expected string")
+			.expect("[mod.json].id: Expected string")
 			.to_string()
 	).collect();
 
@@ -377,9 +393,9 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		}
 	});
 
-	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).nice_unwrap("Unable to create zip writer");
+	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).expect("Unable to create zip writer");
 
-	for mut archive in &mut archives {
+	for archive in &mut archives {
 		let potential_names = [".dylib", ".so", ".dll", ".lib"];
 		
 		// Rust borrow checker lol xd
@@ -390,45 +406,382 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 				println!("{}", file);
 
 				out_archive.raw_copy_file(
-					archive.by_name(&file).nice_unwrap("Unable to fetch file")
-				).nice_unwrap("Unable to transfer binary");
+					archive.by_name(&file).expect("Unable to fetch file")
+				).expect("Unable to transfer binary");
 			}
 		}
 	}
 
-	out_archive.finish().nice_unwrap("Unable to write to zip");
+	out_archive.finish().expect("Unable to write to zip");
 	done!("Successfully merged binaries into {}", inputs[0].to_str().unwrap());
 }
 
+#[deprecated(note = "Should be removed in some CLI version, as modern SDK versions use `package setup` instead")]
 fn get_id(input: PathBuf, raw: bool) {
 	let text = if input.is_dir() {
-		std::fs::read_to_string(input.join("mod.json")).nice_unwrap("Unable to read mod.json")
+		std::fs::read_to_string(input.join("mod.json")).expect("Unable to read mod.json")
 	} else {
 		let mut out = String::new();
 
 		zip::ZipArchive::new(fs::File::open(input).unwrap())
-			.nice_unwrap("Unable to unzip")
+			.expect("Unable to unzip")
 			.by_name("mod.json")
-			.nice_unwrap("Unable to find mod.json in package")
+			.expect("Unable to find mod.json in package")
 			.read_to_string(&mut out)
-			.nice_unwrap("Unable to read mod.json");
+			.expect("Unable to read mod.json");
 
 		out
 	};
 
 	let json =
-		serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json");
+		serde_json::from_str::<serde_json::Value>(&text).expect("Unable to parse mod.json");
 
 	let id = json
 		.get("id")
-		.nice_unwrap("[mod.json]: Missing key 'id'")
+		.expect("[mod.json]: Missing key 'id'")
 		.as_str()
-		.nice_unwrap("[mod.json].id: Expected string");
+		.expect("[mod.json].id: Expected string");
 
 	if raw {
 		print!("{}", id);
 	} else {
 		println!("{}", id);
+	}
+}
+
+#[derive(PartialEq)]
+enum Found {
+	/// No matching dependency found
+	None,
+	/// No matching dependency found, but one with a similar ID was found
+	Maybe(String),
+	/// Dependency found, but it was not an API
+	NotAnApi,
+	/// Dependency found, but it was the wrong version
+	Wrong(Version),
+	/// Dependency found
+	Some(PathBuf, ModFileInfo),
+}
+
+impl Found {
+	fn promote_value(&self) -> usize {
+		match self {
+			Found::None         => 0,
+			Found::Maybe(_)     => 1,
+			Found::NotAnApi     => 2,
+			Found::Wrong(_)     => 3,
+			Found::Some(_, _)   => 4,
+		}
+	}
+
+	/// Set the value of Found if the value is more important than the 
+	/// existing value
+	pub fn promote(&mut self, value: Found) {
+		if self.promote_value() < value.promote_value() {
+			*self = value;
+		}
+	}
+
+	pub fn promote_eq(&mut self, value: Found) {
+		if self.promote_value() <= value.promote_value() {
+			*self = value;
+		}
+	}
+}
+
+fn find_dependency(
+	dep: &Dependency,
+	dir: &PathBuf,
+	search_recursive: bool
+) -> Result<Found, std::io::Error> {
+	// for checking if the id was possibly misspelled, it must be at most 3 
+	// steps away from the searched one
+	let mut closest_score = 4usize;
+	let mut found = Found::None;
+	for dir in if search_recursive {
+		read_dir_recursive(&dir)?
+	} else {
+		dir.read_dir()?.map(|d| d.unwrap().path()).collect()
+	} {
+		let Ok(info) = try_parse_mod_info(&dir) else {
+			continue;
+		};
+		// check if the id matches
+		if dep.id == info.id {
+			if info.api.is_some() {
+				if dep.version.matches(&info.version) {
+					found.promote(Found::Some(dir, info));
+					break;
+				}
+				else {
+					found.promote(Found::Wrong(info.version));
+				}
+			}
+			else {
+				found.promote(Found::NotAnApi);
+			}
+		}
+		// otherwise check if maybe the id was misspelled
+		else {
+			let dist = edit_distance(&dep.id, &info.id);
+			if dist < closest_score {
+				found.promote_eq(Found::Maybe(info.id.clone()));
+				closest_score = dist;
+			}
+		}
+	}
+	Ok(found)
+}
+
+fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String>) {
+	let mod_info = parse_mod_info(&input);
+
+	// If no dependencies, skippy wippy
+	if mod_info.dependencies.is_empty() {
+		return;
+	}
+
+	// Parse externals
+	let externals = externals
+		.into_iter()
+		.map(|ext|
+			// If the external is provided as name:version get those, otherwise 
+			// assume it's just the name
+			if ext.contains(":") {
+				let mut split = ext.split(":");
+				let name = split.next().unwrap().to_string();
+				let ver = split.next().unwrap();
+				(name, Some(Version::parse(ver.strip_prefix("v").unwrap_or(ver))
+					.expect("Invalid version in external {name}")
+				))
+			}
+			else {
+				(ext, None)
+			}
+		)
+		.collect::<HashMap<_, _>>();
+	
+	let mut errors = false;
+
+	// update mods index if all of the mods aren't external
+	if !mod_info.dependencies.iter().all(|d| externals.contains_key(&d.id)) {
+		info!("Updating Geode mods index");
+		update_index(config);
+	}
+
+	let dep_dir = output.join("geode-deps");
+	fs::create_dir_all(&dep_dir).expect("Unable to create dependency directory");
+
+	// check all dependencies
+	for dep in mod_info.dependencies {
+		// is this an external dependency?
+		if let Some(ext) = externals.get(&dep.id) {
+			// did we get a version?
+			if let Some(version) = ext {
+				// is it valid?
+				if dep.version.matches(version) {
+					info!("Dependency '{}' found as external", dep.id);
+				}
+				// external dependency version must match regardless of whether 
+				// it's optional or not as most external dependencies are other 
+				// projects being built at the same time and if those have a 
+				// version mismatch you've screwed something up and should fix 
+				// that
+				else {
+					fail!(
+						"External dependency '{}' version '{version}' does not \
+						match required version '{}' (note: optionality is \
+						ignored when verifying external dependencies)",
+						dep.id, dep.version
+					);
+					errors = true;
+				}
+			}
+			// otherwise warn that a version prolly should be provided, but let 
+			// it slide this time
+			else {
+				warn!(
+					"Dependency '{}' marked as external with no version specified",
+					dep.id
+				);
+			}
+			continue;
+		}
+
+		// otherwise try to find it on installed mods and then on index
+
+		// check index
+		let found_in_index = find_dependency(
+			&dep, &index_mods_dir(config), false
+		).expect("Unable to read index");
+
+		// check installed mods
+		let found_in_installed = find_dependency(
+			&dep, &config.get_current_profile().mods_dir(), true
+		).expect("Unable to read installed mods");
+
+		// if not found in either        hjfod  code
+		if !matches!(found_in_index,     Found::Some(_, _)) &&
+		   !matches!(found_in_installed, Found::Some(_, _))
+		{
+			if dep.required {
+				fail!(
+					"Dependency '{0}' not found in installed mods nor index! \
+					If this is a mod that hasn't been published yet, install it \
+					locally first, or if it's a closed-source mod that won't be \
+					on the index, mark it as external in your CMake using \
+					setup_geode_mod(... EXTERNALS {0}:{1})",
+					dep.id, dep.version
+				);
+				errors = true;
+			}
+			else {
+				info!(
+					"Dependency '{}' not found in installed mods nor index",
+					dep.id
+				)
+			}
+			// bad version
+			match (&found_in_index, &found_in_installed) {
+				(in_index @ Found::Wrong(ver), _) | (in_index @ _, Found::Wrong(ver)) => {
+					info!(
+						"Version '{ver}' of the mod was found in {}, but it was \
+						rejected because version '{}' is required by the dependency",
+						if matches!(in_index, Found::Wrong(_)) {
+							"index"
+						} else {
+							"installed mods"
+						},
+						dep.version
+					);
+				},
+				_ => {},
+			}
+			// misspelled message
+			match (&found_in_index, &found_in_installed) {
+				(in_index @ Found::Maybe(m), _) | (in_index @ _, Found::Maybe(m)) => {
+					info!(
+						"Another mod with a similar ID was found in {}: {m} \
+						- maybe you misspelled?",
+						if matches!(in_index, Found::Maybe(_)) {
+							"index"
+						} else {
+							"installed mods"
+						}
+					);
+				},
+				_ => {},
+			}
+			// not-an-api message
+			match (&found_in_index, &found_in_installed) {
+				(in_index @ Found::NotAnApi, _) | (in_index @ _, Found::NotAnApi) => {
+					info!(
+						"A mod with the ID '{}' was found in {}, but it was not marked \
+						as an API - this may be a mistake; if you are the developer \
+						of the dependency, add the \"api\" key to its mod.json",
+						dep.id,
+						if matches!(in_index, Found::NotAnApi) {
+							"index"
+						} else {
+							"installed mods"
+						}
+					);
+				},
+				_ => {},
+			}
+			// skip rest
+			continue;
+		}
+
+		let path_to_dep_geode;
+		let geode_info;
+		match (found_in_index, found_in_installed) {
+			(Found::Some(inst_path, inst_info), Found::Some(_, _)) => {
+				info!("Dependency '{}' found", dep.id);
+				path_to_dep_geode = inst_path;
+				geode_info = inst_info;
+			}
+
+			(Found::Some(inst_path, inst_info), _) => {
+				warn!(
+					"Dependency '{}' found in installed mods, but not on the \
+					mods index - make sure that the mod is published on the \
+					index when you publish yours, as otherwise users won't be \
+					able to install your mod through the index!",
+					dep.id
+				);
+				info!(
+					"If '{0}' is a closed-source mod that won't be released on \
+					the index, mark it as external in your CMake with \
+					setup_geode_mod(... EXTERNALS {0}:{1})",
+					dep.id, dep.version
+				);
+				path_to_dep_geode = inst_path;
+				geode_info = inst_info;
+			}
+
+			(Found::Wrong(version), Found::Some(_, indx_info)) => {
+				if version > indx_info.version {
+					warn!(
+						"Dependency '{0}' found in installed mods, but as \
+						version '{1}' whereas required is '{2}'. Index has valid \
+						version '{3}', but not using it as it appears you have \
+						a newer version installed. Either manually downgrade \
+						the installed '{0}' to '{3}', or update your mod.json's \
+						dependency requirements",
+						dep.id, version, dep.version, indx_info.version
+					);
+					continue;
+				}
+				info!(
+					"Dependency '{}' found on the index, installing \
+					(update '{}' => '{}')",
+					dep.id, version, indx_info.version
+				);
+				path_to_dep_geode = install_mod(
+					config, &indx_info.id,
+					&VersionReq::parse(&format!("=={}", indx_info.version.to_string())).unwrap()
+				);
+				geode_info = indx_info;
+			}
+
+			(_, Found::Some(_, indx_info)) => {
+				info!(
+					"Dependency '{}' found on the index, installing (version '{}')",
+					dep.id, indx_info.version
+				);
+				path_to_dep_geode = install_mod(
+					config, &indx_info.id,
+					&VersionReq::parse(&format!("=={}", indx_info.version.to_string())).unwrap()
+				);
+				geode_info = indx_info;
+			}
+
+			_ => unreachable!()
+		}
+
+		// check already installed dependencies
+		let found_in_deps = find_dependency(
+			&dep, &dep_dir, false
+		).expect("Unable to read dependencies");
+
+		// check if dependency already installed
+		if let Found::Some(_, info) = found_in_deps {
+			if info.version == geode_info.version {
+				continue;
+			}
+		}
+
+		// unzip the whole .geode package because there's only like a few 
+		// extra files there aside from the lib, headers, and resources
+		zip::ZipArchive::new(fs::File::open(path_to_dep_geode).unwrap())
+			.expect("Unable to unzip")
+			.extract(dep_dir.join(dep.id))
+			.expect("Unable to extract geode package");
+	}
+
+	if errors {
+		fatal!("Some dependencies were unresolved");
 	}
 }
 
@@ -450,6 +803,9 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			merge_packages(packages)
 		},
 
+		Package::Setup { input, output, externals } => setup(config, input, output, externals),
+
+		#[allow(deprecated)]
 		Package::GetId { input, raw } => get_id(input, raw),
 
 		Package::Resources {

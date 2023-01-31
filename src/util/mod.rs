@@ -9,5 +9,3 @@ pub mod input;
 
 #[cfg(target_os = "macos")]
 pub mod launchctl;
-
-pub use logging::NiceUnwrap;

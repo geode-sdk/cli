@@ -1,4 +1,4 @@
-use std::{fmt::Display, io::Write};
+use std::io::Write;
 
 #[macro_export]
 macro_rules! info {
@@ -48,16 +48,6 @@ macro_rules! confirm {
     };
 }
 
-#[macro_export]
-macro_rules! geode_assert {
-	($cond:expr, $x:expr $(, $more:expr)*) => {
-		if !$cond {
-			use crate::fatal;
-			fatal!($x $(, $more)*);
-		}
-	}
-}
-
 pub fn ask_confirm(text: &String, default: bool) -> bool {
 	use ::colored::Colorize;
 	// print question
@@ -79,21 +69,5 @@ pub fn ask_confirm(text: &String, default: bool) -> bool {
 			_ => default,
 		},
 		Err(_) => default,
-	}
-}
-
-pub trait NiceUnwrap<T> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T;
-}
-
-impl<T, E: Display> NiceUnwrap<T> for Result<T, E> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T {
-		self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
-	}
-}
-
-impl<T> NiceUnwrap<T> for Option<T> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T {
-		self.unwrap_or_else(|| fatal!("{}", text))
 	}
 }

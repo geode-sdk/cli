@@ -1,12 +1,7 @@
+
+#![feature(panic_info_message)]
+
 use clap::{Parser, Subcommand};
-/**
- * geode new: Create new geode project from template
- * geode info: Subcommand for listing information about the current state
- * geode package: Subcommand for managing .geode files
- * geode sdk: Subcommand for managing geode sdk
- * geode profile: Subcommand for managing geode installations
- * geode install: alias of `geode package install`
- */
 use std::path::PathBuf;
 
 mod info;
@@ -16,6 +11,7 @@ mod sdk;
 mod template;
 mod util;
 mod index;
+mod file;
 
 use util::*;
 
@@ -87,6 +83,19 @@ fn main() {
 		Ok(_) => {},
 		Err(_) => println!("Unable to enable color support, output may look weird!")
 	};
+
+	std::panic::set_hook(Box::new(|info| {
+		if let Some(msg) = info.message() {
+			fatal!(
+				"{} {}",
+				msg,
+				info.location().map(|l| format!("({l})")).unwrap_or(String::new())
+			);
+		}
+		else {
+			fatal!("{}", info);
+		}
+	}));
 
 	let args = Args::parse();
 

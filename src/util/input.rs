@@ -1,4 +1,4 @@
-use crate::{fail, NiceUnwrap};
+use crate::fail;
 use rustyline::Editor;
 
 pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
@@ -7,7 +7,7 @@ pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String 
 	loop {
 		let line = line_reader
 			.readline_with_initial(&text, (default.unwrap_or(""), ""))
-			.nice_unwrap("Error reading line");
+			.expect("Error reading line");
 		line_reader.add_history_entry(&line);
 
 		if line.is_empty() {

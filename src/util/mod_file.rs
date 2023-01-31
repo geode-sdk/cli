@@ -1,251 +1,247 @@
-use serde_json::Value;
+use semver::{VersionReq, Version};
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-
+use std::fs;
+use std::io::Read;
+use std::path::{PathBuf, Path};
 use crate::spritesheet::SpriteSheet;
-use crate::NiceUnwrap;
-use crate::{geode_assert, fatal, warn};
 
+trait Glob {
+	fn glob(self) -> Self;
+}
+
+impl Glob for Vec<PathBuf> {
+	fn glob(self) -> Self {
+		self
+			.into_iter()
+			.flat_map(|src|
+				glob::glob(
+					std::env::current_dir().unwrap()
+						.join(&src)
+						.to_str()
+						.unwrap()
+				)
+				.unwrap_or_else(|_| panic!("Invalid glob pattern {}", src.to_str().unwrap()))
+				.map(|g| g.unwrap())
+			).collect()
+	}
+}
+
+fn parse_glob<'de, D>(deserializer: D) -> Result<Vec<PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Vec::<PathBuf>::deserialize(deserializer)?.glob())
+}
+
+fn parse_spritesheets<'de, D>(deserializer: D) -> Result<HashMap<String, SpriteSheet>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+	Ok(HashMap::<String, Vec<PathBuf>>::deserialize(deserializer)?
+		.into_iter()
+        .map(|(name, srcs)| {
+			(name.clone(), SpriteSheet {
+				name,
+				files: srcs.glob()
+			})
+        })
+		.collect()
+	)
+}
+
+fn parse_version<'de, D>(deserializer: D) -> Result<Version, D::Error>
+where
+    D: Deserializer<'de>,
+{
+	// semver doesn't accept "v" prefixes and the string will be validated at 
+	// runtime by Geode anyway so let's just crudely remove all 'v's for now
+	Ok(Version::parse(&<String>::deserialize(deserializer)?.replace("v", ""))
+		.map_err(serde::de::Error::custom)?
+	)
+}
+
+fn parse_comparable_version<'de, D>(deserializer: D) -> Result<VersionReq, D::Error>
+where
+    D: Deserializer<'de>,
+{
+	// semver doesn't accept "v" prefixes and the string will be validated at 
+	// runtime by Geode anyway so let's just crudely remove all 'v's for now
+	Ok(VersionReq::parse(&<String>::deserialize(deserializer)?.replace("v", ""))
+		.map_err(serde::de::Error::custom)?
+	)
+}
+
+fn parse_fonts<'de, D>(deserializer: D) -> Result<HashMap<String, BitmapFont>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+	Ok(<HashMap<String, BitmapFont>>::deserialize(deserializer)?
+		.into_iter()
+		.map(|(name, mut font)| {
+			font.name = name.clone();
+			font.path = std::env::current_dir().unwrap().join(font.path);
+			(name, font)
+		})
+		.collect()
+	)
+}
+
+fn parse_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
+where
+    D: Deserializer<'de>,
+{
+	Ok(Color::parse_hex(
+		&<String>::deserialize(deserializer)?
+	).map_err(serde::de::Error::custom)?)
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
+
+impl Color {
+    pub fn parse_hex(value: &str) -> Result<Self, String> {
+        let value = if let Some(stripped) = value.strip_prefix('#') {
+            stripped
+        } else {
+            value
+        };
+        match value.len() {
+            // RRGGBB
+            6 => Ok(Self {
+                red: u8::from_str_radix(&value[0..2], 16).or(Err("Invalid red value".to_string()))?,
+                green: u8::from_str_radix(&value[2..4], 16)
+                    .or(Err("Invalid green value".to_string()))?,
+                blue: u8::from_str_radix(&value[4..6], 16)
+                    .or(Err("Invalid blue value".to_string()))?,
+            }),
+            // RGB
+            3 => Ok(Self {
+                red: u8::from_str_radix(&value[0..1], 16).or(Err("Invalid red value".to_string()))?
+                    * 17,
+                green: u8::from_str_radix(&value[1..2], 16)
+                    .or(Err("Invalid green value".to_string()))?
+                    * 17,
+                blue: u8::from_str_radix(&value[2..3], 16)
+                    .or(Err("Invalid blue value".to_string()))?
+                    * 17,
+            }),
+            _ => {
+                Err("Invalid length for hex string, expected RGB or RRGGBB".into())
+            }
+        }
+    }
+
+    pub fn white() -> Self {
+        Self {
+            red: 255,
+            green: 255,
+            blue: 255,
+        }
+    }
+}
+
+#[derive(Deserialize, PartialEq)]
 pub struct BitmapFont {
+	#[serde(skip)]
 	pub name: String,
 	pub path: PathBuf,
 	pub charset: Option<String>,
 	pub size: u32,
+	#[serde(default)]
 	pub outline: u32,
-	pub color: [u8; 3],
+	#[serde(default = "Color::white", deserialize_with = "parse_color")]
+	pub color: Color,
 }
 
+#[derive(Default, Deserialize, PartialEq)]
 pub struct ModResources {
+	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
 	pub files: Vec<PathBuf>,
+
+	#[serde(deserialize_with = "parse_spritesheets", default = "HashMap::new")]
 	pub spritesheets: HashMap<String, SpriteSheet>,
+
+	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
 	pub sprites: Vec<PathBuf>,
+
+	#[serde(deserialize_with = "parse_fonts", default = "HashMap::new")]
 	pub fonts: HashMap<String, BitmapFont>,
 }
 
-pub struct ModFileInfo {
-	pub name: String,
+#[derive(Default, Deserialize, PartialEq)]
+pub struct Dependency {
 	pub id: String,
+	#[serde(deserialize_with = "parse_comparable_version")]
+	pub version: VersionReq,
+	#[serde(default)]
+	pub required: bool,
+}
+
+#[derive(Default, Deserialize, PartialEq)]
+pub struct ModApi {
+	#[serde(deserialize_with = "parse_glob")]
+	pub include: Vec<PathBuf>,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct ModFileInfo {
+	#[serde(deserialize_with = "parse_version")]
+	pub geode: Version,
+	pub id: String,
+	pub name: String,
+	#[serde(deserialize_with = "parse_version")]
+	pub version: Version,
+	pub developer: String,
+	pub description: String,
+	#[serde(default)]
 	pub resources: ModResources,
+	#[serde(default)]
+	pub dependencies: Vec<Dependency>,
+	pub api: Option<ModApi>,
 }
 
-/// Reusability for get_mod_resources
-fn collect_globs(value: &Value, value_name: &str, root_path: &Path, out: &mut Vec<PathBuf>) {
-	geode_assert!(value.is_array(), "{}: Expected array", value_name);
+pub fn try_parse_mod_info(root_path: &Path) -> Result<ModFileInfo, String> {
+	let data = if root_path.is_dir() {
+		std::fs::read_to_string(root_path.join("mod.json"))
+		.map_err(|e| format!("Unable to read mod.json: {e}"))?
+	} else {
+		let mut out = String::new();
 
-	// Iterate paths
-	for (i, entry) in value.as_array().unwrap().iter().enumerate() {
-		// Ensure path is a string
-		let mut path = PathBuf::from(
-			entry
-				.as_str()
-				.nice_unwrap(format!("{}[{}]: Expected string", value_name, i)),
-		);
+		zip::ZipArchive::new(fs::File::open(root_path).unwrap())
+			.map_err(|e| format!("Unable to unzip: {e}"))?
+			.by_name("mod.json")
+			.map_err(|e| format!("Unable to find mod.json in package: {e}"))?
+			.read_to_string(&mut out)
+			.map_err(|e| format!("Unable to read mod.json: {e}"))?;
 
-		// Absolutize
-		if path.is_relative() {
-			path = root_path.join(path);
-		}
-
-		// Reusability for next
-		let glob_err = format!("{}[{}]: Could not parse glob pattern", value_name, i);
-
-		// Evaluate glob pattern
-		let glob_results = glob::glob(path.to_str().unwrap())
-			.nice_unwrap(&glob_err)
-			.into_iter()
-			.collect::<Result<Vec<_>, _>>()
-			.nice_unwrap(glob_err);
-
-		// Add to files
-		out.extend(glob_results);
-	}
-}
-
-fn get_mod_resources(root: &Value, root_path: &Path) -> ModResources {
-	let mut out = ModResources {
-		files: vec![],
-		sprites: vec![],
-		spritesheets: HashMap::new(),
-		fonts: HashMap::new(),
+		out
 	};
 
-	if let Value::Object(ref resources) = root["resources"] {
-		// Iterate resource attributes
-		for (key, value) in resources {
-			match key.as_str() {
-				"files" => {
-					collect_globs(
-						value,
-						"[mod.json].resources.files",
-						root_path,
-						&mut out.files,
-					);
-				}
+	// to make globs work, relink current directory to the one mod.json is in
+	let old = std::env::current_dir().or(Err("Unable to get current directory"))?;
 
-				"sprites" => {
-					collect_globs(
-						value,
-						"[mod.json].resources.files",
-						root_path,
-						&mut out.sprites,
-					);
-				}
-
-				"spritesheets" => {
-					geode_assert!(value.is_object(), "[mod.json].resources.spritesheets: Expected object");
-
-					// Iterate spritesheets
-					for (name, files) in value.as_object().unwrap() {
-						geode_assert!(
-							out.spritesheets.get(name).is_none(),
-							"[mod.json].resources.spritesheets: Duplicate name '{}'",
-							name
-						);
-
-						let mut sheet_files = Vec::<PathBuf>::new();
-
-						collect_globs(
-							files,
-							&format!("[mod.json].resources.spritesheets.{}", name),
-							root_path,
-							&mut sheet_files,
-						);
-
-						for (i, file) in sheet_files.iter().enumerate() {
-							if file.extension().and_then(|x| x.to_str()).unwrap_or("") != "png" {
-								warn!("[mod.json].resources.sprites.{}[{}]: File extension is not png. Extension will change", name, i);
-							}
-						}
-
-						out.spritesheets.insert(
-							name.to_string(),
-							SpriteSheet {
-								name: name.to_string(),
-								files: sheet_files,
-							},
-						);
-					}
-				}
-
-				"fonts" => {
-					// Iterate fonts
-					for (name, info) in value
-						.as_object()
-						.nice_unwrap("[mod.json].resources.font: Expected object")
-					{
-						geode_assert!(out.fonts.get(name).is_none(), "[mod.json].resources.fonts: Duplicate name '{}'", name);
-
-						// Convenience variable
-						let info_name = format!("[mod.json].resources.font.{}", name);
-
-						geode_assert!(info.is_object(), "{}: Expected object", info_name);
-
-						let mut font = BitmapFont {
-							name: name.to_string(),
-							path: PathBuf::new(),
-							charset: None,
-							size: 0,
-							outline: 0,
-							color: [255, 255, 255],
-						};
-
-						// Iterate font attributes
-						for (key, value) in info.as_object().unwrap() {
-							match key.as_str() {
-								"path" => {
-									font.path = PathBuf::from(value.as_str().nice_unwrap(format!(
-										"{}.path: Expected string",
-										info_name
-									)));
-
-									// Absolutize
-									if font.path.is_relative() {
-										font.path = root_path.join(font.path);
-									}
-								}
-
-								"size" => {
-									font.size = value.as_u64().nice_unwrap(format!(
-										"{}.size: Expected unsigned integer",
-										info_name
-									)) as u32;
-
-									geode_assert!(font.size != 0, "{}.size: Font size cannot be 0", info_name);
-								}
-
-								"outline" => {
-									font.outline = value.as_u64().nice_unwrap(format!(
-										"{}.outline: Expected unsigned integer",
-										info_name
-									)) as u32;
-								}
-
-								"color" => {
-									let color = value
-										.as_str()
-										.nice_unwrap(format!("{}.color: Expected string", info_name));
-
-									let col = u32::from_str_radix(color, 16).nice_unwrap(format!(
-										"{}.color: Expected hexadecimal color",
-										info_name
-									));
-
-									font.color = [
-										((col >> 16) & 0xFF) as u8,
-										((col >> 8) & 0xFF) as u8,
-										(col & 0xFF) as u8,
-									];
-								}
-
-								"charset" => {
-									font.charset = Some(
-										value
-											.as_str()
-											.nice_unwrap(format!(
-												"{}.charset: Expected string",
-												info_name
-											))
-											.to_string(),
-									);
-								}
-
-								_ => fatal!("{}: Unknown key {}", info_name, key),
-							}
-						}
-
-						// Ensure required attributes are filled in
-						geode_assert!(!font.path.as_os_str().is_empty(), "{}: Missing required key 'path'", info_name);
-						geode_assert!(font.size != 0, "{}: Missing required key 'size'", info_name);
-
-						out.fonts.insert(name.to_string(), font);
-					}
-				}
-
-				_ => fatal!("[mod.json].resources: Unknown key {}", key),
-			}
+	std::env::set_current_dir(
+		if root_path.is_dir() {
+			root_path
+		} else {
+			root_path.parent().unwrap()
 		}
-	}
-	out
+	).or(Err("Unable to relink working directory"))?;
+	
+	let res = serde_json::from_str(&data)
+		.map_err(|e| format!("Could not parse mod.json: {e}"))?;
+	
+	// then link it back to where-ever it was
+	std::env::set_current_dir(old).or(Err("Unable to reset working directory"))?;
+
+	Ok(res)
 }
 
-pub fn get_mod_file_info(root: &Value, root_path: &Path) -> ModFileInfo {
-	let name = root
-		.get("name")
-		.nice_unwrap("[mod.json]: Missing required key 'name'")
-		.as_str()
-		.nice_unwrap("[mod.json].name: Expected string")
-		.to_string();
-
-	let id = root
-		.get("id")
-		.nice_unwrap("[mod.json]: Missing required key 'id'")
-		.as_str()
-		.nice_unwrap("[mod.json].id: Expected string")
-		.to_string();
-
-	ModFileInfo {
-		name,
-		id,
-		resources: get_mod_resources(root, root_path),
-	}
+pub fn parse_mod_info(root_path: &Path) -> ModFileInfo {
+	try_parse_mod_info(root_path).unwrap()
 }

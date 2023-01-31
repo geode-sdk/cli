@@ -8,7 +8,6 @@ use texture_packer::{TexturePacker, TexturePackerConfig};
 
 use crate::cache::CacheBundle;
 use crate::rgba4444::RGBA4444;
-use crate::NiceUnwrap;
 use crate::{done, info};
 
 use super::mod_file::ModFileInfo;
@@ -23,6 +22,7 @@ pub struct SheetBundle {
 	pub plist: PathBuf,
 }
 
+#[derive(PartialEq)]
 pub struct SpriteSheet {
 	pub name: String,
 	pub files: Vec<PathBuf>,
@@ -68,9 +68,9 @@ impl SheetBundles {
 
 pub fn read_to_image(path: &Path) -> RgbaImage {
 	image::io::Reader::open(path)
-		.nice_unwrap(format!("Error reading sprite '{}'", path.display()))
+		.expect(&format!("Error reading sprite '{}'", path.display()))
 		.decode()
-		.nice_unwrap(format!("Error decoding sprite '{}'", path.display()))
+		.expect(&format!("Error decoding sprite '{}'", path.display()))
 		.to_rgba8()
 }
 
@@ -169,7 +169,7 @@ fn initialize_spritesheet_bundle(
 		}
 	});
 
-	plist::to_file_xml(&bundle.plist, &plist_file).nice_unwrap("Unable to write to plist file");
+	plist::to_file_xml(&bundle.plist, &plist_file).expect("Unable to write to plist file");
 
 	// Write png
 	let mut file = std::fs::File::create(&bundle.png).unwrap();
@@ -179,7 +179,7 @@ fn initialize_spritesheet_bundle(
 	let exporter = ImageExporter::export(&texture_packer).unwrap();
 	exporter
 		.write_to(&mut file, ImageFormat::Png)
-		.nice_unwrap("Unable to write to png file");
+		.expect("Unable to write to png file");
 
 	done!(
 		"Successfully packed {}",

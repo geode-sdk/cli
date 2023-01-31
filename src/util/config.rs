@@ -1,11 +1,10 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::NiceUnwrap;
 use crate::{done, fail, fatal, info, warn};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -111,6 +110,18 @@ impl Profile {
 			other: HashMap::<String, Value>::new(),
 		}
 	}
+
+	pub fn geode_dir(&self) -> PathBuf {
+		self.gd_path.join("geode")
+	}
+
+	pub fn index_dir(&self) -> PathBuf {
+		self.geode_dir().join("index")
+	}
+
+	pub fn mods_dir(&self) -> PathBuf {
+		self.geode_dir().join("mods")
+	}
 }
 
 impl Config {
@@ -120,6 +131,13 @@ impl Config {
 		} else {
 			None
 		}
+	}
+
+	pub fn get_current_profile(&self) -> Ref<Profile> {
+		self
+			.get_profile(&self.current_profile)
+			.expect("No current profile found!")
+			.borrow()
 	}
 
 	pub fn try_sdk_path() -> Result<PathBuf, &'static str> {
@@ -177,7 +195,7 @@ impl Config {
 		} else {
 			// Parse config
 			let config_json_str =
-				&std::fs::read_to_string(&config_json).nice_unwrap("Unable to read config.json");
+				&std::fs::read_to_string(&config_json).expect("Unable to read config.json");
 			match serde_json::from_str(config_json_str) {
 				Ok(json) => json,
 				Err(e) => {
@@ -205,18 +223,18 @@ impl Config {
 	}
 
 	pub fn save(&self) {
-		std::fs::create_dir_all(geode_root()).nice_unwrap("Unable to create Geode directory");
+		std::fs::create_dir_all(geode_root()).expect("Unable to create Geode directory");
 		std::fs::write(
 			geode_root().join("config.json"),
 			serde_json::to_string(self).unwrap(),
 		)
-		.nice_unwrap("Unable to save config");
+		.expect("Unable to save config");
 	}
 
 	pub fn rename_profile(&mut self, old: &str, new: String) {
 		let profile = self
 			.get_profile(&Some(String::from(old)))
-			.nice_unwrap(format!("Profile named '{}' does not exist", old));
+			.expect(&format!("Profile named '{}' does not exist", old));
 
 		if self.get_profile(&Some(new.to_owned())).is_some() {
 			fail!("The name '{}' is already taken!", new);
