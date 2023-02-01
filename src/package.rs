@@ -713,12 +713,12 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 		}
 
 		let path_to_dep_geode;
-		let geode_info;
+		let _geode_info;
 		match (found_in_installed, found_in_index) {
 			(Found::Some(inst_path, inst_info), Found::Some(_, _)) => {
 				info!("Dependency '{}' found", dep.id);
 				path_to_dep_geode = inst_path;
-				geode_info = inst_info;
+				_geode_info = inst_info;
 			}
 
 			(Found::Some(inst_path, inst_info), _) => {
@@ -736,7 +736,7 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 					dep.id, dep.version
 				);
 				path_to_dep_geode = inst_path;
-				geode_info = inst_info;
+				_geode_info = inst_info;
 			}
 
 			(Found::Wrong(version), Found::Some(_, indx_info)) => {
@@ -761,7 +761,7 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 					config, &indx_info.id,
 					&VersionReq::parse(&format!("=={}", indx_info.version.to_string())).unwrap()
 				);
-				geode_info = indx_info;
+				_geode_info = indx_info;
 			}
 
 			(_, Found::Some(_, indx_info)) => {
@@ -773,30 +773,40 @@ fn setup(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String
 					config, &indx_info.id,
 					&VersionReq::parse(&format!("={}", indx_info.version.to_string())).unwrap()
 				);
-				geode_info = indx_info;
+				_geode_info = indx_info;
 			}
 
 			_ => unreachable!()
 		}
 
 		// check already installed dependencies
-		let found_in_deps = find_dependency(
-			&dep, &dep_dir, false
-		).expect("Unable to read dependencies");
+		// let found_in_deps = find_dependency(
+		// 	&dep, &dep_dir, false
+		// ).expect("Unable to read dependencies");
 
+		// !this check may be added back at some point, but for now there's not 
+		// too much performance benefit from doing this, and doing it might 
+		// cause issues if the dependency has changes
 		// check if dependency already installed
-		if let Found::Some(_, info) = found_in_deps {
-			if info.version == geode_info.version {
-				continue;
-			}
-		}
+		// if let Found::Some(_, info) = found_in_deps {
+		// 	if info.version == geode_info.version {
+		// 		continue;
+		// 	}
+		// }
 
 		// unzip the whole .geode package because there's only like a few 
 		// extra files there aside from the lib, headers, and resources
 		zip::ZipArchive::new(fs::File::open(path_to_dep_geode).unwrap())
 			.expect("Unable to unzip")
-			.extract(dep_dir.join(dep.id))
+			.extract(dep_dir.join(&dep.id))
 			.expect("Unable to extract geode package");
+		
+		// add a note saying if the dependencey is required or not (for cmake to 
+		// know if to link or not)
+		fs::write(
+			dep_dir.join(dep.id).join("geode-dep-options.json"),
+			format!(r#"{{ "required": {} }}"#, if dep.required { "true" } else { "false" })
+		).expect("Unable to save dep options");
 	}
 
 	if errors {
