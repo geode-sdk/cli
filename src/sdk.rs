@@ -4,7 +4,7 @@ use crate::config::Config;
 use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
-use semver::Version;
+use semver::{Version, Prerelease};
 use serde::Deserialize;
 use std::fs;
 use std::io::{stdin, stdout, Write};
@@ -366,7 +366,10 @@ fn install_binaries(config: &mut Config) {
 		let ver = get_version();
 		info!("Installing binaries for {}", ver);
 		release_tag = format!("v{}", ver);
-		target_dir = Config::sdk_path().join(format!("bin/{}", ver));
+		// remove any -beta or -alpha suffixes as geode cmake doesn't care about those
+		let mut stripped_ver = ver.clone();
+		stripped_ver.pre = Prerelease::EMPTY;
+		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
 	}
 	let url = format!(
 		"https://api.github.com/repos/geode-sdk/geode/releases/tags/{}",
