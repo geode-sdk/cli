@@ -64,7 +64,7 @@ fn create_template(
 		let cpp_path = project_location.join("src/main.cpp");
 
 		let cmake_regex = Regex::new(r"\n#.*").unwrap();
-		let cpp_regex = Regex::new(r".*/\*\*\n(?:\s*\* .*\n)*\s*\*/\n?").unwrap();
+		let cpp_regex = Regex::new(r".*/\*\*\r?\n(?:\s*\* .*\r?\n)*\s*\*/\r?\n?").unwrap();
 
 		let cmake_text = fs::read_to_string(&cmake_path).expect("Unable to read template file CMakeLists.txt");
 		let cpp_text = fs::read_to_string(&cpp_path).expect("Unable to read template file main.cpp");
