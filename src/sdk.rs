@@ -163,6 +163,27 @@ fn set_sdk_env(path: &Path) -> bool {
 			env_success = false;
 		} else {
 			env_success = true;
+
+			use std::ffi::c_void;
+
+			#[link(name = "user32")]
+			extern "system" {
+				fn SendMessageTimeoutW(hwnd: *const c_void, msg: u32, wparam: *const c_void, lparam: *const c_void, flags: u32, timeout: u32, result: *mut c_void) -> i32;
+			}
+			unsafe {
+				const HWND_BROADCAST: *const c_void = 0xffff as *const c_void;
+				const WM_SETTINGCHANGE: u32 = 0x1a;
+				const SMTO_ABORTIFHUNG: u32 = 0x2;
+
+				let param = ['E', 'n', 'v', 'i', 'r', 'o', 'n', 'm', 'e', 'n', 't', '\0'].map(|x| x as i8);
+				let param_wide = param.map(|x| x as i16);
+
+				// This should properly update the enviroment variable change to new cmd instances for example,
+				// existing terminals will still have to reload though
+				// Do it for both narrow and wide because i saw it on stackoverflow idk
+				SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, std::ptr::null(), param.as_ptr() as *const c_void, SMTO_ABORTIFHUNG, 1000, std::ptr::null_mut());
+				SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, std::ptr::null(), param_wide.as_ptr() as *const c_void, SMTO_ABORTIFHUNG, 1000, std::ptr::null_mut());
+			}
 		}
 	}
 
