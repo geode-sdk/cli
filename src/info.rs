@@ -159,7 +159,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				done!("Profile added");
 			}
 
-			config.sdk_nightly = Config::sdk_path().join("bin/nightly").exists();
+			config.sdk_nightly = Config::try_sdk_path().map_or(false, |path| path.join("bin/nightly").exists());
 
 			done!("Config setup finished");
 		}
