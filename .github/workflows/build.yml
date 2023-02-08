@@ -18,6 +18,10 @@ jobs:
           os: macos-latest
           out_paths: './build/release/geode'
           static: 'export OPENSSL_STATIC=1'
+        - name: "linux"
+          os: ubuntu-latest
+          out_paths: './build/release/geode'
+          static: ''
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
