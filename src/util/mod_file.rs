@@ -161,6 +161,9 @@ pub struct BitmapFont {
 #[derive(Default, Deserialize, PartialEq)]
 pub struct ModResources {
 	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
+	pub libraries: Vec<PathBuf>,
+
+	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
 	pub files: Vec<PathBuf>,
 
 	#[serde(deserialize_with = "parse_spritesheets", default = "HashMap::new")]
