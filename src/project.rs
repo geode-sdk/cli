@@ -2,13 +2,13 @@
 use std::{fs, path::{PathBuf, Path}, collections::HashMap};
 use clap::Subcommand;
 use semver::{Version, VersionReq};
-use crate::{util::{config::Config, mod_file::{parse_mod_info, ModFileInfo, Dependency, try_parse_mod_info}}, package::get_working_dir, done, warn, info, index::{update_index, index_mods_dir, install_mod}, fail, file::read_dir_recursive, fatal, template};
+use crate::{util::{config::Config, mod_file::{parse_mod_info, ModFileInfo, Dependency, try_parse_mod_info}}, package::get_working_dir, done, warn, info, index::{update_index, index_mods_dir, install_mod}, fail, file::read_dir_recursive, fatal, template, indexer};
 use edit_distance::edit_distance;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub enum Project {
-	/// Initialize a new Geode project
+	/// Initialize a new Geode project (same as `geode new`)
     New {
 		/// The target directory to create the project in
 		path: Option<PathBuf>
@@ -32,28 +32,50 @@ pub enum Project {
 		#[clap(long, num_args(0..))]
 		externals: Vec<String>,
 	},
+
+    /// Publish this project on the Geode mods index
+    Publish {
+        /// Path to the project's built .geode file. If you are using Geode 
+        /// v1.0.0-beta.8 or newer, CLI should be able to figure this out 
+        /// automatically, unless you are building multiple mods from the 
+        /// same directory
+        #[clap(short, long)]
+        package: Option<PathBuf>,
+    },
+
+    /// Unpublish a project from the Geode mods index
+    Unpublish {
+        /// ID of the mod to unpublish. If not provided, current opened project 
+        /// is used
+        id: Option<String>,
+    },
+
+    /// List all published mods
+    ListPublished,
 }
 
-fn find_build_directory(root: &Path, _config: &Config) -> Option<PathBuf> {
+fn find_build_directory(root: &Path) -> Option<PathBuf> {
     #[cfg(windows)]
     {
         // this works for 99% of users. 
         // if you want to parse the CMakeLists.txt file to find the true build 
         // directory 100% of the time, go ahead, but i'm not doing it
-        for path in [
-            root.join("build").join("RelWithDebInfo"),
-            root.join("build").join("Release"),
-            root.join("build").join("MinSizeRel"),
-        ] {
-            if path.exists() {
-                return Some(path);
-            }
+        if root.join("build").exists() {
+            return Some(root.join("build"));
         }
     }
     None
 }
 
-fn clear_cache(dir: &Path, config: &Config) {
+/// Get the project's built .geode file. Path argument should point to the 
+/// directory with the project's mod.json
+pub fn get_built_package(root: &Path) -> Option<PathBuf> {
+    let mod_info = try_parse_mod_info(root).ok()?;
+    let geode_pkg = find_build_directory(root)?.join(format!("{}.geode", mod_info.id));
+    geode_pkg.exists().then_some(geode_pkg)
+}
+
+fn clear_cache(dir: &Path) {
 	// Parse mod.json
 	let mod_info = parse_mod_info(dir);
 
@@ -62,7 +84,7 @@ fn clear_cache(dir: &Path, config: &Config) {
 	fs::remove_dir_all(workdir).expect("Unable to remove cache directory");
 
     // Remove cached .geode package
-    let dir = find_build_directory(dir, config);
+    let dir = find_build_directory(dir);
     if let Some(dir) = dir {
         for file in fs::read_dir(&dir).expect("Unable to read build directory") {
             let path = file.unwrap().path();
@@ -432,11 +454,40 @@ pub fn check_dependencies(config: &Config, input: PathBuf, output: PathBuf, exte
     }
 }
 
+pub fn publish_project(_config: &Config, dir: &Path, package_path: Option<PathBuf>) {
+    let Some(pkg) = package_path.or(get_built_package(dir)) else {
+        fatal!(
+            "Unable to find the project's .geode package - please try manually \
+            specifying the path to the project's built .geode package using \
+            the `--package <path>` option.\nThis issue is likely caused by \
+            an outdated Geode SDK version (at least 1.0.0-beta.8 needed) or \
+            by building multiple projects from the same directory."
+        );
+    };
+
+    // initialize indexer and add mod there
+    if !indexer::is_initialized() {
+        indexer::initialize();
+    }
+    indexer::add_mod(pkg);
+}
+
+pub fn unpublish_project(id: Option<String>) {
+    if !indexer::is_initialized() {
+        fatal!("You don't seem to have any mods published!");
+    }
+    else {
+        indexer::remove_mod(
+            id.unwrap_or_else(|| parse_mod_info(&std::env::current_dir().unwrap()).id)
+        );
+    }
+}
+
 pub fn subcommand(config: &mut Config, cmd: Project) {
 	match cmd {
         Project::New { path } => template::build_template(config, path),
 		Project::ClearCache => clear_cache(
-            &std::env::current_dir().unwrap(), config
+            &std::env::current_dir().unwrap()
         ),
 		Project::Check { install_dir, externals } => check_dependencies(
             config,
@@ -444,5 +495,10 @@ pub fn subcommand(config: &mut Config, cmd: Project) {
             install_dir.unwrap_or("build".into()),
             externals
         ),
+        Project::Publish { package } => publish_project(
+            config, &std::env::current_dir().unwrap(), package
+        ),
+        Project::Unpublish { id } => unpublish_project(id),
+        Project::ListPublished => indexer::list_mods(),
 	}
 }

@@ -65,12 +65,6 @@ enum GeodeCommands {
 	Index {
 		#[clap(subcommand)]
 		commands: crate::index::Index,
-	},
-
-	/// Subcommand for interacting with your indexer
-	Indexer {
-		#[clap(subcommand)]
-		commands: crate::indexer::Indexer,
 	}
 }
 
@@ -106,7 +100,6 @@ fn main() {
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
 		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
-		GeodeCommands::Indexer { commands } => indexer::subcommand(&mut config, commands),
 	}
 
 	config.save();
