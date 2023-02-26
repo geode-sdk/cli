@@ -1,3 +1,5 @@
+use std::io::{stdout, stdin, Write};
+
 use crate::fail;
 use rustyline::Editor;
 
@@ -19,5 +21,20 @@ pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String 
 		} else {
 			return line.trim().to_string();
 		}
+	}
+}
+
+pub fn ask_yesno(prompt: &str, default: bool) -> bool {
+	print!("{} ({}) ", prompt, if default { "Y/n" } else { "y/N" });
+
+	stdout().flush().unwrap();
+
+	let mut ans = String::new();
+	stdin().read_line(&mut ans).unwrap();
+	ans = ans.trim().to_string().to_lowercase();
+	match ans.as_str() {
+		"y" | "ye" | "yes" => true,
+		"n" | "no" => false,
+		_ => default
 	}
 }

@@ -156,7 +156,6 @@ fn export_mod(package: PathBuf) {
 	info!("git -C {} push -f", indexer_path.to_str().unwrap());
 }
 
-
 pub fn subcommand(_config: &mut Config, cmd: Indexer) {
 	match cmd {
 		Indexer::Init => initialize(),

@@ -1,6 +1,7 @@
 use crate::input::ask_value;
 use crate::config::Config;
 use crate::sdk::get_version;
+use crate::util::input::ask_yesno;
 use crate::{done, info, warn};
 use git2::Repository;
 use path_absolutize::Absolutize;
@@ -9,7 +10,6 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::json;
 use std::fs;
-use std::io::{stdin, stdout, Write};
 use std::path::PathBuf;
 
 fn create_template(
@@ -23,14 +23,7 @@ fn create_template(
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
-		print!("         Are you sure you want to proceed? (y/N) ");
-
-		stdout().flush().unwrap();
-
-		let mut ans = String::new();
-		stdin().read_line(&mut ans).unwrap();
-		ans = ans.trim().to_string();
-		if !(ans == "y" || ans == "Y") {
+		if !ask_yesno("Are you sure you want to proceed?", false) {
 			info!("Aborting");
 			return;
 		}
@@ -116,8 +109,23 @@ fn create_template(
 	done!("Succesfully initialized project! Happy modding :)");
 }
 
-pub fn build_template(config: &mut Config, name: Option<String>, location: Option<PathBuf>, strip: bool) {
-	let final_name = ask_value("Name", name.as_deref(), true);
+fn possible_name(path: &Option<PathBuf>) -> Option<String> {
+	let dir_name;
+	let Some(path) = path else { return None; };
+	if path.is_absolute() {
+		dir_name = path.file_name()?.to_string_lossy().to_string();
+	}
+	else {
+		dir_name = std::env::current_dir().ok()?.join(path).file_name()?.to_string_lossy().to_string();
+	}
+	Some(dir_name)
+}
+
+pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
+	info!("This utility will walk you through setting up a new mod.");
+	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
+
+	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 
 	let location = location.unwrap_or_else(|| std::env::current_dir().unwrap().join(&final_name));
 	let location = location.absolutize().unwrap();
@@ -128,7 +136,9 @@ pub fn build_template(config: &mut Config, name: Option<String>, location: Optio
 
 	if config.default_developer.is_none() {
 		info!(
-			"Using '{}' as the default developer for all future projects.",
+			"Using '{}' as the default developer for all future projects. \
+			If this is undesirable, you can set a default developer using \
+			`geode config set default-developer <name>`",
 			&final_developer
 		);
 		config.default_developer = Some(final_developer.clone());
@@ -145,6 +155,10 @@ pub fn build_template(config: &mut Config, name: Option<String>, location: Optio
 		"{}.{}",
 		final_developer.to_lowercase().replace(' ', "_"),
 		final_name.to_lowercase().replace(' ', "_")
+	);
+
+	let strip = ask_yesno(
+		"Do you want to remove comments from the default template?", false
 	);
 
 	info!("Creating project {}", mod_id);

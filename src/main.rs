@@ -25,58 +25,43 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum GeodeCommands {
-	/// Create template mod project
+	/// Initialize a new Geode project
 	New {
-		/// Mod project directory
-		#[clap(short, long)]
-		path: Option<PathBuf>,
-
-		/// Mod name
-		#[clap(short, long)]
-		name: Option<String>,
-
-		/// Remove all tutorial comments from template
-		#[clap(short, long)]
-		strip: bool
+		/// The target directory to create the project in
+		path: Option<PathBuf>
 	},
 
-	/// Install a .geode package to current profile, alias of `geode package install`
-	Install {
-		/// Location of the .geode package to install
-		path: PathBuf,
-	},
-
-	/// Subcommand for managing profiles
+	/// Options for managing profiles (installations of Geode)
 	Profile {
 		#[clap(subcommand)]
 		commands: crate::profile::Profile,
 	},
 
-	/// Subcommand for managing configurable data
+	/// Options for configuring Geode CLI
 	Config {
 		#[clap(subcommand)]
 		commands: crate::info::Info,
 	},
 
-	/// Subcommand for managing the Geode SDK
+	/// Options for installing & managing the Geode SDK
 	Sdk {
 		#[clap(subcommand)]
 		commands: crate::sdk::Sdk,
 	},
 
-	/// Subcommand for managing Geode packages
-	Package {
-		#[clap(subcommand)]
-		commands: crate::package::Package,
-	},
-
-	/// Subcommand for working with the current mod project
+	/// Tools for working with the current mod project
 	Project {
 		#[clap(subcommand)]
 		commands: crate::project::Project,
 	},
 
-	/// Subcommand for interacting with the Geode mod index
+	/// Options for working with .geode packages
+	Package {
+		#[clap(subcommand)]
+		commands: crate::package::Package,
+	},
+
+	/// Tools for interacting with the Geode mod index
 	Index {
 		#[clap(subcommand)]
 		commands: crate::index::Index,
@@ -114,8 +99,7 @@ fn main() {
 	let mut config = config::Config::new();
 
 	match args.command {
-		GeodeCommands::New { name, path, strip } => template::build_template(&mut config, name, path, strip),
-		GeodeCommands::Install { path } => package::install(&mut config, &path),
+		GeodeCommands::New { path } => template::build_template(&mut config, path),
 		GeodeCommands::Profile { commands } => profile::subcommand(&mut config, commands),
 		GeodeCommands::Config { commands } => info::subcommand(&mut config, commands),
 		GeodeCommands::Sdk { commands } => sdk::subcommand(&mut config, commands),
