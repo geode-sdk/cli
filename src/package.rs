@@ -71,16 +71,6 @@ pub enum Package {
 		externals: Vec<String>,
 	},
 
-	/// Fetch mod id from a package
-	GetId {
-		/// Location of package
-		input: PathBuf,
-
-		/// Strip trailing newline
-		#[clap(long)]
-		raw: bool,
-	},
-
 	/// Process the resources specified by a package
 	Resources {
 		/// Location of mod's folder
@@ -425,39 +415,6 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 
 	out_archive.finish().expect("Unable to write to zip");
 	done!("Successfully merged binaries into {}", inputs[0].to_str().unwrap());
-}
-
-#[deprecated(note = "Should be removed in some CLI version, as modern SDK versions use `package setup` instead")]
-fn get_id(input: PathBuf, raw: bool) {
-	let text = if input.is_dir() {
-		std::fs::read_to_string(input.join("mod.json")).expect("Unable to read mod.json")
-	} else {
-		let mut out = String::new();
-
-		zip::ZipArchive::new(fs::File::open(input).unwrap())
-			.expect("Unable to unzip")
-			.by_name("mod.json")
-			.expect("Unable to find mod.json in package")
-			.read_to_string(&mut out)
-			.expect("Unable to read mod.json");
-
-		out
-	};
-
-	let json =
-		serde_json::from_str::<serde_json::Value>(&text).expect("Unable to parse mod.json");
-
-	let id = json
-		.get("id")
-		.expect("[mod.json]: Missing key 'id'")
-		.as_str()
-		.expect("[mod.json].id: Expected string");
-
-	if raw {
-		print!("{}", id);
-	} else {
-		println!("{}", id);
-	}
 }
 
 #[derive(PartialEq)]
@@ -842,9 +799,6 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 		},
 
 		Package::Setup { input, output, externals } => setup(config, input, output, externals),
-
-		#[allow(deprecated)]
-		Package::GetId { input, raw } => get_id(input, raw),
 
 		Package::Resources {
 			root_path,
