@@ -11,6 +11,7 @@ mod util;
 mod index;
 mod file;
 mod indexer;
+mod project;
 
 use util::*;
 
@@ -69,6 +70,12 @@ enum GeodeCommands {
 		commands: crate::package::Package,
 	},
 
+	/// Subcommand for working with the current mod project
+	Project {
+		#[clap(subcommand)]
+		commands: crate::project::Project,
+	},
+
 	/// Subcommand for interacting with the Geode mod index
 	Index {
 		#[clap(subcommand)]
@@ -108,19 +115,13 @@ fn main() {
 
 	match args.command {
 		GeodeCommands::New { name, path, strip } => template::build_template(&mut config, name, path, strip),
-
 		GeodeCommands::Install { path } => package::install(&mut config, &path),
-
 		GeodeCommands::Profile { commands } => profile::subcommand(&mut config, commands),
-
 		GeodeCommands::Config { commands } => info::subcommand(&mut config, commands),
-
 		GeodeCommands::Sdk { commands } => sdk::subcommand(&mut config, commands),
-
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
-		
+		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
-
 		GeodeCommands::Indexer { commands } => indexer::subcommand(&mut config, commands),
 	}
 

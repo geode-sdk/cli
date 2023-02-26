@@ -86,7 +86,7 @@ pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 	path.exists()
 		.then(|| {
-			match zip::ZipArchive::new(File::open(path).expect("Unable to open cache file")) {
+			match zip::ZipArchive::new(File::open(path).expect("Unable to open cached package")) {
 				Ok(mut archive) => {
 					let cache: ResourceCache = if archive.by_name(".geode_cache").is_ok() {
 						let mut cache_data = String::new();
