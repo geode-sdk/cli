@@ -130,7 +130,7 @@ fn initialize_spritesheet_bundle(
 		// enabling trim causes textures with empty padding to be misaligned, 
 		// if you figure out how to ensure it doesn't do that then you can 
 		// re-enable trim
-		trim: false,
+		trim: true,
 		..Default::default()
 	};
 	let mut texture_packer = TexturePacker::new_skyline(config);
