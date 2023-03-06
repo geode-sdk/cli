@@ -78,7 +78,7 @@ pub fn ask_confirm(text: &str, default: bool) -> bool {
 		"{}{} {} ",
 		"| Okay | ".bright_purple(),
 		text,
-		if default { "(Y/n)" } else { "(N/y)" }
+		if default { "(Y/n)" } else { "(y/N)" }
 	);
 	std::io::stdout().flush().unwrap();
 	let mut yes = String::new();
