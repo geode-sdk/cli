@@ -340,17 +340,20 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 	}
 }
 
+fn switch_to_ref(repo: &Repository, name: &str) {
+	let (obj, refer) = repo.revparse_ext(name).unwrap();
+	repo.checkout_tree(&obj, None).expect("Unable to checkout tree");
+	match refer {
+		Some(gref) => repo.set_head(gref.name().unwrap()),
+		None => repo.set_head_detached(obj.id()),
+	}.expect("Failed to update head");
+}
+
 fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	info!("Updating head");
 
 	if config.sdk_nightly {
-		let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
-		let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
-		repo.set_head("refs/heads/main").unwrap();
-		let mut refer = repo.find_reference("refs/heads/main").unwrap();
-		refer.set_target(fetch_commit.id(), "Fast-Forward").unwrap();
-		repo.checkout_head(None)
-			.expect("Unable to switch to latest commit");
+		switch_to_ref(repo, "refs/heads/main");
 		info!("Switched to latest commit");
 		return;
 	}
@@ -374,11 +377,8 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 		return;
 	}
 
-	// Change head and checkout
-	let refname = format!("refs/tags/v{}", latest_version.as_ref().unwrap());
-	repo.set_head(&refname).unwrap();
-	repo.checkout_head(None).unwrap();
-
+	let tag_name = latest_version.as_ref().unwrap().to_string();
+	switch_to_ref(repo, &format!("refs/tags/v{}", tag_name));
 	done!("Updated head to v{}", latest_version.unwrap());
 }
 
@@ -388,7 +388,7 @@ fn install_binaries(config: &mut Config) {
 	let target_dir: PathBuf;
 	if config.sdk_nightly {
 		info!("Installing nightly binaries");
-		release_tag = "Nightly".into();
+		release_tag = "nightly".into();
 		target_dir = Config::sdk_path().join("bin/nightly");
 	} else {
 		let ver = get_version();
@@ -413,7 +413,10 @@ fn install_binaries(config: &mut Config) {
 		.send()
 		.expect("Unable to get download info from GitHub")
 		.json::<GithubReleaseResponse>()
-		.expect("Unable to parse GitHub response");
+		.unwrap_or_else(|_| fatal!(
+			"It appears that \"{}\" is not a valid Geode release",
+			release_tag
+		));
 
 	let mut target_url: Option<String> = None;
 	for asset in res.assets {
