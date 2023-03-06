@@ -142,7 +142,13 @@ impl Config {
 
 	pub fn try_sdk_path() -> Result<PathBuf, &'static str> {
 		let sdk_var = std::env::var("GEODE_SDK")
-			.map_err(|_| "Unable to find Geode SDK (GEODE_SDK isn't set). Please install it using `geode sdk install` or use `geode sdk set-path` to set it to an existing clone")?;
+			.map_err(|_|
+				"Unable to find Geode SDK (GEODE_SDK isn't set). Please install \
+				it using `geode sdk install` or use `geode sdk set-path` to set \
+				it to an existing clone. If you just installed the SDK using \
+				`geode sdk install`, please restart your terminal / computer to \
+				apply changes."
+			)?;
 	
 		let path = PathBuf::from(sdk_var);
 		if !path.is_dir() {
