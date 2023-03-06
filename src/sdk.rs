@@ -194,6 +194,17 @@ fn set_sdk_env(path: &Path) -> bool {
 	env_success
 }
 
+fn get_sdk_path() -> Option<PathBuf> {
+	if std::env::var("GEODE_SDK").is_ok() &&
+		Config::try_sdk_path().is_ok()
+	{
+		Some(Config::sdk_path())
+	}
+	else {
+		None
+	}
+}
+
 fn install(config: &mut Config, path: PathBuf, force: bool) {
 	let parent = path.parent().unwrap();
 
@@ -477,6 +488,18 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::Install { reinstall, force, path } => {
 			if reinstall && !uninstall() && !force {
 				return;
+			}
+
+			if !force {
+				if let Some(path) = get_sdk_path() {
+					fatal!(
+						"SDK is already installed at {} - if you meant to \
+						update the SDK, use `geode sdk update`, or if you \
+						want to change the install location use the --reinstall \
+						option",
+						path.display()
+					);
+				}
 			}
 
 			let actual_path = match path {
