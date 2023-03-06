@@ -1,13 +1,13 @@
 use clap::Subcommand;
 use colored::Colorize;
 use crate::config::Config;
+use crate::util::logging::ask_confirm;
 use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
 use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
 use semver::{Version, Prerelease};
 use serde::Deserialize;
 use std::fs;
-use std::io::{stdin, stdout, Write};
 use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "macos")]
@@ -93,15 +93,10 @@ pub enum Sdk {
 fn uninstall() -> bool {
 	let sdk_path = Config::sdk_path();
 
-	warn!("Are you sure you want to uninstall SDK? (GEODE_SDK={sdk_path:?})");
-	print!("         (type 'Yes' to proceed) ");
-
-	stdout().flush().unwrap();
-
-	let mut ans = String::new();
-	stdin().read_line(&mut ans).unwrap();
-	ans = ans.trim().to_string();
-	if ans != "Yes" {
+	if !ask_confirm(
+		&format!("Are you sure you want to uninstall Geode SDK? (Installed at {sdk_path:?})"),
+		false
+	) {
 		fail!("Aborting");
 		return false;
 	}
@@ -204,13 +199,13 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 
 	if !force && std::env::var("GEODE_SDK").is_ok() {
 		if Config::try_sdk_path().is_ok() {
-			fail!("SDK is already installed");
+			fail!("SDK is already installed at {}", Config::sdk_path().display());
 			info!("Use --reinstall if you want to remove the existing installation");
 			return;
 		} else {
 			let env_sdk_path = std::env::var("GEODE_SDK").unwrap();
 			info!("GEODE_SDK ({env_sdk_path}) is already set, but seems to point to an invalid sdk installation.");
-			if !crate::logging::ask_confirm(&"Do you wish to proceed?".into(), true) {
+			if !crate::logging::ask_confirm("Do you wish to proceed?", true) {
 				fatal!("Aborting");
 			}
 		}

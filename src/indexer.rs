@@ -1,5 +1,5 @@
 use crate::config::{geode_root};
-use crate::input::ask_value;
+use crate::util::logging::ask_value;
 use std::fs;
 use std::path::PathBuf;
 use git2::{Repository, ResetType, IndexAddOption, Signature};

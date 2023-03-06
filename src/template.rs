@@ -1,7 +1,7 @@
-use crate::input::ask_value;
+
 use crate::config::Config;
 use crate::sdk::get_version;
-use crate::util::input::ask_yesno;
+use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn};
 use git2::Repository;
 use path_absolutize::Absolutize;
@@ -23,7 +23,7 @@ fn create_template(
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
-		if !ask_yesno("Are you sure you want to proceed?", false) {
+		if !ask_confirm("Are you sure you want to proceed?", false) {
 			info!("Aborting");
 			return;
 		}
@@ -157,7 +157,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_name.to_lowercase().replace(' ', "_")
 	);
 
-	let strip = ask_yesno(
+	let strip = ask_confirm(
 		"Do you want to remove comments from the default template?", false
 	);
 

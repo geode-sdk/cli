@@ -1,5 +1,7 @@
 use std::io::Write;
 
+use rustyline::Editor;
+
 #[macro_export]
 macro_rules! info {
     ($x:expr $(, $more:expr)*) => {{
@@ -48,7 +50,28 @@ macro_rules! confirm {
     };
 }
 
-pub fn ask_confirm(text: &String, default: bool) -> bool {
+pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
+	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
+	let mut line_reader = Editor::<()>::new();
+	loop {
+		let line = line_reader
+			.readline_with_initial(&text, (default.unwrap_or(""), ""))
+			.expect("Error reading line");
+		line_reader.add_history_entry(&line);
+
+		if line.is_empty() {
+			if required {
+				fail!("Please enter a value");
+			} else {
+				return default.unwrap_or("").to_string();
+			}
+		} else {
+			return line.trim().to_string();
+		}
+	}
+}
+
+pub fn ask_confirm(text: &str, default: bool) -> bool {
 	use ::colored::Colorize;
 	// print question
 	print!(
@@ -61,11 +84,8 @@ pub fn ask_confirm(text: &String, default: bool) -> bool {
 	let mut yes = String::new();
 	match std::io::stdin().read_line(&mut yes) {
 		Ok(_) => match yes.trim().to_lowercase().as_str() {
-			"yes" => true,
-			"ye" => true,
-			"y" => true,
-			"no" => false,
-			"n" => false,
+			"yes" | "ye" | "y" => true,
+			"no" | "n" => false,
 			_ => default,
 		},
 		Err(_) => default,

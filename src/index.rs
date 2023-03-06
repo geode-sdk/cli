@@ -3,7 +3,7 @@ use semver::VersionReq;
 use zip::ZipArchive;
 use crate::config::Config;
 use crate::file::copy_dir_recursive;
-use crate::input::ask_value;
+use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
 use crate::{done, info, warn, fatal};
 use sha3::{Digest, Sha3_256};
