@@ -459,7 +459,12 @@ fn set_sdk_path(path: PathBuf, do_move: bool) {
 		let old = std::env::var("GEODE_SDK").map(PathBuf::from)
 			.expect("Cannot locate SDK.");
 
-		assert!(old.is_dir(), "Internal Error: $GEODE_SDK doesn't point to a directory. Please reinstall the Geode SDK");
+		assert!(old.is_dir(), 
+			"Internal Error: GEODE_SDK doesn't point to a directory ({}). This \
+			might be caused by having run `geode sdk set-path` - try restarting \
+			your terminal / computer, or reinstall using `geode sdk install --reinstall`",
+			old.display()
+		);
 		assert!(old.join("VERSION").exists(), "Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.");
 		assert!(!path.exists(), "Cannot move SDK to existing path {}", path.to_str().unwrap());
 
