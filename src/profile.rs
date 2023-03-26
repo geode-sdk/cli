@@ -62,8 +62,15 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 				let name = &profile.borrow().name;
 				let path = &profile.borrow().gd_path;
 
+				let indicator = if config.current_profile.as_ref() == Some(name) {
+					"* "
+				} else {
+					""
+				};
+
 				println!(
-					"{} [ path = {} ]",
+					"{}{} [ path = {} ]",
+					indicator.bright_cyan(),
 					name.bright_cyan(),
 					path.to_string_lossy().bright_green()
 				);
