@@ -157,18 +157,16 @@ fn create_resources(
 	cache: &mut cache::ResourceCache,
 	working_dir: &Path,
 	output_dir: &PathBuf,
-	sprite_output_dir: &PathBuf,
 	shut_up: bool,
 ) {
 	// Make sure output directory exists
 	fs::create_dir_all(output_dir).expect("Could not create resource directory");
-	fs::create_dir_all(sprite_output_dir).expect("Could not create sprite resource directory");
 
 	// Create spritesheets
 	for sheet in mod_info.resources.spritesheets.values() {
 		let sheet_file = spritesheet::get_spritesheet_bundles(
 			sheet,
-			sprite_output_dir,
+			output_dir,
 			cache_bundle,
 			mod_info,
 			shut_up,
@@ -178,7 +176,7 @@ fn create_resources(
 
 	// Create fonts
 	for font in mod_info.resources.fonts.values() {
-		let font_file = bmfont::get_font_bundles(font, sprite_output_dir, cache_bundle, mod_info, shut_up);
+		let font_file = bmfont::get_font_bundles(font, output_dir, cache_bundle, mod_info, shut_up);
 		cache.add_font(font, font_file.cache_name(working_dir));
 	}
 
@@ -194,13 +192,13 @@ fn create_resources(
 
 		// Collect all errors
 		(|| {
-			sprite.save(sprite_output_dir.join(base.to_string() + "-uhd.png"))?;
+			sprite.save(output_dir.join(base.to_string() + "-uhd.png"))?;
 
 			spritesheet::downscale(&mut sprite, 2);
-			sprite.save(sprite_output_dir.join(base.to_string() + "-hd.png"))?;
+			sprite.save(output_dir.join(base.to_string() + "-hd.png"))?;
 
 			spritesheet::downscale(&mut sprite, 2);
-			sprite.save(sprite_output_dir.join(base.to_string() + ".png"))
+			sprite.save(output_dir.join(base.to_string() + ".png"))
 		})()
 		.expect(&format!(
 			"Unable to copy sprite at {}",
@@ -245,7 +243,6 @@ fn create_package_resources_only(
 		&mod_info,
 		&mut cache_bundle,
 		&mut new_cache,
-		output_dir,
 		output_dir,
 		output_dir,
 		shut_up,
@@ -306,7 +303,6 @@ fn create_package(
 		&mut cache_bundle,
 		&mut new_cache,
 		&working_dir,
-		&working_dir.join("resources"),
 		&working_dir.join("resources").join(&mod_file_info.id),
 		false,
 	);
