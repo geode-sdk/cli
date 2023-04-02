@@ -324,10 +324,11 @@ fn create_package(
 	// Copy headers
 	if let Some(ref api) = mod_file_info.api {
 		for header in &api.include {
-			let out = working_dir.join(header.strip_prefix(&root_path).unwrap_or(header));
+			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
+			println!("working_dir: {working_dir:?}, out: {out:?}, root_path: {root_path:?}, header: {header:?}");
 			fs::copy(root_path.join(&header), &out)
-				.expect(&format!("Unable to copy header {} to {}", header.to_string_lossy(), out.display()));
+				.expect(&format!("Unable to copy header {} to {}", header.display(), out.display()));
 		}
 	}
 

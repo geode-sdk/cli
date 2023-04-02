@@ -34,6 +34,18 @@ where
     Ok(Vec::<PathBuf>::deserialize(deserializer)?.glob())
 }
 
+fn parse_glob_rel<'de, D>(deserializer: D) -> Result<Vec<PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(Vec::<PathBuf>::deserialize(deserializer)?
+		.glob()
+		.into_iter()
+		.map(|p| p.strip_prefix(std::env::current_dir().unwrap()).unwrap_or(&p).to_path_buf())
+		.collect()
+	)
+}
+
 fn parse_spritesheets<'de, D>(deserializer: D) -> Result<HashMap<String, SpriteSheet>, D::Error>
 where
     D: Deserializer<'de>,
@@ -187,7 +199,7 @@ pub struct Dependency {
 
 #[derive(Default, Deserialize, PartialEq)]
 pub struct ModApi {
-	#[serde(deserialize_with = "parse_glob")]
+	#[serde(deserialize_with = "parse_glob_rel")]
 	pub include: Vec<PathBuf>,
 }
 
