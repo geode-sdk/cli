@@ -118,10 +118,7 @@ fn zip_folder(path: &Path, output: &Path) {
 				.unwrap()
 				.to_string();
 
-			// Windows is weird and needs this change
-			if cfg!(windows) {
-				relative_path = relative_path.replace('/', "\\");
-			}
+			relative_path = relative_path.replace('\\', "/");
 
 			zip_file.start_file(relative_path, zip_options).unwrap();
 			zip_file.write_all(&fs::read(item.path()).unwrap()).unwrap();
@@ -326,7 +323,6 @@ fn create_package(
 		for header in &api.include {
 			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
-			println!("working_dir: {working_dir:?}, out: {out:?}, root_path: {root_path:?}, header: {header:?}");
 			fs::copy(root_path.join(&header), &out)
 				.expect(&format!("Unable to copy header {} to {}", header.display(), out.display()));
 		}
