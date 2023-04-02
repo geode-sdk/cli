@@ -24,6 +24,15 @@ pub enum Index {
 		output: PathBuf
 	},
 
+	/// Install a mod from the index to the current profile
+	Install {
+		/// Mod ID to install
+		id: String,
+
+		/// Mod version to install, defaults to latest
+		version: Option<VersionReq>,
+	},
+
 	/// Updates the index cache
 	Update,
 }
@@ -173,18 +182,29 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 	
 	info!("Installing mod '{}' version '{}'", id, version);
 
-	let mut pkg_data = io::Cursor::new(Vec::new());
-
-	reqwest::blocking::get(entry.r#mod.download)
+	let bytes = reqwest::blocking::get(entry.r#mod.download)
 		.expect("Unable to download mod")
-		.copy_to(&mut pkg_data)
+		.bytes()
 		.expect("Unable to download mod");
 	
 	let dest = config.get_current_profile().mods_dir().join(format!("{id}.geode"));
-	let mut file = std::fs::File::create(&dest)
-		.expect("Unable to create destination file for mod");
-	
-	std::io::copy(&mut pkg_data, &mut file).expect("Unable to install mod");
+
+	let mut hasher = Sha3_256::new();
+	hasher.update(&bytes);
+	let hash = hex::encode(hasher.finalize().to_vec());
+
+	if hash != entry.r#mod.hash {
+		fatal!(
+			"Downloaded file doesn't match expected hash\n\
+			    {hash}\n\
+			 vs {}\n\
+			Try again, and if the issue persists, report this on GitHub: \
+			https://github.com/geode-sdk/cli/issues/new",
+			entry.r#mod.hash
+		);
+	}
+
+	fs::write(&dest, bytes).expect("Unable to install .geode file");
 
 	dest
 }
@@ -279,5 +299,10 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
 		Index::Update => update_index(config),
+		Index::Install { id, version } => {
+			update_index(config);
+			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR));
+			done!("Mod installed");
+		},
 	}
 }
