@@ -40,7 +40,9 @@ pub struct EntryMod {
 pub struct Entry {
 	r#mod: EntryMod,
 	platforms: HashSet<String>,
+	#[serde(default)]
 	tags: Vec<String>,
+	#[serde(default)]
 	featured: bool,
 }
 
