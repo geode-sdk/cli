@@ -170,7 +170,7 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 	
 	let plat = if cfg!(windows) {
 		"windows"
-	} else if cfg!(macos) {
+	} else if cfg!(target_os = "macos") {
 		"macos"
 	} else {
 		panic!("This platform doesn't support installing mods");
