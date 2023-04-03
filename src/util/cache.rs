@@ -21,22 +21,29 @@ pub struct CacheBundle {
 }
 
 impl CacheBundle {
-	pub fn extract_cached_into(&mut self, name: &str, output: &PathBuf) {
+	pub fn try_extract_cached_into(&mut self, name: &str, output: &PathBuf) -> bool {
 		match &mut self.src {
 			CacheBundleSource::Archive(archive) => {
-				let mut cached_file = archive.by_name(name).unwrap();
+				let Ok(mut cached_file) = archive.by_name(name) else {
+					return false;
+				};
 
 				// Read cached file to buffer
 				let mut buf: Vec<u8> = Vec::new();
-				cached_file.read_to_end(&mut buf).unwrap();
+				let Ok(_) = cached_file.read_to_end(&mut buf) else {
+					return false;
+				};
 
 				// Write buffer into output directory, same file name
-				std::fs::write(output, buf).unwrap();
+				std::fs::write(output, buf).is_ok()
 			}
 
 			CacheBundleSource::Directory(dir) => {
 				if dir.join(name) != *output {
-					std::fs::copy(dir.join(name), output).unwrap();
+					std::fs::copy(dir.join(name), output).is_ok()
+				}
+				else {
+					false
 				}
 			}
 		}

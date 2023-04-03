@@ -198,20 +198,49 @@ fn initialize_spritesheet_bundle(
 	);
 }
 
-fn extract_from_cache(
+fn try_extract_from_cache(
 	path: &Path,
 	working_dir: &Path,
 	cache_bundle: &mut CacheBundle,
 	shut_up: bool,
-) {
+) -> bool {
 	let path_name = path.to_str().unwrap();
 	if !shut_up {
 		info!("Extracting '{}' from cache", path_name);
 	}
-	cache_bundle.extract_cached_into(
+	cache_bundle.try_extract_cached_into(
 		path_name,
 		&working_dir.join(path.file_name().unwrap().to_str().unwrap()),
-	);
+	)
+}
+
+fn try_extract_bundles_from_cache(
+	sheet: &SpriteSheet,
+	working_dir: &Path,
+	cache: &mut Option<CacheBundle>,
+	shut_up: bool,
+) -> Option<SheetBundles> {
+	if let Some(cache_bundle) = cache {
+		// Cache found
+		if let Some(p) = cache_bundle.cache.fetch_spritesheet_bundles(sheet) {
+			if !shut_up {
+				info!("Using cached files");
+			}
+			let bundles = SheetBundles::new(p.to_path_buf());
+
+			// Extract all files
+			try_extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
+
+			done!("Fetched {} from cache", sheet.name.bright_yellow());
+			return Some(bundles);
+		}
+	}
+	None
 }
 
 pub fn get_spritesheet_bundles(
@@ -225,27 +254,12 @@ pub fn get_spritesheet_bundles(
 		info!("Fetching spritesheet {}", sheet.name.bright_yellow());
 	}
 
-	if let Some(cache_bundle) = cache {
-		// Cache found
-		if let Some(p) = cache_bundle.cache.fetch_spritesheet_bundles(sheet) {
-			if !shut_up {
-				info!("Using cached files");
-			}
-			let bundles = SheetBundles::new(p.to_path_buf());
-
-			// Extract all files
-			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle, shut_up);
-
-			done!("Fetched {} from cache", sheet.name.bright_yellow());
-			return bundles;
-		}
+	if let Some(cached) = try_extract_bundles_from_cache(
+		sheet, working_dir, cache, shut_up
+	) {
+		return cached;
 	}
-
+	
 	if !shut_up {
 		info!("Sheet is not cached, building from scratch");
 	}
