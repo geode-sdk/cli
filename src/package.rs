@@ -189,6 +189,7 @@ fn create_resources(
 
 		// Collect all errors
 		(|| {
+			spritesheet::downscale(&mut sprite, 1);
 			sprite.save(output_dir.join(base.to_string() + "-uhd.png"))?;
 
 			spritesheet::downscale(&mut sprite, 2);
