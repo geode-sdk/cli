@@ -1,5 +1,5 @@
 
-use std::fs;
+use std::fs::{self, read_dir};
 use std::io::{Read, Write, Seek};
 use std::path::{Path, PathBuf};
 
@@ -13,7 +13,7 @@ use crate::util::cache::CacheBundle;
 use crate::util::mod_file::{ModFileInfo, parse_mod_info};
 use crate::util::spritesheet;
 use crate::{cache, project};
-use crate::{done, fail, info, warn, fatal};
+use crate::{done, info, warn, fatal};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -29,13 +29,16 @@ pub enum Package {
 		/// Location of mod's folder
 		root_path: PathBuf,
 
-		/// Add binary file
+		/// Add an external binary file. By default, all known binary files 
+		/// (.dll, .lib, .dylib, .so) named after the mod ID in the root path 
+		/// are included
 		#[clap(short, long, num_args(1..))]
 		binary: Vec<PathBuf>,
 
-		/// Location of output file
+		/// Location of output file. If not provided, the resulting file is named 
+		/// {mod.id}.geode and placed at the root path
 		#[clap(short, long)]
-		output: PathBuf,
+		output: Option<PathBuf>,
 
 		/// Whether to install the generated package after creation
 		#[clap(short, long)]
@@ -255,12 +258,17 @@ fn create_package(
 	config: &mut Config,
 	root_path: &Path,
 	binaries: Vec<PathBuf>,
-	mut output: PathBuf,
+	raw_output: Option<PathBuf>,
 	do_install: bool,
 ) {
+	// Parse mod.json
+	let mod_file_info = parse_mod_info(root_path);
+
+	let mut output = raw_output.unwrap_or(root_path.join(format!("{}.geode", mod_file_info.id)));
+
 	// If it's a directory, add file path to it
 	if output.is_dir() {
-		output.push(root_path.file_name().unwrap());
+		output.push(&mod_file_info.id);
 		output.set_extension("geode");
 		warn!(
 			"Specified output is a directory. Creating package at {}",
@@ -268,21 +276,11 @@ fn create_package(
 		);
 	}
 
-	// Ensure at least one binary
-	if binaries.is_empty() {
-		fail!("No binaries added");
-		info!("Help: Add a binary with `--binary <bin_path>`");
-		return;
-	}
-
 	// Test if possible to create file
 	if !output.exists() || output.is_dir() {
 		fs::write(&output, "").expect("Could not create package");
 		fs::remove_file(&output).unwrap();
 	}
-
-	// Parse mod.json
-	let mod_file_info = parse_mod_info(root_path);
 
 	// Setup working directory
 	let working_dir = get_working_dir(&mod_file_info.id);
@@ -329,7 +327,26 @@ fn create_package(
 		}
 	}
 
-	// Copy binaries
+	let mut binaries_added = false;
+	for file in read_dir(root_path).expect("Unable to read root directory") {
+		let Ok(file) = file else { continue; };
+		let path = file.path();
+		let Some(name) = path.file_stem() else { continue; };
+		let Some(ext) = path.extension() else { continue; };
+		if name.to_string_lossy() == mod_file_info.id
+			&& matches!(
+				ext.to_string_lossy().as_ref(),
+				"ios.dylib" | "dylib" | "dll" | "lib" | "so"
+			)
+		{
+			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
+			std::fs::copy(path, working_dir.join(&binary))
+				.expect(&format!("Unable to copy binary '{}'", binary));
+			binaries_added = true;
+		}
+	}
+
+	// Copy other binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
 		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| binary_name.contains(**x)) {
@@ -338,6 +355,13 @@ fn create_package(
 
 		std::fs::copy(binary, working_dir.join(binary_name))
 			.expect(&format!("Unable to copy binary at '{}'", binary.display()));
+		binaries_added = true;
+	}
+
+	// Ensure at least one binary
+	if !binaries_added {
+		warn!("No binaries added to the resulting package");
+		info!("Help: Add a binary with `--binary <bin_path>`");
 	}
 
 	new_cache.save(&working_dir);
