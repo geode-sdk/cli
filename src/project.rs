@@ -31,6 +31,10 @@ pub enum Project {
 		/// other means (usually through building it as part of the same project)
 		#[clap(long, num_args(0..))]
 		externals: Vec<String>,
+
+		/// Disable updating the mods index before checking dependencies
+		#[clap(long)]
+		dont_update_index: bool,
 	},
 
     /// Publish this project on the Geode mods index
@@ -189,7 +193,13 @@ fn find_dependency(
 	Ok(found)
 }
 
-pub fn check_dependencies(config: &Config, input: PathBuf, output: PathBuf, externals: Vec<String>) {
+pub fn check_dependencies(
+	config: &Config,
+	input: PathBuf,
+	output: PathBuf,
+	externals: Vec<String>,
+	dont_update_index: bool
+) {
 	let mod_info = parse_mod_info(&input);
 
 	// If no dependencies, skippy wippy
@@ -220,7 +230,9 @@ pub fn check_dependencies(config: &Config, input: PathBuf, output: PathBuf, exte
 	let mut errors = false;
 
 	// update mods index if all of the mods aren't external
-	if !mod_info.dependencies.iter().all(|d| externals.contains_key(&d.id)) {
+	if !mod_info.dependencies.iter().all(|d| externals.contains_key(&d.id))
+		&& !dont_update_index
+	{
 		info!("Updating Geode mods index");
 		update_index(config);
 	}
@@ -489,11 +501,12 @@ pub fn subcommand(config: &mut Config, cmd: Project) {
 		Project::ClearCache => clear_cache(
             &std::env::current_dir().unwrap()
         ),
-		Project::Check { install_dir, externals } => check_dependencies(
+		Project::Check { install_dir, externals, dont_update_index } => check_dependencies(
             config,
             std::env::current_dir().unwrap(),
             install_dir.unwrap_or("build".into()),
-            externals
+            externals,
+			dont_update_index
         ),
         Project::Publish { package } => publish_project(
             config, &std::env::current_dir().unwrap(), package

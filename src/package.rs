@@ -430,7 +430,7 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			input,
 			output,
 			externals
-		} => project::check_dependencies(config, input, output, externals),
+		} => project::check_dependencies(config, input, output, externals, false),
 
 		Package::Resources {
 			root_path,
