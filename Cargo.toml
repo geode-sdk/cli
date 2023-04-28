@@ -41,7 +41,3 @@ ansi_term = "0.12"
 
 [build-dependencies]
 winres = "0.1.12"
-
-[profile.release]
-lto = true
-codegen-units = 1
