@@ -37,7 +37,9 @@ fn create_template(
 		&project_location,
 	).expect("Unable to clone repository");
 
-	fs::remove_dir_all(project_location.join(".git")).unwrap();
+	if let Err(_) = fs::remove_dir_all(project_location.join(".git")) {
+		warn!("Unable to remove .git directory");
+	}
 
 	// Replace "Template" with project name (no spaces)
 	let filtered_name: String = name.chars().filter(|c| !c.is_whitespace()).collect();
