@@ -59,16 +59,14 @@ pub enum Project {
 }
 
 fn find_build_directory(root: &Path) -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        // this works for 99% of users. 
-        // if you want to parse the CMakeLists.txt file to find the true build 
-        // directory 100% of the time, go ahead, but i'm not doing it
-        if root.join("build").exists() {
-            return Some(root.join("build"));
-        }
+    // this works for 99% of users. 
+    // if you want to parse the CMakeLists.txt file to find the true build 
+    // directory 100% of the time, go ahead, but i'm not doing it
+    if root.join("build").exists() {
+        Some(root.join("build"))
+    } else {
+    	None
     }
-    None
 }
 
 /// Get the project's built .geode file. Path argument should point to the 

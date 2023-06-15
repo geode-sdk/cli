@@ -1,8 +1,10 @@
 use crate::config::{Config, Profile as CfgProfile};
-use crate::{done, fail};
+use crate::{done, fail, info, warn, fatal};
 use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
+use std::process::Command;
+
 /**
  * geode profile list: List profiles of geode
  * geode profile switch: Switch main geode profile
@@ -48,11 +50,70 @@ pub enum Profile {
 		/// New name
 		new: String,
 	},
+
+	/// Open Geometry Dash based on profile
+	Run {
+		/// Profile to run, uses default if none is provided
+		profile: Option<String>,
+
+		/// Run Geometry Dash in the background instead of the foreground
+		#[clap(long)]
+		background: bool
+	}
 }
 
 fn is_valid_geode_dir(_dir: &Path) -> bool {
 	//TODO: this
 	true
+}
+
+pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
+	let prof_instance = profile.clone()
+		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
+		.unwrap_or(Some(config.get_current_profile()));
+
+	if prof_instance.is_none() {
+		fatal!("Profile '{}' does not exist", profile.unwrap_or(String::new()));
+	}
+
+	let path = &prof_instance.unwrap().gd_path;
+
+	let mut cmd = if cfg!(windows) {
+		let mut out = Command::new(path.join("GeometryDash.exe"));
+		out.current_dir(path);
+		out
+	} else {
+		let mut out = Command::new(path.join("MacOS").join("Geometry Dash"));
+
+		if path.join("MacOS").join("steam_appid.txt").exists() {
+			warn!("Steam version detected. Output may not be available.");
+
+			out.env("DYLD_INSERT_LIBRARIES", path
+				.parent().unwrap()
+				.parent().unwrap()
+				.parent().unwrap()
+				.parent().unwrap()
+				.parent().unwrap()
+				.join("Steam.AppBundle")
+				.join("Steam")
+				.join("Contents")
+				.join("MacOS")
+				.join("steamloader.dylib")
+			);
+		}
+
+		out
+	};
+
+	info!("Starting Geometry Dash");
+
+	if let Ok(mut child) = cmd.spawn() {
+		if !background {
+			child.wait().unwrap();
+		}
+	} else {
+		fail!("Unable to start Geometry Dash");
+	}
 }
 
 pub fn subcommand(config: &mut Config, cmd: Profile) {
@@ -113,5 +174,7 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		Profile::Rename { old, new } => {
 			config.rename_profile(&old, new);
 		}
+
+		Profile::Run { profile, background } => run_profile(config, profile, background)
 	}
 }

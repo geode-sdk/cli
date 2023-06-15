@@ -65,6 +65,13 @@ enum GeodeCommands {
 	Index {
 		#[clap(subcommand)]
 		commands: crate::index::Index,
+	},
+
+	/// Run default instance of Geometry Dash
+	Run {
+		/// Run Geometry Dash in the background instead of the foreground
+		#[clap(long)]
+		background: bool
 	}
 }
 
@@ -100,6 +107,7 @@ fn main() {
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
 		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
+		GeodeCommands::Run { background } => profile::run_profile(&config, None, background)
 	}
 
 	config.save();
