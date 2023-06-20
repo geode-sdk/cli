@@ -13,7 +13,7 @@ use crate::util::cache::CacheBundle;
 use crate::util::mod_file::{ModFileInfo, parse_mod_info};
 use crate::util::spritesheet;
 use crate::{cache, project};
-use crate::{done, info, warn, fatal};
+use crate::{done, info, warn, fatal, NiceUnwrap};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -88,10 +88,10 @@ pub fn install(config: &mut Config, pkg_path: &Path) {
 	let mod_path = config.get_current_profile().mods_dir();
 
 	if !mod_path.exists() {
-		fs::create_dir_all(&mod_path).expect("Could not setup mod installation");
+		fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
 	}
 	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
-		.expect("Could not install mod");
+		.nice_unwrap("Could not install mod");
 
 	done!(
 		"Installed {}",
@@ -128,7 +128,7 @@ fn zip_folder(path: &Path, output: &Path) {
 		}
 	}
 
-	zip_file.finish().expect("Unable to zip");
+	zip_file.finish().nice_unwrap("Unable to zip");
 
 	done!(
 		"Successfully packaged {}",
@@ -160,7 +160,7 @@ fn create_resources(
 	shut_up: bool,
 ) {
 	// Make sure output directory exists
-	fs::create_dir_all(output_dir).expect("Could not create resource directory");
+	fs::create_dir_all(output_dir).nice_unwrap("Could not create resource directory");
 
 	// Create spritesheets
 	for sheet in mod_info.resources.spritesheets.values() {
@@ -201,7 +201,7 @@ fn create_resources(
 			spritesheet::downscale(&mut sprite, 2);
 			sprite.save(output_dir.join(base.to_string() + ".png"))
 		})()
-		.expect(&format!(
+		.nice_unwrap(&format!(
 			"Unable to copy sprite at {}",
 			sprite_path.display()
 		));
@@ -213,7 +213,7 @@ fn create_resources(
 	// Move other resources
 	for file in &mod_info.resources.files {
 		std::fs::copy(file, output_dir.join(file.file_name().unwrap()))
-			.expect(&format!("Unable to copy file at '{}'", file.display()));
+			.nice_unwrap(&format!("Unable to copy file at '{}'", file.display()));
 	}
 
 	if !&mod_info.resources.libraries.is_empty() {
@@ -222,7 +222,7 @@ fn create_resources(
 	// Move other resources
 	for file in &mod_info.resources.libraries {
 		std::fs::copy(file, working_dir.join(file.file_name().unwrap()))
-			.expect(&format!("Unable to copy file at '{}'", file.display()));
+			.nice_unwrap(&format!("Unable to copy file at '{}'", file.display()));
 	}
 }
 
@@ -278,7 +278,7 @@ fn create_package(
 
 	// Test if possible to create file
 	if !output.exists() || output.is_dir() {
-		fs::write(&output, "").expect("Could not create package");
+		fs::write(&output, "").nice_unwrap("Could not create package");
 		fs::remove_file(&output).unwrap();
 	}
 
@@ -313,7 +313,7 @@ fn create_package(
 		let path = root_path.join(file);
 		if path.exists() {
 			std::fs::copy(path, working_dir.join(file))
-				.expect(&format!("Could not copy {file}"));
+				.nice_unwrap(&format!("Could not copy {file}"));
 		}
 	}
 
@@ -323,12 +323,12 @@ fn create_package(
 			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
 			fs::copy(root_path.join(&header), &out)
-				.expect(&format!("Unable to copy header {} to {}", header.display(), out.display()));
+				.nice_unwrap(&format!("Unable to copy header {} to {}", header.display(), out.display()));
 		}
 	}
 
 	let mut binaries_added = false;
-	for file in read_dir(root_path).expect("Unable to read root directory") {
+	for file in read_dir(root_path).nice_unwrap("Unable to read root directory") {
 		let Ok(file) = file else { continue; };
 		let path = file.path();
 		let Some(name) = path.file_stem() else { continue; };
@@ -341,7 +341,7 @@ fn create_package(
 		{
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
 			std::fs::copy(path, working_dir.join(&binary))
-				.expect(&format!("Unable to copy binary '{}'", binary));
+				.nice_unwrap(&format!("Unable to copy binary '{}'", binary));
 			binaries_added = true;
 		}
 	}
@@ -354,7 +354,7 @@ fn create_package(
 		}
 
 		std::fs::copy(binary, working_dir.join(binary_name))
-			.expect(&format!("Unable to copy binary at '{}'", binary.display()));
+			.nice_unwrap(&format!("Unable to copy binary at '{}'", binary.display()));
 		binaries_added = true;
 	}
 
@@ -377,25 +377,25 @@ pub fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> 
 	let mut text = String::new();
 
 	input.by_name("mod.json")
-		 .expect("Unable to find mod.json in package")
+		 .nice_unwrap("Unable to find mod.json in package")
 		 .read_to_string(&mut text)
-		 .expect("Unable to read mod.json");
+		 .nice_unwrap("Unable to read mod.json");
 
-	serde_json::from_str::<serde_json::Value>(&text).expect("Unable to parse mod.json")
+	serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json")
 }
 
 fn merge_packages(inputs: Vec<PathBuf>) {
 	let mut archives: Vec<_> = inputs.iter().map(|x| {
-		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).expect("Unable to unzip")
+		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).nice_unwrap("Unable to unzip")
 	}).collect();
 
 	// Sanity check
 	let mut mod_ids: Vec<_> = archives.iter_mut().map(|x|
 		mod_json_from_archive(x)
 			.get("id")
-			.expect("[mod.json]: Missing key 'id'")
+			.nice_unwrap("[mod.json]: Missing key 'id'")
 			.as_str()
-			.expect("[mod.json].id: Expected string")
+			.nice_unwrap("[mod.json].id: Expected string")
 			.to_string()
 	).collect();
 
@@ -408,7 +408,7 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		}
 	});
 
-	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).expect("Unable to create zip writer");
+	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).nice_unwrap("Unable to create zip writer");
 
 	for archive in &mut archives {
 		let potential_names = [".dylib", ".so", ".dll", ".lib"];
@@ -421,13 +421,13 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 				println!("{}", file);
 
 				out_archive.raw_copy_file(
-					archive.by_name(&file).expect("Unable to fetch file")
-				).expect("Unable to transfer binary");
+					archive.by_name(&file).nice_unwrap("Unable to fetch file")
+				).nice_unwrap("Unable to transfer binary");
 			}
 		}
 	}
 
-	out_archive.finish().expect("Unable to write to zip");
+	out_archive.finish().nice_unwrap("Unable to write to zip");
 	done!("Successfully merged binaries into {}", inputs[0].to_str().unwrap());
 }
 

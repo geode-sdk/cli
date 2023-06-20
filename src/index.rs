@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::file::copy_dir_recursive;
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
-use crate::{done, info, warn, fatal};
+use crate::{done, info, warn, fatal, NiceUnwrap};
 use sha3::{Digest, Sha3_256};
 use serde::{Serialize, Deserialize};
 use serde_json::json;
@@ -70,22 +70,22 @@ pub fn update_index(config: &Config) {
 		.header("If-None-Match", format!("\"{}\"", current_sha))
 		.header("User-Agent", "GeodeCli")
 		.send()
-		.expect("Unable to fetch index version");
+		.nice_unwrap("Unable to fetch index version");
 
 	if response.status() == 304 {
 		done!("Index is up-to-date");
 		return;
 	}
 	assert!(response.status() == 200, "Version check received status code {}", response.status());
-	let latest_sha = response.text().expect("Unable to decode index version");
+	let latest_sha = response.text().nice_unwrap("Unable to decode index version");
 
 	let mut zip_data = io::Cursor::new(Vec::new());
 
 	client.get("https://github.com/geode-sdk/mods/zipball/main")
-		.send().expect("Unable to download index")
-		.copy_to(&mut zip_data).expect("Unable to write to index");
+		.send().nice_unwrap("Unable to download index")
+		.copy_to(&mut zip_data).nice_unwrap("Unable to write to index");
 
-	let mut zip_archive = ZipArchive::new(zip_data).expect("Unable to decode index zip");
+	let mut zip_archive = ZipArchive::new(zip_data).nice_unwrap("Unable to decode index zip");
 
 
 	let before_items = if target_index_dir.join("mods").exists() {
@@ -96,7 +96,7 @@ pub fn update_index(config: &Config) {
 			.collect::<Vec<_>>();
 		items.sort();
 
-		fs::remove_dir_all(&target_index_dir).expect("Unable to remove old index version");
+		fs::remove_dir_all(&target_index_dir).nice_unwrap("Unable to remove old index version");
 		Some(items)
 	} else {
 		None
@@ -104,15 +104,15 @@ pub fn update_index(config: &Config) {
 
 	let extract_dir = std::env::temp_dir().join("geode-nuevo-index-zip");
 	if extract_dir.exists() {
-		fs::remove_dir_all(&extract_dir).expect("Unable to prepare new index");
+		fs::remove_dir_all(&extract_dir).nice_unwrap("Unable to prepare new index");
 	}
 	fs::create_dir(&extract_dir).unwrap();
-	zip_archive.extract(&extract_dir).expect("Unable to extract new index");
+	zip_archive.extract(&extract_dir).nice_unwrap("Unable to extract new index");
 
 	
 	let new_root_dir = fs::read_dir(&extract_dir).unwrap().next().unwrap().unwrap().path();
 	copy_dir_recursive(&new_root_dir, &target_index_dir)
-		.expect("Unable to copy new index");
+		.nice_unwrap("Unable to copy new index");
 
 	// we don't care if temp dir removal fails
 	drop(fs::remove_dir_all(extract_dir));
@@ -142,7 +142,7 @@ pub fn update_index(config: &Config) {
 		}
 	}
 
-	fs::write(checksum, latest_sha).expect("Unable to save version");
+	fs::write(checksum, latest_sha).nice_unwrap("Unable to save version");
 	done!("Successfully updated index")
 }
 
@@ -151,14 +151,14 @@ pub fn index_mods_dir(config: &Config) -> PathBuf {
 }
 
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
-	for dir in index_mods_dir(config).read_dir().expect("Unable to read index") {
+	for dir in index_mods_dir(config).read_dir().nice_unwrap("Unable to read index") {
 		let path = dir.unwrap().path();
 		let Ok(mod_info) = try_parse_mod_info(&path) else { continue; };
 		if &mod_info.id == id && version.matches(&mod_info.version) {
 			return Some(serde_json::from_str(
 				&fs::read_to_string(path.join("entry.json"))
-				.expect("Unable to read index entry")
-			).expect("Unable to parse index entry"));
+				.nice_unwrap("Unable to read index entry")
+			).nice_unwrap("Unable to parse index entry"));
 		}
 	}
 	None
@@ -166,26 +166,26 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 
 pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBuf {
 	let entry = get_entry(config, &id, &version)
-		.expect(&format!("Unable to find '{id}' version '{version}'"));
+		.nice_unwrap(&format!("Unable to find '{id}' version '{version}'"));
 	
 	let plat = if cfg!(windows) {
 		"windows"
 	} else if cfg!(target_os = "macos") {
 		"macos"
 	} else {
-		panic!("This platform doesn't support installing mods");
+		fatal!("This platform doesn't support installing mods");
 	};
 
 	if !entry.platforms.contains(plat) {
-		fatal!("Mod '{id}' is not available on '{plat}'");
+		fatal!("Mod '{}' is not available on '{}'", id, plat);
 	}
 	
 	info!("Installing mod '{}' version '{}'", id, version);
 
 	let bytes = reqwest::blocking::get(entry.r#mod.download)
-		.expect("Unable to download mod")
+		.nice_unwrap("Unable to download mod")
 		.bytes()
-		.expect("Unable to download mod");
+		.nice_unwrap("Unable to download mod");
 	
 	let dest = config.get_current_profile().mods_dir().join(format!("{id}.geode"));
 
@@ -195,7 +195,7 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 
 	if hash != entry.r#mod.hash {
 		fatal!(
-			"Downloaded file doesn't match expected hash\n\
+			"Downloaded file doesn't match nice_unwraped hash\n\
 			    {hash}\n\
 			 vs {}\n\
 			Try again, and if the issue persists, report this on GitHub: \
@@ -204,7 +204,7 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 		);
 	}
 
-	fs::write(&dest, bytes).expect("Unable to install .geode file");
+	fs::write(&dest, bytes).nice_unwrap("Unable to install .geode file");
 
 	dest
 }
@@ -212,7 +212,7 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 fn create_index_json(path: &Path) {
 	let url = ask_value("URL", None, true);
 
-	let response = reqwest::blocking::get(&url).expect("Unable to access .geode file at URL");
+	let response = reqwest::blocking::get(&url).nice_unwrap("Unable to access .geode file at URL");
 
 	let file_name = reqwest::Url::parse(&url).unwrap()
 		.path_segments()
@@ -222,7 +222,7 @@ fn create_index_json(path: &Path) {
 
 	let file_contents = response
 		.bytes()
-		.expect("Unable to access .geode file at URL");
+		.nice_unwrap("Unable to access .geode file at URL");
 
 	let mut hasher = Sha3_256::new();
 	hasher.update(&file_contents);
@@ -254,7 +254,7 @@ fn create_index_json(path: &Path) {
 	std::fs::write(
 		&path.join("index.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
-	).expect("Unable to write to project");
+	).nice_unwrap("Unable to write to project");
 }
 
 fn create_entry(out_path: &Path) {
@@ -276,20 +276,20 @@ fn create_entry(out_path: &Path) {
 	if entry_path.exists() {
 		warn!("Directory not empty");
 	} else {
-		fs::create_dir(&entry_path).expect("Unable to create folder");
+		fs::create_dir(&entry_path).nice_unwrap("Unable to create folder");
 	}
 
 	create_index_json(&entry_path);
-	fs::copy(&mod_json_path, entry_path.join("mod.json")).expect("Unable to copy mod.json");
+	fs::copy(&mod_json_path, entry_path.join("mod.json")).nice_unwrap("Unable to copy mod.json");
 
 	if about_path.exists() {
-		fs::copy(&about_path, entry_path.join("about.md")).expect("Unable to copy about.md");
+		fs::copy(&about_path, entry_path.join("about.md")).nice_unwrap("Unable to copy about.md");
 	} else {
 		warn!("No about.md found, skipping");
 	}
 
 	if logo_path.exists() {
-		fs::copy(&logo_path, entry_path.join("logo.png")).expect("Unable to copy logo.png");
+		fs::copy(&logo_path, entry_path.join("logo.png")).nice_unwrap("Unable to copy logo.png");
 	} else {
 		warn!("No logo.png found, skipping");
 	}

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::{done, fail, fatal, info, warn};
+use crate::{done, fail, info, warn, NiceUnwrap};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -136,7 +136,7 @@ impl Config {
 	pub fn get_current_profile(&self) -> Ref<Profile> {
 		self
 			.get_profile(&self.current_profile)
-			.expect("No current profile found!")
+			.nice_unwrap("No current profile found!")
 			.borrow()
 	}
 
@@ -170,12 +170,7 @@ impl Config {
 	}
 
 	pub fn sdk_path() -> PathBuf {
-		match Self::try_sdk_path() {
-			Ok(path) => path,
-			Err(err) => {
-				fatal!("{}", err);
-			}
-		}
+		Self::try_sdk_path().nice_unwrap("Unable to get SDK path")
 	}
 
 	pub fn new() -> Config {
@@ -207,17 +202,16 @@ impl Config {
 		} else {
 			// Parse config
 			let config_json_str =
-				&std::fs::read_to_string(&config_json).expect("Unable to read config.json");
+				&std::fs::read_to_string(&config_json).nice_unwrap("Unable to read config.json");
 			match serde_json::from_str(config_json_str) {
 				Ok(json) => json,
 				Err(e) => {
 					// Try migrating old config
-					if let Ok(json) = serde_json::from_str::<OldConfig>(config_json_str) {
-						info!("Migrating old config.json");
-						json.migrate()
-					} else {
-						fatal!("Unable to parse config.json: {}", e);
-					}
+					let json = serde_json::from_str::<OldConfig>(config_json_str)
+						.ok()
+						.nice_unwrap(format!("Unable to parse config.json: {}", e));
+					info!("Migrating old config.json");
+					json.migrate()
 				}
 			}
 		};
@@ -235,18 +229,18 @@ impl Config {
 	}
 
 	pub fn save(&self) {
-		std::fs::create_dir_all(geode_root()).expect("Unable to create Geode directory");
+		std::fs::create_dir_all(geode_root()).nice_unwrap("Unable to create Geode directory");
 		std::fs::write(
 			geode_root().join("config.json"),
 			serde_json::to_string(self).unwrap(),
 		)
-		.expect("Unable to save config");
+		.nice_unwrap("Unable to save config");
 	}
 
 	pub fn rename_profile(&mut self, old: &str, new: String) {
 		let profile = self
 			.get_profile(&Some(String::from(old)))
-			.expect(&format!("Profile named '{}' does not exist", old));
+			.nice_unwrap(&format!("Profile named '{}' does not exist", old));
 
 		if self.get_profile(&Some(new.to_owned())).is_some() {
 			fail!("The name '{}' is already taken!", new);

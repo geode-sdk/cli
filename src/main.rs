@@ -82,19 +82,6 @@ fn main() {
 		Err(_) => println!("Unable to enable color support, output may look weird!")
 	};
 
-	std::panic::set_hook(Box::new(|info| {
-		if let Some(msg) = info.payload().downcast_ref::<&str>() {
-			fatal!(
-				"{} {}",
-				msg,
-				info.location().map(|l| format!("({l})")).unwrap_or(String::new())
-			);
-		}
-		else {
-			fatal!("{}", info);
-		}
-	}));
-
 	let args = Args::parse();
 
 	let mut config = config::Config::new();

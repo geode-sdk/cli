@@ -17,7 +17,7 @@ use crate::launchctl;
 use winreg::RegKey;
 
 use crate::confirm;
-use crate::{done, fail, fatal, info, warn};
+use crate::{done, fail, fatal, info, warn, NiceUnwrap};
 
 #[derive(Deserialize)]
 struct GithubReleaseAsset {
@@ -248,11 +248,11 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 
 	let repo = builder
 		.clone("https://github.com/geode-sdk/geode", &path)
-		.expect("Could not download SDK");
+		.nice_unwrap("Could not download SDK");
 
 	// update submodules, because for some reason
 	// Repository::update_submodules is private
-	update_submodules_recurse(&repo).expect("Unable to update submodules!");
+	update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
 	// set GEODE_SDK environment variable;
 	if set_sdk_env(&path) {
@@ -290,7 +290,7 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 
 	// Initialize repository
 	let repo = Repository::open(Config::sdk_path())
-		.expect("Could not initialize local SDK repository");
+		.nice_unwrap("Could not initialize local SDK repository");
 
 	// Fetch
 	let mut remote = repo
@@ -313,7 +313,7 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 			Some(FetchOptions::new().remote_callbacks(callbacks)),
 			None,
 		)
-		.expect("Could not fetch latest update");
+		.nice_unwrap("Could not fetch latest update");
 
 	// Check if can fast-forward
 	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
@@ -342,11 +342,11 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 
 fn switch_to_ref(repo: &Repository, name: &str) {
 	let (obj, refer) = repo.revparse_ext(name).unwrap();
-	repo.checkout_tree(&obj, None).expect("Unable to checkout tree");
+	repo.checkout_tree(&obj, None).nice_unwrap("Unable to checkout tree");
 	match refer {
 		Some(gref) => repo.set_head(gref.name().unwrap()),
 		None => repo.set_head_detached(obj.id()),
-	}.expect("Failed to update head");
+	}.nice_unwrap("Failed to update head");
 }
 
 fn switch_to_tag(config: &mut Config, repo: &Repository) {
@@ -361,7 +361,7 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	let mut latest_version: Option<Version> = None;
 	for tag in repo
 		.tag_names(None)
-		.expect("Unable to get SDK tags")
+		.nice_unwrap("Unable to get SDK tags")
 		.iter()
 		.flatten()
 	{
@@ -411,12 +411,9 @@ fn install_binaries(config: &mut Config) {
 		.get(&url)
 		.headers(headers)
 		.send()
-		.expect("Unable to get download info from GitHub")
+		.nice_unwrap("Unable to get download info from GitHub")
 		.json::<GithubReleaseResponse>()
-		.unwrap_or_else(|_| fatal!(
-			"It appears that \"{}\" is not a valid Geode release",
-			release_tag
-		));
+		.nice_unwrap(format!("Could not parse Geode release \"{}\"", release_tag));
 
 	let mut target_url: Option<String> = None;
 	for asset in res.assets {
@@ -437,19 +434,19 @@ fn install_binaries(config: &mut Config) {
 
 	assert!(target_url.is_some(), "No binaries found for current platform!");
 
-	fs::create_dir_all(&target_dir).expect("Unable to create directory for binaries");
+	fs::create_dir_all(&target_dir).nice_unwrap("Unable to create directory for binaries");
 
 	info!("Downloading");
 
 	let temp_zip = target_dir.join("temp.zip");
-	download_url(target_url.unwrap(), &temp_zip).expect("Downloading binaries failed");
+	download_url(target_url.unwrap(), &temp_zip).nice_unwrap("Downloading binaries failed");
 
-	let file = fs::File::open(&temp_zip).expect("Unable to read downloaded ZIP");
-	let mut zip = zip::ZipArchive::new(file).expect("Downloaded ZIP appears to be corrupted");
+	let file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
+	let mut zip = zip::ZipArchive::new(file).nice_unwrap("Downloaded ZIP appears to be corrupted");
 	zip.extract(target_dir)
-		.expect("Unable to unzip downloaded binaries");
+		.nice_unwrap("Unable to unzip downloaded binaries");
 
-	fs::remove_file(temp_zip).expect("Unable to clean up downloaded ZIP");
+	fs::remove_file(temp_zip).nice_unwrap("Unable to clean up downloaded ZIP");
 
 	done!("Binaries installed");
 }
@@ -457,7 +454,7 @@ fn install_binaries(config: &mut Config) {
 fn set_sdk_path(path: PathBuf, do_move: bool) {
 	if do_move {
 		let old = std::env::var("GEODE_SDK").map(PathBuf::from)
-			.expect("Cannot locate SDK.");
+			.nice_unwrap("Cannot locate SDK.");
 
 		assert!(old.is_dir(), 
 			"Internal Error: GEODE_SDK doesn't point to a directory ({}). This \
@@ -468,7 +465,7 @@ fn set_sdk_path(path: PathBuf, do_move: bool) {
 		assert!(old.join("VERSION").exists(), "Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.");
 		assert!(!path.exists(), "Cannot move SDK to existing path {}", path.to_str().unwrap());
 
-		fs::rename(old, &path).expect("Unable to move SDK");
+		fs::rename(old, &path).nice_unwrap("Unable to move SDK");
 	} else {
 		assert!(path.exists(), "Cannot set SDK path to nonexistent directory {}", path.to_str().unwrap());
 		assert!(path.is_dir(), "Cannot set SDK path to non-directory {}", path.to_str().unwrap());
@@ -485,10 +482,10 @@ fn set_sdk_path(path: PathBuf, do_move: bool) {
 pub fn get_version() -> Version {
 	Version::parse(
 		fs::read_to_string(Config::sdk_path().join("VERSION"))
-			.expect("Unable to read SDK version, make sure you are using SDK v0.4.2 or later")
+			.nice_unwrap("Unable to read SDK version, make sure you are using SDK v0.4.2 or later")
 			.as_str(),
 	)
-	.expect("Invalid SDK version")
+	.nice_unwrap("Invalid SDK version")
 }
 
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
@@ -517,7 +514,7 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 						PathBuf::from("/Users/Shared/Geode/sdk")
 					} else {
 						dirs::document_dir()
-							.expect(
+							.nice_unwrap(
 								"No default path available! \
 								Please provide the path manually as an\
 								argument to `geode sdk install`",

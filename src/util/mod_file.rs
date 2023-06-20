@@ -5,6 +5,7 @@ use std::fs;
 use std::io::Read;
 use std::path::{PathBuf, Path};
 use crate::spritesheet::SpriteSheet;
+use crate::NiceUnwrap;
 
 trait Glob {
 	fn glob(self) -> Self;
@@ -21,7 +22,7 @@ impl Glob for Vec<PathBuf> {
 						.to_str()
 						.unwrap()
 				)
-				.unwrap_or_else(|_| panic!("Invalid glob pattern {}", src.to_str().unwrap()))
+				.nice_unwrap(format!("Invalid glob pattern {}", src.to_str().unwrap()))
 				.map(|g| g.unwrap())
 			).collect()
 	}

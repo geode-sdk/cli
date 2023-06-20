@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::util::config::Profile;
-use crate::{done, fail, info};
+use crate::{done, fail, info, NiceUnwrap};
 use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
@@ -61,7 +61,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				config.default_developer = Some(value);
 			} else if field == "sdk-nightly" {
 				config.sdk_nightly =
-					get_bool(&value).expect(&format!("'{}' cannot be parsed as a bool", value));
+					get_bool(&value).nice_unwrap(&format!("'{}' cannot be parsed as a bool", value));
 			} else if field == "sdk-path" {
 				fail!("Set the SDK Path using `geode sdk set-path <PATH>`");
 				return;

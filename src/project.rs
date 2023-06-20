@@ -2,7 +2,8 @@
 use std::{fs, path::{PathBuf, Path}, collections::HashMap};
 use clap::Subcommand;
 use semver::{Version, VersionReq};
-use crate::{util::{config::Config, mod_file::{parse_mod_info, ModFileInfo, Dependency, try_parse_mod_info}}, package::get_working_dir, done, warn, info, index::{update_index, index_mods_dir, install_mod}, fail, file::read_dir_recursive, fatal, template, indexer};
+use crate::{util::{config::Config, mod_file::{parse_mod_info, ModFileInfo, Dependency, try_parse_mod_info}}, package::get_working_dir, index::{update_index, index_mods_dir, install_mod}, file::read_dir_recursive, template, indexer};
+use crate::{done, warn, info, fail, fatal, NiceUnwrap};
 use edit_distance::edit_distance;
 
 #[derive(Subcommand, Debug)]
@@ -83,16 +84,16 @@ fn clear_cache(dir: &Path) {
 
     // Remove cache directory
 	let workdir = get_working_dir(&mod_info.id);
-	fs::remove_dir_all(workdir).expect("Unable to remove cache directory");
+	fs::remove_dir_all(workdir).nice_unwrap("Unable to remove cache directory");
 
     // Remove cached .geode package
     let dir = find_build_directory(dir);
     if let Some(dir) = dir {
-        for file in fs::read_dir(&dir).expect("Unable to read build directory") {
+        for file in fs::read_dir(&dir).nice_unwrap("Unable to read build directory") {
             let path = file.unwrap().path();
             let Some(ext) = path.extension() else { continue };
             if ext == "geode" {
-                fs::remove_file(path).expect("Unable to delete cached .geode package");
+                fs::remove_file(path).nice_unwrap("Unable to delete cached .geode package");
             }
         }
     }
@@ -216,7 +217,7 @@ pub fn check_dependencies(
 				let name = split.next().unwrap().to_string();
 				let ver = split.next().unwrap();
 				(name, Some(Version::parse(ver.strip_prefix("v").unwrap_or(ver))
-					.expect("Invalid version in external {name}")
+					.nice_unwrap("Invalid version in external {name}")
 				))
 			}
 			else {
@@ -236,7 +237,7 @@ pub fn check_dependencies(
 	}
 
 	let dep_dir = output.join("geode-deps");
-	fs::create_dir_all(&dep_dir).expect("Unable to create dependency directory");
+	fs::create_dir_all(&dep_dir).nice_unwrap("Unable to create dependency directory");
 
 	// check all dependencies
 	for dep in mod_info.dependencies {
@@ -279,12 +280,12 @@ pub fn check_dependencies(
 		// check index
 		let found_in_index = find_dependency(
 			&dep, &index_mods_dir(config), false
-		).expect("Unable to read index");
+		).nice_unwrap("Unable to read index");
 
 		// check installed mods
 		let found_in_installed = find_dependency(
 			&dep, &config.get_current_profile().mods_dir(), true
-		).expect("Unable to read installed mods");
+		).nice_unwrap("Unable to read installed mods");
 
 		// if not found in either        hjfod  code
 		if !matches!(found_in_index,     Found::Some(_, _)) &&
@@ -429,7 +430,7 @@ pub fn check_dependencies(
 		// check already installed dependencies
 		// let found_in_deps = find_dependency(
 		// 	&dep, &dep_dir, false
-		// ).expect("Unable to read dependencies");
+		// ).nice_unwrap("Unable to read dependencies");
 
 		// !this check may be added back at some point, but for now there's not 
 		// too much performance benefit from doing this, and doing it might 
@@ -444,16 +445,16 @@ pub fn check_dependencies(
 		// unzip the whole .geode package because there's only like a few 
 		// extra files there aside from the lib, headers, and resources
 		zip::ZipArchive::new(fs::File::open(path_to_dep_geode).unwrap())
-			.expect("Unable to unzip")
+			.nice_unwrap("Unable to unzip")
 			.extract(dep_dir.join(&dep.id))
-			.expect("Unable to extract geode package");
+			.nice_unwrap("Unable to extract geode package");
 		
 		// add a note saying if the dependencey is required or not (for cmake to 
 		// know if to link or not)
 		fs::write(
 			dep_dir.join(dep.id).join("geode-dep-options.json"),
 			format!(r#"{{ "required": {} }}"#, if dep.required { "true" } else { "false" })
-		).expect("Unable to save dep options");
+		).nice_unwrap("Unable to save dep options");
 	}
 
 	if errors {
@@ -465,15 +466,13 @@ pub fn check_dependencies(
 }
 
 pub fn publish_project(_config: &Config, dir: &Path, package_path: Option<PathBuf>) {
-    let Some(pkg) = package_path.or(get_built_package(dir)) else {
-        fatal!(
-            "Unable to find the project's .geode package - please try manually \
-            specifying the path to the project's built .geode package using \
-            the `--package <path>` option.\nThis issue is likely caused by \
-            an outdated Geode SDK version (at least 1.0.0-beta.8 needed) or \
-            by building multiple projects from the same directory."
-        );
-    };
+    let pkg = package_path.or(get_built_package(dir)).nice_unwrap(
+	    	"Unable to find the project's .geode package - please try manually \
+	    	specifying the path to the project's built .geode package using \
+	    	the `--package <path>` option.\nThis issue is likely caused by \
+	    	an outdated Geode SDK version (at least 1.0.0-beta.8 needed) or \
+	    	by building multiple projects from the same directory."
+    );
 
     // initialize indexer and add mod there
     if !indexer::is_initialized() {

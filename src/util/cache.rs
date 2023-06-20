@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use crate::mod_file::BitmapFont;
 use crate::spritesheet::SpriteSheet;
-use crate::warn;
+use crate::{warn, NiceUnwrap};
 
 #[derive(Serialize, Deserialize)]
 pub struct ResourceCache {
@@ -80,7 +80,7 @@ pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
 		.exists()
 		.then(|| {
 			let cache = ResourceCache::load(
-				fs::read_to_string(path.join(".geode_cache")).expect("Unable to read cache"),
+				fs::read_to_string(path.join(".geode_cache")).nice_unwrap("Unable to read cache"),
 			);
 			Some(CacheBundle {
 				cache,
@@ -93,7 +93,7 @@ pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 	path.exists()
 		.then(|| {
-			match zip::ZipArchive::new(File::open(path).expect("Unable to open cached package")) {
+			match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cached package")) {
 				Ok(mut archive) => {
 					let cache: ResourceCache = if archive.by_name(".geode_cache").is_ok() {
 						let mut cache_data = String::new();
@@ -136,7 +136,7 @@ impl ResourceCache {
 
 	pub fn load(cache_data: String) -> ResourceCache {
 		serde_json::from_str::<ResourceCache>(&cache_data)
-			.expect("Unable to parse cache file: {}")
+			.nice_unwrap("Unable to parse cache file")
 	}
 
 	pub fn save(&self, path: &Path) {

@@ -2,7 +2,7 @@
 use crate::config::Config;
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
-use crate::{done, info, warn};
+use crate::{done, info, warn, NiceUnwrap};
 use git2::Repository;
 use path_absolutize::Absolutize;
 use regex::Regex;
@@ -28,14 +28,14 @@ fn create_template(
 			return;
 		}
 	} else {
-		fs::create_dir_all(&project_location).expect("Unable to create project directory");
+		fs::create_dir_all(&project_location).nice_unwrap("Unable to create project directory");
 	}
 
 	// Clone repository
 	Repository::clone(
 		"https://github.com/geode-sdk/example-mod",
 		&project_location,
-	).expect("Unable to clone repository");
+	).nice_unwrap("Unable to clone repository");
 
 	if let Err(_) = fs::remove_dir_all(project_location.join(".git")) {
 		warn!("Unable to remove .git directory");
@@ -61,11 +61,11 @@ fn create_template(
 		let cmake_regex = Regex::new(r"\n#.*").unwrap();
 		let cpp_regex = Regex::new(r".*/\*\*\r?\n(?:\s*\* .*\r?\n)*\s*\*/\r?\n?").unwrap();
 
-		let cmake_text = fs::read_to_string(&cmake_path).expect("Unable to read template file CMakeLists.txt");
-		let cpp_text = fs::read_to_string(&cpp_path).expect("Unable to read template file main.cpp");
+		let cmake_text = fs::read_to_string(&cmake_path).nice_unwrap("Unable to read template file CMakeLists.txt");
+		let cpp_text = fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
 
-		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, "")).expect("Unable to access template file CMakeLists.txt");
-		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, "")).expect("Unable to access template file main.cpp");
+		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, "")).nice_unwrap("Unable to access template file CMakeLists.txt");
+		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, "")).nice_unwrap("Unable to access template file main.cpp");
 	}
 
 	// Default mod.json
@@ -88,7 +88,7 @@ fn create_template(
 	fs::write(
 		&project_location.join("mod.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
-	).expect("Unable to write to project");
+	).nice_unwrap("Unable to write to project");
 
 	// FIXME: should this be here? at least have an option,
 	// right now you can't even tell its running cmake
@@ -102,7 +102,7 @@ fn create_template(
 				.arg("build")
 				.arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=1")
 				.output()
-				.expect("Unable to initialize project with CMake");
+				.nice_unwrap("Unable to initialize project with CMake");
 		} else {
 			warn!("CMake not found. CMake is required to build Geode projects.");
 		}

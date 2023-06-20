@@ -4,11 +4,11 @@ use std::fs;
 use std::path::PathBuf;
 use git2::{Repository, ResetType, IndexAddOption, Signature};
 use crate::package::mod_json_from_archive;
-use crate::{info, done, fatal, warn};
+use crate::{info, done, fatal, warn, NiceUnwrap};
 use colored::Colorize;
 
 fn reset_and_commit(repo: &Repository, msg: &str) {
-	let head = repo.head().expect("Broken repository, can't get HEAD");
+	let head = repo.head().nice_unwrap("Broken repository, can't get HEAD");
 	if !head.is_branch() {
 		fatal!("Broken repository, detached HEAD");
 	}
@@ -18,16 +18,16 @@ fn reset_and_commit(repo: &Repository, msg: &str) {
 		commit = commit.parent(0).unwrap();
 	}
 
-	repo.reset(commit.as_object(), ResetType::Soft, None).expect("Unable to refresh repository");
+	repo.reset(commit.as_object(), ResetType::Soft, None).nice_unwrap("Unable to refresh repository");
 	
-	let mut index = repo.index().expect("cannot get the Index file");
-	index.add_all(["."].iter(), IndexAddOption::DEFAULT, None).expect("Unable to add changes");
-	index.write().expect("Unable to write changes");
+	let mut index = repo.index().nice_unwrap("cannot get the Index file");
+	index.add_all(["."].iter(), IndexAddOption::DEFAULT, None).nice_unwrap("Unable to add changes");
+	index.write().nice_unwrap("Unable to write changes");
 
 	let sig = Signature::now("GeodeBot", "hjfodgames@gmail.com").unwrap();
 
-	let tree = repo.find_tree(index.write_tree().expect("Unable to get write tree")).unwrap();
-	repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &[&commit]).expect("Unable to commit");
+	let tree = repo.find_tree(index.write_tree().nice_unwrap("Unable to get write tree")).unwrap();
+	repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &[&commit]).nice_unwrap("Unable to commit");
 }
 
 pub fn indexer_path() -> PathBuf {
@@ -58,7 +58,7 @@ pub fn initialize() {
 	);
 
 	let fork_url = ask_value("Enter the URL of your fork", None, true);
-	Repository::clone(&fork_url, indexer_path()).expect("Unable to clone your repository.");
+	Repository::clone(&fork_url, indexer_path()).nice_unwrap("Unable to clone your repository.");
 
 	done!("Successfully initialized Indexer");
 }
@@ -90,9 +90,9 @@ pub fn remove_mod(id: String) {
 		fatal!("Cannot remove mod {}: does not exist", id);
 	}
 
-	fs::remove_dir_all(mod_path).expect("Unable to remove mod");
+	fs::remove_dir_all(mod_path).nice_unwrap("Unable to remove mod");
 
-	let repo = Repository::open(&indexer_path).expect("Unable to open repository");
+	let repo = Repository::open(&indexer_path).nice_unwrap("Unable to open repository");
 	reset_and_commit(&repo, &format!("Remove {}", &id));
 
 	done!("Succesfully removed {}\n", id);
@@ -110,15 +110,15 @@ pub fn add_mod(package: PathBuf) {
 		fatal!("Package path {} does not exist!", package.display());
 	}
 
-	let mut archive = zip::ZipArchive::new(fs::File::open(&package).unwrap()).expect("Unable to read package");
+	let mut archive = zip::ZipArchive::new(fs::File::open(&package).unwrap()).nice_unwrap("Unable to read package");
 	
 	let mod_json = mod_json_from_archive(&mut archive);
 
 	let major_version = mod_json
 		.get("version")
-		.expect("[mod.json]: Missing key 'version'")
+		.nice_unwrap("[mod.json]: Missing key 'version'")
 		.as_str()
-		.expect("[mod.json].version: Expected string")
+		.nice_unwrap("[mod.json].version: Expected string")
 		.split(".")
 		.next()
 		.unwrap()
@@ -128,22 +128,22 @@ pub fn add_mod(package: PathBuf) {
 
 	let mod_id = mod_json_from_archive(&mut archive)
 		.get("id")
-		.expect("[mod.json]: Missing key 'id'")
+		.nice_unwrap("[mod.json]: Missing key 'id'")
 		.as_str()
-		.expect("[mod.json].id: Expected string")
+		.nice_unwrap("[mod.json].id: Expected string")
 		.to_string();
 
 	let mod_path = indexer_path.join(format!("{}@{}", &mod_id, &major_version));
 	if !mod_path.exists() {
 		fs::create_dir(&mod_path)
-			.expect("Unable to create directory in local indexer for mod");
+			.nice_unwrap("Unable to create directory in local indexer for mod");
 	}
 
 	fs::copy(package, mod_path.join("mod.geode"))
-		.expect("Unable to copy .geode package to local Indexer");
+		.nice_unwrap("Unable to copy .geode package to local Indexer");
 
 	let repo = Repository::open(&indexer_path)
-			.expect("Unable to open local Indexer repository");
+			.nice_unwrap("Unable to open local Indexer repository");
 	reset_and_commit(&repo, &format!("Add/Update {}", &mod_id));
 
 	match repo.find_remote("origin").and_then(|mut o| o.push(&["main"], None)) {

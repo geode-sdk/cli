@@ -1,5 +1,5 @@
 use crate::config::{Config, Profile as CfgProfile};
-use crate::{done, fail, info, warn, fatal};
+use crate::{done, fail, info, warn, NiceUnwrap};
 use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
@@ -68,15 +68,11 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 }
 
 pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
-	let prof_instance = profile.clone()
+	let path = &profile.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
-		.unwrap_or(Some(config.get_current_profile()));
-
-	if prof_instance.is_none() {
-		fatal!("Profile '{}' does not exist", profile.unwrap_or(String::new()));
-	}
-
-	let path = &prof_instance.unwrap().gd_path;
+		.unwrap_or(Some(config.get_current_profile()))
+		.nice_unwrap(format!("Profile '{}' does not exist", profile.unwrap_or(String::new())))
+		.gd_path;
 
 	let mut cmd = if cfg!(windows) {
 		let mut out = Command::new(path.join("GeometryDash.exe"));
@@ -107,12 +103,9 @@ pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
 
 	info!("Starting Geometry Dash");
 
-	if let Ok(mut child) = cmd.spawn() {
-		if !background {
-			child.wait().unwrap();
-		}
-	} else {
-		fail!("Unable to start Geometry Dash");
+	let mut child = cmd.spawn().nice_unwrap("Unable to start Geometry Dash");
+	if !background {
+		child.wait().unwrap();
 	}
 }
 

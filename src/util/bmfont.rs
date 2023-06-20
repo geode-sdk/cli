@@ -8,7 +8,7 @@ use texture_packer::texture::Texture;
 use texture_packer::TexturePacker;
 use texture_packer::TexturePackerConfig;
 
-use crate::{done, info};
+use crate::{done, info, NiceUnwrap};
 use image::{Rgba, RgbaImage};
 
 use super::mod_file::ModFileInfo;
@@ -189,7 +189,7 @@ fn initialize_font_bundle(
 
 	// Create .png file
 	let exporter = ImageExporter::export(&packer).unwrap();
-	let mut f = fs::File::create(&bundle.png).expect("Unable to write font .png file");
+	let mut f = fs::File::create(&bundle.png).nice_unwrap("Unable to write font .png file");
 	exporter.write_to(&mut f, image::ImageFormat::Png).unwrap();
 
 	// Get all characters and their metrics (positions in the png)
@@ -264,7 +264,7 @@ fn initialize_font_bundle(
 		kerning_count = all_kerning_pairs.len(),
 		all_kernings = all_kerning_pairs.join("\n"),
 	);
-	fs::write(&bundle.fnt, fnt_data).expect("Unable to write font .fnt file");
+	fs::write(&bundle.fnt, fnt_data).nice_unwrap("Unable to write font .fnt file");
 
 	PathBuf::from(font.name.to_owned() + ".png")
 }
