@@ -14,9 +14,10 @@ impl ColorMap for RGBA4444 {
 
 	#[inline(always)]
 	fn map_color(&self, color: &mut Rgba<u8>) {
-		color[0] = (color[0] / 15) * 15;
-		color[1] = (color[1] / 15) * 15;
-		color[2] = (color[2] / 15) * 15;
-		color[3] = (color[3] / 15) * 15;
+		let convert = |x: u8| (x as f32 / 255.0 * 15.0) as u8 * (255 / 15);
+		color[0] = convert(color[0]);
+		color[1] = convert(color[1]);
+		color[2] = convert(color[2]);
+		color[3] = convert(color[3]);
 	}
 }
