@@ -483,7 +483,8 @@ pub fn get_version() -> Version {
 	Version::parse(
 		fs::read_to_string(Config::sdk_path().join("VERSION"))
 			.nice_unwrap("Unable to read SDK version, make sure you are using SDK v0.4.2 or later")
-			.as_str(),
+			.as_str()
+			.trim(),
 	)
 	.nice_unwrap("Invalid SDK version")
 }
