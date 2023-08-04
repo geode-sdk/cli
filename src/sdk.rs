@@ -417,6 +417,11 @@ fn install_binaries(config: &mut Config) {
 
 	let mut target_url: Option<String> = None;
 	for asset in res.assets {
+		// skip installers
+		if asset.name.to_lowercase().contains("installer") {
+			continue;
+		}
+
 		#[cfg(any(target_os = "windows", target_os = "linux"))]
 		if asset.name.to_lowercase().contains("win") {
 			target_url = Some(asset.browser_download_url);
