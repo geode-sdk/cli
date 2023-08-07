@@ -9,6 +9,7 @@ use crate::{done, info, warn, fatal, NiceUnwrap};
 use sha3::{Digest, Sha3_256};
 use serde::{Serialize, Deserialize};
 use serde_json::json;
+use reqwest::header::{USER_AGENT, AUTHORIZATION};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -68,7 +69,8 @@ pub fn update_index(config: &Config) {
 	let response = client.get("https://api.github.com/repos/geode-sdk/mods/commits/main")
 		.header("Accept", "application/vnd.github.sha")
 		.header("If-None-Match", format!("\"{}\"", current_sha))
-		.header("User-Agent", "GeodeCli")
+		.header(USER_AGENT, "GeodeCli")
+		.header(AUTHORIZATION, std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")))
 		.send()
 		.nice_unwrap("Unable to fetch index version");
 

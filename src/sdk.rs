@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::util::logging::ask_confirm;
 use git2::build::RepoBuilder;
 use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
-use reqwest::header::{HeaderMap, HeaderValue, USER_AGENT};
+use reqwest::header::{USER_AGENT, AUTHORIZATION};
 use semver::{Version, Prerelease};
 use serde::Deserialize;
 use std::fs;
@@ -399,17 +399,14 @@ fn install_binaries(config: &mut Config) {
 		stripped_ver.pre = Prerelease::EMPTY;
 		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
 	}
-	let url = format!(
-		"https://api.github.com/repos/geode-sdk/geode/releases/tags/{}",
-		release_tag
-	);
-
-	let mut headers = HeaderMap::new();
-	headers.insert(USER_AGENT, HeaderValue::from_static("github_api/1.0"));
 
 	let res = reqwest::blocking::Client::new()
-		.get(&url)
-		.headers(headers)
+		.get(&format!(
+			"https://api.github.com/repos/geode-sdk/geode/releases/tags/{}",
+			release_tag
+		))
+		.header(USER_AGENT, "github_api/1.0")
+		.header(AUTHORIZATION, std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")))
 		.send()
 		.nice_unwrap("Unable to get download info from GitHub")
 		.json::<GithubReleaseResponse>()
