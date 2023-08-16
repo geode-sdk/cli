@@ -5,6 +5,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
 use std::io::BufRead;
+
 /**
  * geode info
  */
@@ -109,7 +110,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 		Info::Setup {} => {
 			if config.profiles.is_empty() {
-				info!("Please enter the path to the Geometry Dash folder:");
+				info!("Please enter the path to the Geometry Dash app:");
 
 				let path = loop {
 					let mut buf = String::new();
@@ -123,24 +124,34 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 					// Verify path is valid
 					let path = PathBuf::from(buf.trim());
-					if !path.is_dir() {
-						fail!(
-							"The path must point to the Geometry Dash \
-							folder, not the executable"
-						);
-						continue;
+
+					if cfg!(windows) {
+						if path.is_dir() {
+							fail!(
+								"The path must point to the Geometry Dash exe,\
+								not the folder it's in"
+							);
+							continue;
+						} else if path.extension().and_then(|p| p.to_str()).unwrap_or("") != "exe" {
+							fail!("The path must point to a .exe file");
+							continue;
+						}
+					} else {
+						if !path.is_dir() ||
+						   path.extension().and_then(|p| p.to_str()).unwrap_or("") != "app"
+						{
+							fail!("The path must point to the Geometry Dash app");
+							continue;
+						} else if path.join("Contents/MacOS/Geometry Dash").exists()
+						{
+							fail!("The path must point to the Geometry Dash app, not a Steam shortcut");
+							continue;
+						}
 					}
-					if path
-						.read_dir()
-						.map(|mut files| files.next().is_none())
-						.unwrap_or(false)
-					{
-						fail!("Given path appears to be empty");
-						continue;
-					}
+
+					break path;
 					// todo: maybe do some checksum verification
 					// to make sure GD 2.113 is in the folder
-					break path;
 				};
 
 				info!("Please enter a name for the profile:");

@@ -75,17 +75,16 @@ pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
 		.gd_path;
 
 	let mut cmd = if cfg!(windows) {
-		let mut out = Command::new(path.join("GeometryDash.exe"));
-		out.current_dir(path);
+		let mut out = Command::new(path);
+		out.current_dir(path.parent().unwrap());
 		out
 	} else {
-		let mut out = Command::new(path.join("MacOS").join("Geometry Dash"));
+		let mut out = Command::new(path.join("Contents/MacOS/Geometry Dash"));
 
-		if path.join("MacOS").join("steam_appid.txt").exists() {
+		if path.join("Contents/MacOS/steam_appid.txt").exists() {
 			warn!("Steam version detected. Output may not be available.");
 
 			out.env("DYLD_INSERT_LIBRARIES", path
-				.parent().unwrap()
 				.parent().unwrap()
 				.parent().unwrap()
 				.parent().unwrap()

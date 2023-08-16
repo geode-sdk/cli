@@ -29,7 +29,7 @@ pub struct Config {
 }
 
 // old config.json structures for migration
-
+// TODO: remove this in 3.0
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct OldConfigInstallation {
@@ -37,6 +37,7 @@ pub struct OldConfigInstallation {
 	pub executable: String,
 }
 
+// TODO: remove this in 3.0
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct OldConfig {
@@ -46,6 +47,7 @@ pub struct OldConfig {
 	pub default_developer: Option<String>,
 }
 
+// TODO: remove this in 3.0
 impl OldConfig {
 	pub fn migrate(&self) -> Config {
 		let profiles = self
@@ -102,17 +104,37 @@ pub fn geode_root() -> PathBuf {
 	data_dir
 }
 
+fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
+	// Migrate folder to executable
+	if cfg!(windows) && path.is_dir() {
+		path.push("GeometryDash.exe");
+
+		if !path.exists() {
+			warn!("Unable to find GeometryDash.exe in profile \
+				  '{}', please update the GD path for it", name);
+		}
+	} else if path.file_name().unwrap() == "Contents" {
+		path = path.parent().unwrap().to_path_buf();
+	}
+
+	path
+}
+
 impl Profile {
 	pub fn new(name: String, location: PathBuf) -> Profile {
 		Profile {
+			gd_path: migrate_location(&name, location),
 			name,
-			gd_path: location,
 			other: HashMap::<String, Value>::new(),
 		}
 	}
 
 	pub fn geode_dir(&self) -> PathBuf {
-		self.gd_path.join("geode")
+		if cfg!(windows) {
+			self.gd_path.parent().unwrap().join("geode")
+		} else {
+			self.gd_path.join("Contents/geode")
+		}
 	}
 
 	pub fn index_dir(&self) -> PathBuf {
@@ -207,6 +229,7 @@ impl Config {
 				Ok(json) => json,
 				Err(e) => {
 					// Try migrating old config
+					// TODO: remove this in 3.0
 					let json = serde_json::from_str::<OldConfig>(config_json_str)
 						.ok()
 						.nice_unwrap(format!("Unable to parse config.json: {}", e));
