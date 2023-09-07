@@ -259,5 +259,5 @@ pub fn try_parse_mod_info(root_path: &Path) -> Result<ModFileInfo, String> {
 }
 
 pub fn parse_mod_info(root_path: &Path) -> ModFileInfo {
-	try_parse_mod_info(root_path).unwrap()
+	try_parse_mod_info(root_path).nice_unwrap("Failed to parse mod.json")
 }
