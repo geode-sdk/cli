@@ -5,6 +5,7 @@ use semver::{Version, VersionReq};
 use crate::{util::{config::Config, mod_file::{parse_mod_info, ModFileInfo, Dependency, try_parse_mod_info}}, package::get_working_dir, index::{update_index, index_mods_dir, install_mod}, file::read_dir_recursive, template, indexer};
 use crate::{done, warn, info, fail, fatal, NiceUnwrap};
 use edit_distance::edit_distance;
+use crate::util::mod_file::DependencyImportance;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -291,7 +292,7 @@ pub fn check_dependencies(
 		if !matches!(found_in_index,     Found::Some(_, _)) &&
 		   !matches!(found_in_installed, Found::Some(_, _))
 		{
-			if dep.required {
+			if dep.importance == DependencyImportance::Required {
 				fail!(
 					"Dependency '{0}' not found in installed mods nor index! \
 					If this is a mod that hasn't been published yet, install it \
@@ -453,7 +454,8 @@ pub fn check_dependencies(
 		// know if to link or not)
 		fs::write(
 			dep_dir.join(dep.id).join("geode-dep-options.json"),
-			format!(r#"{{ "required": {} }}"#, if dep.required { "true" } else { "false" })
+			format!(r#"{{ "required": {} }}"#,
+					if dep.importance == DependencyImportance::Required { "true" } else { "false" })
 		).nice_unwrap("Unable to save dep options");
 	}
 

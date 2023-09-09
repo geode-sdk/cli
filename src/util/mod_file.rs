@@ -190,12 +190,20 @@ pub struct ModResources {
 }
 
 #[derive(Default, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum DependencyImportance {
+	#[default]
+	Required,
+	Recommended,
+	Suggested
+}
+#[derive(Default, Deserialize, PartialEq)]
 pub struct Dependency {
 	pub id: String,
 	#[serde(deserialize_with = "parse_comparable_version")]
 	pub version: VersionReq,
 	#[serde(default)]
-	pub required: bool,
+	pub importance: DependencyImportance,
 }
 
 #[derive(Default, Deserialize, PartialEq)]
