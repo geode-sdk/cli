@@ -195,7 +195,7 @@ pub enum DependencyImportance {
 	#[default]
 	Required,
 	Recommended,
-	Suggested
+	Suggested,
 }
 #[derive(Default, Deserialize, PartialEq)]
 pub struct Dependency {
@@ -204,6 +204,7 @@ pub struct Dependency {
 	pub version: VersionReq,
 	#[serde(default)]
 	pub importance: DependencyImportance,
+	pub required: Option<bool>,
 }
 
 #[derive(Default, Deserialize, PartialEq)]

@@ -292,7 +292,8 @@ pub fn check_dependencies(
 		if !matches!(found_in_index,     Found::Some(_, _)) &&
 		   !matches!(found_in_installed, Found::Some(_, _))
 		{
-			if dep.importance == DependencyImportance::Required {
+			if dep.importance == DependencyImportance::Required ||
+				dep.required.is_some() && dep.required.unwrap() {
 				fail!(
 					"Dependency '{0}' not found in installed mods nor index! \
 					If this is a mod that hasn't been published yet, install it \
@@ -455,7 +456,8 @@ pub fn check_dependencies(
 		fs::write(
 			dep_dir.join(dep.id).join("geode-dep-options.json"),
 			format!(r#"{{ "required": {} }}"#,
-					if dep.importance == DependencyImportance::Required { "true" } else { "false" })
+					if dep.importance == DependencyImportance::Required ||
+						dep.required.is_some() && dep.required.unwrap() { "true" } else { "false" })
 		).nice_unwrap("Unable to save dep options");
 	}
 
