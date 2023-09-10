@@ -53,12 +53,12 @@ macro_rules! confirm {
 
 pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
 	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
-	let mut line_reader = Editor::<()>::new();
+	let mut line_reader = Editor::<(), rustyline::history::DefaultHistory>::new().unwrap();
 	loop {
 		let line = line_reader
 			.readline_with_initial(&text, (default.unwrap_or(""), ""))
 			.expect("Error reading line");
-		line_reader.add_history_entry(&line);
+		line_reader.add_history_entry(&line).expect("Error reading line");
 
 		if line.is_empty() {
 			if required {
