@@ -124,13 +124,6 @@ fn initialize_spritesheet_bundle(
 	let config = TexturePackerConfig {
 		max_width,
 		max_height: u32::MAX,
-		allow_rotation: false,
-		texture_outlines: false,
-		border_padding: 0,
-		// enabling trim causes textures with empty padding to be misaligned, 
-		// if you figure out how to ensure it doesn't do that then you can 
-		// re-enable trim
-		trim: true,
 		..Default::default()
 	};
 	let mut texture_packer = TexturePacker::new_skyline(config);
@@ -154,12 +147,20 @@ fn initialize_spritesheet_bundle(
 
 	// Initialize the plist file
 	let frame_info = texture_packer.get_frames().iter().map(|(name, frame)| {
+		// when the texture is rotated frame width and height are supposed to still be un-rotated
+		let real_frame_w: u32 = if frame.rotated { frame.frame.h } else { frame.frame.w };
+		let real_frame_h: u32 = if frame.rotated { frame.frame.w } else { frame.frame.h };
+
+		// subtract original center from new center to get the offset
+		let offset_x: i32 = (frame.source.x + real_frame_w / 2) as i32 - (frame.source.w / 2) as i32;
+		let offset_y: i32 = (frame.source.y + real_frame_h / 2) as i32 - (frame.source.h / 2) as i32;
+
 		(sprite_name_in_sheet(name), json!({
+			"spriteOffset": format!("{{{},{}}}", offset_x, -offset_y),
+			"spriteSize": format!("{{{},{}}}", real_frame_w, real_frame_h),
+			"spriteSourceSize": format!("{{{},{}}}", frame.source.w, frame.source.h),
+			"textureRect": format!("{{{{{},{}}},{{{},{}}}}}", frame.frame.x, frame.frame.y, real_frame_w, real_frame_h),
 			"textureRotated": frame.rotated,
-			"spriteSourceSize": format!("{{{}, {}}}", frame.source.w, frame.source.h),
-			"spriteSize": format!("{{{}, {}}}", frame.frame.w, frame.frame.h),
-			"textureRect": format!("{{{{{}, {}}}, {{{}, {}}}}}", frame.frame.x, frame.frame.y, frame.frame.w, frame.frame.h),
-			"spriteOffset": format!("{{{}, {}}}", frame.source.x, -(frame.source.y as i32)),
 		}))
 	}).collect::<BTreeMap<_, _>>();
 	// Using BTreeMap to make sure all packings for the same input produce
