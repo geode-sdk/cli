@@ -5,6 +5,7 @@ use image::{imageops, ImageFormat, RgbaImage};
 use serde_json::json;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::{TexturePacker, TexturePackerConfig};
+use texture_packer::texture::Texture;
 
 use crate::cache::CacheBundle;
 use crate::rgba4444::RGBA4444;
@@ -166,11 +167,17 @@ fn initialize_spritesheet_bundle(
 	// Using BTreeMap to make sure all packings for the same input produce
 	// identical output via sorted keys
 
+	let texture_file_name = mod_info.id.to_owned()
+		+ "/" + bundle.png.file_name().unwrap().to_str().unwrap();
+
 	// Write plist
 	let plist_file = json!({
 		"frames": frame_info,
 		"metadata": {
-			"format": 3
+			"format": 3,
+			"realTextureFileName": texture_file_name,
+			"size": format!("{{{},{}}}", texture_packer.width(), texture_packer.height()),
+			"textureFileName": texture_file_name
 		}
 	});
 
