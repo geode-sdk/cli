@@ -106,7 +106,7 @@ pub fn geode_root() -> PathBuf {
 
 fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
 	// Migrate folder to executable
-	if cfg!(windows) && path.is_dir() {
+	if (cfg!(target_os = "windows") || cfg!(target_os = "linux")) && path.is_dir() {
 		path.push("GeometryDash.exe");
 
 		if !path.exists() {
@@ -130,7 +130,7 @@ impl Profile {
 	}
 
 	pub fn geode_dir(&self) -> PathBuf {
-		if cfg!(windows) {
+		if cfg!(target_os = "windows") || cfg!(target_os = "linux")  {
 			self.gd_path.parent().unwrap().join("geode")
 		} else {
 			self.gd_path.join("Contents/geode")

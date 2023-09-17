@@ -74,7 +74,7 @@ pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
 		.nice_unwrap(format!("Profile '{}' does not exist", profile.unwrap_or(String::new())))
 		.gd_path;
 
-	let mut cmd = if cfg!(windows) {
+	let mut cmd = if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
 		let mut out = Command::new(path);
 		out.current_dir(path.parent().unwrap());
 		out
