@@ -142,7 +142,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 						{
 							fail!("The path must point to the Geometry Dash app");
 							continue;
-						} else if path.join("Contents/MacOS/Geometry Dash").exists()
+						} else if !path.join("Contents/MacOS/Geometry Dash").exists()
 						{
 							fail!("The path must point to the Geometry Dash app, not a Steam shortcut");
 							continue;
