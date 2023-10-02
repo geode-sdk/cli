@@ -2,7 +2,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use crate::config::Config;
 use crate::util::logging::ask_confirm;
-use git2::build::RepoBuilder;
+use git2::build::{RepoBuilder, CheckoutBuilder};
 use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
 use reqwest::header::{USER_AGENT, AUTHORIZATION};
 use semver::{Version, Prerelease};
@@ -325,28 +325,30 @@ fn update(config: &mut Config, branch: Option<Branch>) {
 		switch_to_tag(config, &repo);
 
 		done!("SDK is up to date");
-	} else if !merge_analysis.is_fast_forward() {
+	} else if merge_analysis.is_fast_forward() {
+		// Change head and checkout
+
+		switch_to_tag(config, &repo);
+		
+		done!("Successfully updated SDK.");
+	} else {
 		fail!("Cannot update SDK, it has local changes");
 		info!(
 			"Go into the repository at {} and manually run `git pull`",
 			Config::sdk_path().to_str().unwrap()
 		);
-	} else {
-		// Change head and checkout
-
-		switch_to_tag(config, &repo);
-
-		done!("Successfully updated SDK.");
 	}
 }
 
 fn switch_to_ref(repo: &Repository, name: &str) {
-	let (obj, refer) = repo.revparse_ext(name).unwrap();
-	repo.checkout_tree(&obj, None).nice_unwrap("Unable to checkout tree");
-	match refer {
-		Some(gref) => repo.set_head(gref.name().unwrap()),
-		None => repo.set_head_detached(obj.id()),
-	}.nice_unwrap("Failed to update head");
+	let mut reference = repo.find_reference(name).unwrap();
+	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
+	let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
+
+	reference.set_target(fetch_commit.id(), "Fast-Forward").unwrap();
+	repo.set_head(name).nice_unwrap("Failed to set head");
+	repo.checkout_head(Some(CheckoutBuilder::default().force()))
+		.nice_unwrap("Failed to checkout head");
 }
 
 fn switch_to_tag(config: &mut Config, repo: &Repository) {
