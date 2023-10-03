@@ -31,12 +31,6 @@ struct GithubReleaseResponse {
 	assets: Vec<GithubReleaseAsset>,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum Branch {
-	Nightly,
-	Stable,
-}
-
 fn download_url(
 	url: String,
 	file_name: &PathBuf,
@@ -76,9 +70,8 @@ pub enum Sdk {
 
 	/// Update SDK
 	Update {
-		/// Set update branch
-		#[clap(value_enum)]
-		branch: Option<Branch>,
+		/// Set update branch, can be nightly, stable, or any specific version
+		branch: Option<String>,
 	},
 
 	/// Change SDK path.
@@ -277,18 +270,25 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 	info!("Use `geode sdk install-binaries` to install pre-built binaries");
 }
 
-fn update(config: &mut Config, branch: Option<Branch>) {
+fn update(config: &mut Config, branch: Option<String>) {
 	// Switch branch if necessary
-	match branch {
-		Some(Branch::Nightly) => {
+	match branch.as_ref().map(String::as_str) {
+		Some("nightly") => {
 			info!("Switching to nightly");
 			config.sdk_nightly = true;
+			config.sdk_version = None;
 		}
-		Some(Branch::Stable) => {
+		Some("stable") => {
 			info!("Switching to stable");
 			config.sdk_nightly = false;
+			config.sdk_version = None;
 		}
-		None => {}
+		Some(ver) => {
+			info!("Switching to {}", ver);
+			config.sdk_nightly = false;
+			config.sdk_version = Some(ver.into());
+		}
+		_ => {}
 	};
 
 	info!("Updating SDK");
@@ -362,6 +362,15 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	if config.sdk_nightly {
 		switch_to_ref(repo, "refs/heads/main");
 		info!("Switched to latest commit");
+		return;
+	} else if let Some(ver) = config.sdk_version.clone() {
+		let ref_str = format!("refs/tags/{ver}");
+		if repo.find_reference(ref_str.as_str()).is_err() {
+			config.sdk_version = None;
+			fatal!("Unable to find tag {ver}");
+		}
+		switch_to_ref(repo, ref_str.as_str());
+		info!("Switched to {ver}");
 		return;
 	}
 

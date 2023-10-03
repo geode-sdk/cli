@@ -24,6 +24,7 @@ pub struct Config {
 	pub profiles: Vec<RefCell<Profile>>,
 	pub default_developer: Option<String>,
 	pub sdk_nightly: bool,
+	pub sdk_version: Option<String>,
 	#[serde(flatten)]
 	other: HashMap<String, Value>,
 }
@@ -80,6 +81,7 @@ impl OldConfig {
 			profiles,
 			default_developer: self.default_developer.to_owned(),
 			sdk_nightly: false,
+			sdk_version: None,
 			other: HashMap::new(),
 		}
 	}
@@ -205,6 +207,7 @@ impl Config {
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_nightly: false,
+				sdk_version: None,
 				other: HashMap::<String, Value>::new(),
 			};
 		}
@@ -219,6 +222,7 @@ impl Config {
 				profiles: Vec::new(),
 				default_developer: None,
 				sdk_nightly: false,
+				sdk_version: None,
 				other: HashMap::<String, Value>::new(),
 			}
 		} else {
