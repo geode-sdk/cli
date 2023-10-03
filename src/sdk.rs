@@ -9,6 +9,7 @@ use semver::{Version, Prerelease};
 use serde::Deserialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::env;
 
 #[cfg(target_os = "macos")]
 use crate::launchctl;
@@ -64,7 +65,11 @@ pub enum Sdk {
 	},
 
 	/// Install prebuilt binaries for SDK
-	InstallBinaries,
+	InstallBinaries {
+		/// Force platform to install binaries for
+		#[clap(long, short, value_parser = ["windows", "macos", "android"])]
+		platform: Option<String>
+	},
 
 	/// Uninstall SDK
 	Uninstall,
@@ -384,7 +389,7 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	done!("Updated head to v{}", latest_version.unwrap());
 }
 
-fn install_binaries(config: &mut Config) {
+fn install_binaries(config: &mut Config, platform: Option<String>) {
 	update(config, None);
 	let release_tag: String;
 	let target_dir: PathBuf;
@@ -421,18 +426,29 @@ fn install_binaries(config: &mut Config) {
 			continue;
 		}
 
-		#[cfg(any(target_os = "windows", target_os = "linux"))]
-		if asset.name.to_lowercase().contains("win") {
-			target_url = Some(asset.browser_download_url);
-			info!("Found binaries for platform Windows");
-			break;
-		}
-
-		#[cfg(target_os = "macos")]
-		if asset.name.to_lowercase().contains("mac") {
-			target_url = Some(asset.browser_download_url);
-			info!("Found binaries for platform MacOS");
-			break;
+		match platform.as_deref().unwrap_or(env::consts::OS) {
+			"windows" | "linux" => {
+				if asset.name.to_lowercase().contains("win") {
+					target_url = Some(asset.browser_download_url);
+					info!("Found binaries for platform Windows");
+					break;
+				}
+			}
+			"macos" => {
+				if asset.name.to_lowercase().contains("mac") {
+					target_url = Some(asset.browser_download_url);
+					info!("Found binaries for platform MacOS");
+					break;
+				}
+			}
+			"android" => {
+				if asset.name.to_lowercase().contains("android") {
+					target_url = Some(asset.browser_download_url);
+					info!("Found binaries for platform Android");
+					break;
+				}
+			}
+			os => fatal!("Platform {os} is not supported!")
 		}
 	}
 
@@ -547,6 +563,6 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::SetPath { path, r#move } => set_sdk_path(path, r#move),
 		Sdk::Update { branch } => update(config, branch),
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
-		Sdk::InstallBinaries => install_binaries(config),
+		Sdk::InstallBinaries { platform } => install_binaries(config, platform),
 	}
 }
