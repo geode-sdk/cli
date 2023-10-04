@@ -298,9 +298,7 @@ fn update(config: &mut Config, branch: Option<String>) {
 		.nice_unwrap("Could not initialize local SDK repository");
 
 	// Fetch
-	let mut remote = repo
-		.find_remote(repo.remotes().unwrap().iter().next().unwrap().unwrap())
-		.unwrap();
+	let mut remote = repo.find_remote("origin").unwrap();
 
 	let mut callbacks = RemoteCallbacks::new();
 	callbacks.sideband_progress(|x| {
@@ -346,14 +344,21 @@ fn update(config: &mut Config, branch: Option<String>) {
 }
 
 fn switch_to_ref(repo: &Repository, name: &str) {
-	let mut reference = repo.find_reference(name).unwrap();
+	let mut reference = repo.find_reference("refs/heads/main").unwrap();
 	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
 	let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
 
 	reference.set_target(fetch_commit.id(), "Fast-Forward").unwrap();
-	repo.set_head(name).nice_unwrap("Failed to set head");
+	repo.set_head("refs/heads/main").unwrap();
 	repo.checkout_head(Some(CheckoutBuilder::default().force()))
-		.nice_unwrap("Failed to checkout head");
+		.nice_unwrap("Failed to checkout main");
+
+	let (obj, refer) = repo.revparse_ext(name).unwrap();
+	repo.checkout_tree(&obj, None).nice_unwrap("Unable to checkout tree");
+	match refer {
+		Some(refer) => repo.set_head(refer.name().unwrap()),
+		None => repo.set_head_detached(obj.id()),
+	}.nice_unwrap("Failed to update head");
 }
 
 fn switch_to_tag(config: &mut Config, repo: &Repository) {
