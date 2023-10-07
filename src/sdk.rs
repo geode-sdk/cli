@@ -272,23 +272,22 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 
 fn update(config: &mut Config, branch: Option<String>) {
 	// Switch branch if necessary
-	match branch.as_ref().map(String::as_str) {
-		Some("nightly") => {
+	match branch.as_deref().unwrap_or(if config.sdk_nightly { "nightly" } else { "stable" }) {
+		"nightly" => {
 			info!("Switching to nightly");
 			config.sdk_nightly = true;
 			config.sdk_version = None;
 		}
-		Some("stable") => {
+		"stable" => {
 			info!("Switching to stable");
 			config.sdk_nightly = false;
 			config.sdk_version = None;
 		}
-		Some(ver) => {
+		ver => {
 			info!("Switching to {}", ver);
 			config.sdk_nightly = false;
 			config.sdk_version = Some(ver.into());
 		}
-		_ => {}
 	};
 
 	info!("Updating SDK");
