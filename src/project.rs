@@ -110,6 +110,7 @@ fn clear_cache(dir: &Path) {
 }
 
 #[derive(PartialEq)]
+#[allow(clippy::large_enum_variant)]
 enum Found {
 	/// No matching dependency found
 	None,
@@ -159,7 +160,7 @@ fn find_dependency(
 	let mut closest_score = 4usize;
 	let mut found = Found::None;
 	for dir in if search_recursive {
-		read_dir_recursive(&dir)?
+		read_dir_recursive(dir)?
 	} else {
 		dir.read_dir()?.map(|d| d.unwrap().path()).collect()
 	} {
@@ -213,11 +214,11 @@ pub fn check_dependencies(
 		.map(|ext|
 			// If the external is provided as name:version get those, otherwise 
 			// assume it's just the name
-			if ext.contains(":") {
-				let mut split = ext.split(":");
+			if ext.contains(':') {
+				let mut split = ext.split(':');
 				let name = split.next().unwrap().to_string();
 				let ver = split.next().unwrap();
-				(name, Some(Version::parse(ver.strip_prefix("v").unwrap_or(ver))
+				(name, Some(Version::parse(ver.strip_prefix('v').unwrap_or(ver))
 					.nice_unwrap("Invalid version in external {name}")
 				))
 			}
@@ -312,7 +313,7 @@ pub fn check_dependencies(
 			}
 			// bad version
 			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::Wrong(ver), _) | (in_index @ _, Found::Wrong(ver)) => {
+				(in_index @ Found::Wrong(ver), _) | (in_index, Found::Wrong(ver)) => {
 					info!(
 						"Version '{ver}' of the mod was found in {}, but it was \
 						rejected because version '{}' is required by the dependency",
@@ -328,7 +329,7 @@ pub fn check_dependencies(
 			}
 			// misspelled message
 			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::Maybe(m), _) | (in_index @ _, Found::Maybe(m)) => {
+				(in_index @ Found::Maybe(m), _) | (in_index, Found::Maybe(m)) => {
 					info!(
 						"Another mod with a similar ID was found in {}: {m} \
 						- maybe you misspelled?",
@@ -343,7 +344,7 @@ pub fn check_dependencies(
 			}
 			// not-an-api message
 			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::NotAnApi, _) | (in_index @ _, Found::NotAnApi) => {
+				(in_index @ Found::NotAnApi, _) | (in_index, Found::NotAnApi) => {
 					info!(
 						"A mod with the ID '{}' was found in {}, but it was not marked \
 						as an API - this may be a mistake; if you are the developer \
@@ -409,7 +410,7 @@ pub fn check_dependencies(
 				);
 				path_to_dep_geode = install_mod(
 					config, &indx_info.id,
-					&VersionReq::parse(&format!("=={}", indx_info.version.to_string())).unwrap()
+					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap()
 				);
 				_geode_info = indx_info;
 			}
@@ -421,7 +422,7 @@ pub fn check_dependencies(
 				);
 				path_to_dep_geode = install_mod(
 					config, &indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version.to_string())).unwrap()
+					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap()
 				);
 				_geode_info = indx_info;
 			}
