@@ -1,5 +1,6 @@
 use clap::Subcommand;
 use colored::Colorize;
+use path_absolutize::Absolutize;
 use crate::config::Config;
 use crate::util::logging::ask_confirm;
 use git2::build::{RepoBuilder, CheckoutBuilder};
@@ -108,37 +109,6 @@ fn uninstall() -> bool {
 	true
 }
 
-fn update_submodules_recurse(repo: &Repository) -> Result<(), git2::Error> {
-	for mut subm in repo.submodules()? {
-		let name = subm
-			.name()
-			.as_ref()
-			.map(|s| String::from(*s))
-			.unwrap_or_else(|| "<Unknown>".into());
-
-		let mut callbacks = RemoteCallbacks::new();
-		callbacks.sideband_progress(|x| {
-			print!(
-				"{} Cloning submodule {}: {}",
-				"| Info |".bright_cyan(),
-				name,
-				std::str::from_utf8(x).unwrap()
-			);
-			true
-		});
-
-		let mut opts = FetchOptions::new();
-		opts.remote_callbacks(callbacks);
-
-		let mut sopts = SubmoduleUpdateOptions::new();
-		sopts.fetch(opts);
-
-		subm.update(true, Some(&mut sopts))?;
-		update_submodules_recurse(&subm.open()?)?;
-	}
-	Ok(())
-}
-
 fn set_sdk_env(path: &Path) -> bool {
 	let env_success: bool;
 
@@ -204,6 +174,7 @@ fn get_sdk_path() -> Option<PathBuf> {
 }
 
 fn install(config: &mut Config, path: PathBuf, force: bool) {
+	let path = path.absolutize().nice_unwrap("Failed to get absolute path");
 	let parent = path.parent().unwrap();
 
 	if !force && std::env::var("GEODE_SDK").is_ok() {
@@ -247,10 +218,6 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 	let repo = builder
 		.clone("https://github.com/geode-sdk/geode", &path)
 		.nice_unwrap("Could not download SDK");
-
-	// update submodules, because for some reason
-	// Repository::update_submodules is private
-	update_submodules_recurse(&repo).nice_unwrap("Unable to update submodules!");
 
 	// set GEODE_SDK environment variable;
 	if set_sdk_env(&path) {
