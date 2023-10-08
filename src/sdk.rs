@@ -4,7 +4,7 @@ use path_absolutize::Absolutize;
 use crate::config::Config;
 use crate::util::logging::ask_confirm;
 use git2::build::{RepoBuilder, CheckoutBuilder};
-use git2::{FetchOptions, RemoteCallbacks, Repository, SubmoduleUpdateOptions};
+use git2::{FetchOptions, RemoteCallbacks, Repository};
 use reqwest::header::{USER_AGENT, AUTHORIZATION};
 use semver::{Version, Prerelease};
 use serde::Deserialize;
@@ -230,11 +230,41 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 		);
 	}
 
+	fetch_repo_info(&repo);
+
 	switch_to_tag(config, &repo);
 
 	done!("Successfully installed SDK");
 	info!("Please restart your command line to have the GEODE_SDK enviroment variable set.");
 	info!("Use `geode sdk install-binaries` to install pre-built binaries");
+}
+
+fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
+	let mut remote = repo.find_remote("origin").unwrap();
+
+	let mut callbacks = RemoteCallbacks::new();
+	callbacks.sideband_progress(|x| {
+		print!(
+			"{} {}",
+			"| Info |".bright_cyan(),
+			std::str::from_utf8(x).unwrap()
+		);
+		true
+	});
+
+	remote
+		.fetch(
+			&["main"],
+			Some(FetchOptions::new().remote_callbacks(callbacks)),
+			None,
+		)
+		.nice_unwrap("Could not fetch latest update");
+
+	// Check if can fast-forward
+	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
+	let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
+
+	repo.merge_analysis(&[&fetch_commit]).unwrap().0
 }
 
 fn update(config: &mut Config, branch: Option<String>) {
@@ -264,31 +294,7 @@ fn update(config: &mut Config, branch: Option<String>) {
 		.nice_unwrap("Could not initialize local SDK repository");
 
 	// Fetch
-	let mut remote = repo.find_remote("origin").unwrap();
-
-	let mut callbacks = RemoteCallbacks::new();
-	callbacks.sideband_progress(|x| {
-		print!(
-			"{} {}",
-			"| Info |".bright_cyan(),
-			std::str::from_utf8(x).unwrap()
-		);
-		true
-	});
-
-	remote
-		.fetch(
-			&["main"],
-			Some(FetchOptions::new().remote_callbacks(callbacks)),
-			None,
-		)
-		.nice_unwrap("Could not fetch latest update");
-
-	// Check if can fast-forward
-	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
-	let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
-
-	let merge_analysis = repo.merge_analysis(&[&fetch_commit]).unwrap().0;
+	let merge_analysis = fetch_repo_info(&repo);
 
 	if merge_analysis.is_up_to_date() {
 		switch_to_tag(config, &repo);
