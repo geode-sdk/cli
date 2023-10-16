@@ -125,7 +125,8 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					// Verify path is valid
 					let path = PathBuf::from(buf.trim());
 
-					if cfg!(windows) {
+					#[allow(clippy::collapsible_else_if)]
+					if cfg!(windows) || cfg!(target_os = "linux") {
 						if path.is_dir() {
 							fail!(
 								"The path must point to the Geometry Dash exe,\
