@@ -90,7 +90,7 @@ impl OldConfig {
 pub fn geode_root() -> PathBuf {
 	// get data dir per-platform
 	let data_dir: PathBuf;
-	#[cfg(any(windows, target_os = "linux"))]
+	#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 	{
 		data_dir = dirs::data_local_dir().unwrap().join("Geode");
 	};
@@ -98,7 +98,7 @@ pub fn geode_root() -> PathBuf {
 	{
 		data_dir = PathBuf::from("/Users/Shared/Geode");
 	};
-	#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+	#[cfg(not(any(windows, target_os = "macos", target_os = "linux", target_os = "android")))]
 	{
 		use std::compile_error;
 		compile_error!("implement root directory");

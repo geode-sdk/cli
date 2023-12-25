@@ -150,7 +150,7 @@ fn set_sdk_env(path: &Path) -> bool {
 		}
 	}
 
-	#[cfg(target_os = "linux")] {
+	#[cfg(any(target_os = "linux", target_os = "android"))] {
 		warn!("set_sdk_env is not implemented on linux");
 		env_success = false;
 	}
