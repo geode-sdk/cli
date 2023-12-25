@@ -336,7 +336,7 @@ fn create_package(
 		if name.to_string_lossy() == mod_file_info.id
 			&& matches!(
 				ext.to_string_lossy().as_ref(),
-				"ios.dylib" | "dylib" | "dll" | "lib" | "so"
+				"ios.dylib" | "dylib" | "dll" | "lib" | "so" | "v7.so" | "v8.so"
 			)
 		{
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
@@ -349,7 +349,7 @@ fn create_package(
 	// Copy other binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
-		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".so"].iter().find(|x| binary_name.contains(**x)) {
+		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".v7.so", ".v8.so", ".so"].iter().find(|x| binary_name.ends_with(**x)) {
 			binary_name = mod_file_info.id.to_string() + ext;
 		}
 
