@@ -72,10 +72,8 @@ jobs:
           tag_name: ${{ steps.info.outputs.version }}
           name: CLI ${{ steps.info.outputs.version }}
           body: |
-            TODO before publishing:
-             - mark if pre-release
-             - add changelog
-             - remove this
+            ## Changelog
+            - Something
           draft: true
           files: |
             ./artifacts/*.zip

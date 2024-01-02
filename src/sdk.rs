@@ -62,7 +62,7 @@ pub enum Sdk {
 	/// Install prebuilt binaries for SDK
 	InstallBinaries {
 		/// Force platform to install binaries for
-		#[clap(long, short, value_parser = ["windows", "macos", "android"])]
+		#[clap(long, short)]
 		platform: Option<String>
 	},
 
