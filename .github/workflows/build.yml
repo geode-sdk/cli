@@ -8,7 +8,7 @@ on:
     - "Cargo.toml"
     - "build.rs"
     - ".github/workflows/build.yml"
-    branches: [ main, ci-release ]
+    branches: [ main ]
 
 jobs:
   build:
