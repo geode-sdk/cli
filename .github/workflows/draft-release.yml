@@ -22,11 +22,36 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
-      - uses: actions/download-artifact@v4
+      # - uses: actions/download-artifact@v4
+      #   with:
+      #     run-id: ${{ steps.info.outputs.run_id }}
+      #     path: ${{ github.workspace }}/artifacts
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # not using download-artifacts until this is possible:
+      # https://github.com/actions/download-artifact/issues/143
+      - name: Download artifacts
+        uses: actions/github-script@v6
         with:
-          run-id: ${{ steps.info.outputs.run_id }}
-          path: ${{ github.workspace }}/artifacts
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: ${{ steps.info.outputs.run_id }},
+            });
+            console.log(`Found ${allArtifacts.length} artifacts!`);
+            for (const artifact of allArtifacts.data.artifacts) {
+              console.log(`Downloading ${artifact.name}`);
+              const download = await github.rest.actions.downloadArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: artifact.id,
+                archive_format: 'zip',
+              });
+              
+              let fs = require('fs');
+              fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/artifacts/${artifact.name}.zip`, Buffer.from(download.data));
+            }
         
       - name: Rename files
         run: |
