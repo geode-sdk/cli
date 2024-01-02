@@ -1,6 +1,6 @@
 # Update cli manifest in the geode-sdk/website repository
-# in the future should udpate geode-sdk/homebrew-geode too
-name: Trigger 
+# in the future should update geode-sdk/homebrew-geode too
+name: Update CLI Manifests
 
 on:
   # trigger when a new release is released
