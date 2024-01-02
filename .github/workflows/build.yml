@@ -3,7 +3,7 @@ name: Build Binaries
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, ci-release ]
 
 jobs:
   build:
