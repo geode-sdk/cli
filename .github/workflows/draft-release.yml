@@ -34,9 +34,10 @@ jobs:
         uses: actions/github-script@v6
         with:
           script: |
-            const fs = require('fs');
+            const fs = require('node:fs/promises');
+            
             const path = `${process.env.GITHUB_WORKSPACE}/artifacts`;
-            fs.mkdir(path, { recursive: true });
+            await fs.mkdir(path, { recursive: true });
 
             const allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
               owner: context.repo.owner,
@@ -53,7 +54,7 @@ jobs:
                 archive_format: 'zip',
               });
               
-              fs.writeFileSync(`${path}/${artifact.name}.zip`, Buffer.from(download.data));
+              await fs.writeFile(`${path}/${artifact.name}.zip`, Buffer.from(download.data));
             }
         
       - name: Rename files
