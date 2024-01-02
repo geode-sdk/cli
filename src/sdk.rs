@@ -418,7 +418,7 @@ fn install_binaries(config: &mut Config, platform: Option<String>) {
 			continue;
 		}
 
-		match platform {
+		match platform.as_str() {
 			"windows" | "linux" | "win" => {
 				if asset.name.to_lowercase().contains("-win") {
 					target_url = Some(asset.browser_download_url);
