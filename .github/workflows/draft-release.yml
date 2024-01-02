@@ -26,6 +26,7 @@ jobs:
         with:
           run-id: ${{ steps.info.outputs.run_id }}
           path: ${{ github.workspace }}/artifacts
+          github-token: ${{ secrets.GITHUB_TOKEN }}
         
       - name: Rename files
         run: |
