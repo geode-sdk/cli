@@ -1,0 +1,11 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  draft:
+    name: Draft Release
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo hi
