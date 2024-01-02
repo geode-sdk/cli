@@ -1,0 +1,51 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  draft:
+    name: Draft Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Define variables
+        id: info
+        run: |
+          VERSION=v$(cat Cargo.toml | sed -nr 's/version = \"(.+)\"/\1/p' | head -1)
+          # gets the latest action run from the main branch
+          BRANCH=ci-release
+          API_URL="https://api.github.com/repos/geode-sdk/cli/actions/workflows/build.yml/runs?per_page=1&branch=$BRANCH&event=push&status=success"
+          RUN_ID = $(curl $API_URL | jq .workflow_runs[0].id)
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.info.outputs.run_id }}
+          path: artifacts
+        
+      - name: Rename files
+        run: |
+          cd artifacts
+          mv geode-cli-win.zip geode-cli-${{ steps.info.outputs.version }}-win.zip
+          mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.version }}-mac.zip
+          mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.version }}-linux.zip
+
+      - name: Create Draft Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.info.outputs.version }}
+          name: CLI ${{ steps.info.outputs.version }}
+          body: |
+            TODO before publishing:
+             - mark if pre-release
+             - add changelog
+             - remove this
+          draft: true
+          files: |
+            ./artifacts/*.zip

@@ -15,21 +15,26 @@ jobs:
           os: windows-latest
           out_paths: './build/release/geode.exe'
           static: ''
+          id: win
+
         - name: "macOS"
           os: macos-latest
           out_paths: './build/release/geode'
           static: 'export OPENSSL_STATIC=1'
+          id: mac
+
         - name: "linux"
           os: ubuntu-latest
           out_paths: './build/release/geode'
-          static: ''
+          # some stupid old ubuntu versions cant install libssl3
+          static: 'export OPENSSL_STATIC=1'
+          id: linux
+        
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: recursive
+    - uses: actions/checkout@v4
 
     - uses: actions-rs/toolchain@v1
       with:
@@ -55,5 +60,5 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: ${{ matrix.config.name }} CLI Binary
+        name: geode-cli-${{ matrix.config.name }}
         path: ./out/
