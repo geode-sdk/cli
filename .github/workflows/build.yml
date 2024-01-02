@@ -13,19 +13,19 @@ jobs:
         config:
         - name: "Windows"
           os: windows-latest
-          out_paths: './build/release/geode.exe'
+          out_paths: './target/release/geode.exe'
           static: ''
           id: win
 
         - name: "macOS"
           os: macos-latest
-          out_paths: './build/release/geode'
+          out_paths: './target/release/geode'
           static: 'export OPENSSL_STATIC=1'
           id: mac
 
         - name: "linux"
           os: ubuntu-latest
-          out_paths: './build/release/geode'
+          out_paths: './target/release/geode'
           # some stupid old ubuntu versions cant install libssl3
           static: 'export OPENSSL_STATIC=1'
           id: linux
@@ -40,19 +40,17 @@ jobs:
       with:
         toolchain: stable
         
-    - uses: Swatinem/rust-cache@v1
+    - uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.config.name }}
-        target-dir: ./build
 
     - name: Build
       run: |
         ${{ matrix.config.static }}
-        cargo build --release --target-dir ${{ github.workspace }}/build     
+        cargo build --release
     
     - name: Move to output folder
       shell: bash
-      working-directory: ${{ github.workspace }}
       run: |
         mkdir ./out
         mv ${{ matrix.config.out_paths }} ./out
@@ -60,5 +58,5 @@ jobs:
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: geode-cli-${{ matrix.config.name }}
+        name: geode-cli-${{ matrix.config.id }}
         path: ./out/
