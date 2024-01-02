@@ -25,11 +25,11 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           run-id: ${{ steps.info.outputs.run_id }}
-          path: artifacts
+          path: ${{ github.workspace }}/artifacts
         
       - name: Rename files
         run: |
-          cd artifacts
+          cd ${{ github.workspace }}/artifacts
           mv geode-cli-win.zip geode-cli-${{ steps.info.outputs.version }}-win.zip
           mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.version }}-mac.zip
           mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.version }}-linux.zip
