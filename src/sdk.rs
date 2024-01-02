@@ -406,39 +406,46 @@ fn install_binaries(config: &mut Config, platform: Option<String>) {
 		.nice_unwrap(format!("Could not parse Geode release \"{}\"", release_tag));
 
 	let mut target_url: Option<String> = None;
+	let platform = platform.as_deref().unwrap_or(env::consts::OS).to_lowercase();
 	for asset in res.assets {
 		// skip installers
 		if asset.name.to_lowercase().contains("installer") {
 			continue;
 		}
 
-		match platform.as_deref().unwrap_or(env::consts::OS) {
-			"windows" | "linux" => {
-				if asset.name.to_lowercase().contains("win") {
+		// skip resources
+		if !asset.name.to_lowercase().contains("geode") {
+			continue;
+		}
+
+		match platform {
+			"windows" | "linux" | "win" => {
+				if asset.name.to_lowercase().contains("-win") {
 					target_url = Some(asset.browser_download_url);
 					info!("Found binaries for platform Windows");
 					break;
 				}
 			}
-			"macos" => {
-				if asset.name.to_lowercase().contains("mac") {
+			"macos" | "mac" => {
+				if asset.name.to_lowercase().contains("-mac") {
 					target_url = Some(asset.browser_download_url);
 					info!("Found binaries for platform MacOS");
 					break;
 				}
 			}
-			"android" => {
-				if asset.name.to_lowercase().contains("android") {
+			os => {
+				if asset.name.to_lowercase().contains(&format!("-{os}")) {
 					target_url = Some(asset.browser_download_url);
-					info!("Found binaries for platform Android");
+					info!("Found binaries for platform \"{os}\"");
 					break;
 				}
 			}
-			os => fatal!("Platform {os} is not supported!")
 		}
 	}
 
-	assert!(target_url.is_some(), "No binaries found for current platform!");
+	if target_url.is_none() {
+		fatal!("No binaries found for current platform! ({platform})");
+	}
 
 	fs::create_dir_all(&target_dir).nice_unwrap("Unable to create directory for binaries");
 
