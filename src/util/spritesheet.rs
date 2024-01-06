@@ -84,7 +84,7 @@ pub fn downscale(img: &mut RgbaImage, factor: u32) {
 	);
 
 	// Dither
-	imageops::dither(img, &RGBA4444);
+	//imageops::dither(img, &RGBA4444);
 }
 
 fn initialize_spritesheet_bundle(
