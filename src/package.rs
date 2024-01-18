@@ -29,13 +29,13 @@ pub enum Package {
 		/// Location of mod's folder
 		root_path: PathBuf,
 
-		/// Add an external binary file. By default, all known binary files 
-		/// (.dll, .lib, .dylib, .so) named after the mod ID in the root path 
+		/// Add an external binary file. By default, all known binary files
+		/// (.dll, .lib, .dylib, .so) named after the mod ID in the root path
 		/// are included
 		#[clap(short, long, num_args(1..))]
 		binary: Vec<PathBuf>,
 
-		/// Location of output file. If not provided, the resulting file is named 
+		/// Location of output file. If not provided, the resulting file is named
 		/// {mod.id}.geode and placed at the root path
 		#[clap(short, long)]
 		output: Option<PathBuf>,
@@ -51,8 +51,8 @@ pub enum Package {
 		packages: Vec<PathBuf>
 	},
 
-	/// Check the dependencies of a project. 
-	/// Currently just an alias for `geode project check`, will be removed in 
+	/// Check the dependencies of a project.
+	/// Currently just an alias for `geode project check`, will be removed in
 	/// CLI v3.0.0!
 	#[deprecated(since = "v2.0.0", note = "Will be removed in v3.0.0")]
 	Setup {
@@ -62,9 +62,9 @@ pub enum Package {
 		/// Package build directory
 		output: PathBuf,
 
-		/// Any external dependencies as a list in the form of `mod.id:version`. 
-		/// An external dependency is one that the CLI will not verify exists in 
-		/// any way; it will just assume you have it installed through some 
+		/// Any external dependencies as a list in the form of `mod.id:version`.
+		/// An external dependency is one that the CLI will not verify exists in
+		/// any way; it will just assume you have it installed through some
 		/// other means (usually through building it as part of the same project)
 		#[clap(long, num_args(0..))]
 		externals: Vec<String>,
@@ -336,7 +336,7 @@ fn create_package(
 		if name.to_string_lossy() == mod_file_info.id
 			&& matches!(
 				ext.to_string_lossy().as_ref(),
-				"ios.dylib" | "dylib" | "dll" | "lib" | "so" | "v7.so" | "v8.so"
+				"ios.dylib" | "dylib" | "dll" | "lib" | "so" | "android32.so" | "android64.so"
 			)
 		{
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
@@ -349,7 +349,7 @@ fn create_package(
 	// Copy other binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
-		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".v7.so", ".v8.so", ".so"].iter().find(|x| binary_name.ends_with(**x)) {
+		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".android32.so", ".android64.so", ".so"].iter().find(|x| binary_name.ends_with(**x)) {
 			binary_name = mod_file_info.id.to_string() + ext;
 		}
 
@@ -412,7 +412,7 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 
 	for archive in &mut archives {
 		let potential_names = [".dylib", ".so", ".dll", ".lib"];
-		
+
 		// Rust borrow checker lol xd
 		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
 
