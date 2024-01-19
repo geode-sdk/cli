@@ -19,6 +19,7 @@ fn create_template(
 	id: String,
 	developer: String,
 	description: String,
+	gd: String,
 	strip: bool
 ) {
 	if project_location.exists() {
@@ -75,7 +76,8 @@ fn create_template(
 		"id":           id,
 		"name":         name,
 		"developer":    developer,
-		"description":  description
+		"description":  description,
+		"gd": gd
 	});
 
 	// Format neatly
@@ -133,6 +135,16 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let location = location.absolutize().unwrap();
 
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
+	let mut gd = String::from("");
+	loop {
+		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
+		if gd.starts_with("2.") || gd == "*".to_string() {
+			break;
+		}
+
+		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx or *)");
+		info!("Check https://docs.geode-sdk.org/mods/configuring for more details.")
+	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
 
@@ -172,6 +184,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		mod_id,
 		final_developer,
 		final_description,
+		gd,
 		strip
 	);
 }

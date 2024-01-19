@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "geode"
-version = "2.6.2"
+version = "2.6.6"
 dependencies = [
  "ansi_term",
  "cfg-if",
