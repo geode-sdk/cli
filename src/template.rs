@@ -138,11 +138,11 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut gd = String::from("");
 	loop {
 		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
-		if gd.starts_with("2.") {
+		if gd.starts_with("2.") || gd == "*".to_string() {
 			break;
 		}
 
-		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx)");
+		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx || *)\nCheck https://docs.geode-sdk.org/mods/configuring for more details.");
 	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
