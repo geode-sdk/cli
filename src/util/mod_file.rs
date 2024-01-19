@@ -222,6 +222,7 @@ pub struct ModFileInfo {
 	#[serde(deserialize_with = "parse_version")]
 	pub version: Version,
 	pub developer: String,
+	pub gd: String,
 	pub description: String,
 	#[serde(default)]
 	pub resources: ModResources,

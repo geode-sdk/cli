@@ -1,5 +1,6 @@
 
 use crate::config::Config;
+use crate::gd::{get_gd_versions, get_latest_gd_version};
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn, NiceUnwrap};
@@ -19,6 +20,7 @@ fn create_template(
 	id: String,
 	developer: String,
 	description: String,
+	gd: String,
 	strip: bool
 ) {
 	if project_location.exists() {
@@ -75,7 +77,8 @@ fn create_template(
 		"id":           id,
 		"name":         name,
 		"developer":    developer,
-		"description":  description
+		"description":  description,
+		"gd": gd
 	});
 
 	// Format neatly
@@ -133,6 +136,18 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let location = location.absolutize().unwrap();
 
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
+	let mut gd = String::from("");
+	loop {
+		gd = ask_value("Geometry Dash Version", Some(&get_latest_gd_version()), true);
+
+		let accepted_versions = get_gd_versions();
+		let accepted_versions_str = accepted_versions.join(", ");
+		let found = accepted_versions.into_iter().find(|x| { x == &gd.as_str() });
+		if found.is_some() {
+			break;
+		}
+		info!("Geometry Dash version isn't valid, please choose a valid version ({})", accepted_versions_str);
+	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
 
@@ -172,6 +187,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		mod_id,
 		final_developer,
 		final_description,
+		gd,
 		strip
 	);
 }
