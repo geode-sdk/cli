@@ -8,7 +8,6 @@ use texture_packer::{TexturePacker, TexturePackerConfig};
 use texture_packer::texture::Texture;
 
 use crate::cache::CacheBundle;
-use crate::rgba4444::RGBA4444;
 use crate::{done, info, NiceUnwrap};
 
 use super::mod_file::ModFileInfo;

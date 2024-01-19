@@ -135,7 +135,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let location = location.absolutize().unwrap();
 
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
-	let mut gd = String::from("");
+	let mut gd;
 	loop {
 		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
 		if gd.starts_with("2.") || gd == "*".to_string() {
