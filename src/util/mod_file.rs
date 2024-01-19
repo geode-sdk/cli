@@ -1,3 +1,4 @@
+use clap::builder::Str;
 use semver::{VersionReq, Version};
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
@@ -222,13 +223,28 @@ pub struct ModFileInfo {
 	#[serde(deserialize_with = "parse_version")]
 	pub version: Version,
 	pub developer: String,
-	pub gd: String,
+	pub gd: DetailedGDVersion,
 	pub description: String,
 	#[serde(default)]
 	pub resources: ModResources,
 	#[serde(default)]
 	pub dependencies: Vec<Dependency>,
 	pub api: Option<ModApi>,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct DetailedGDVersion {
+	pub android: Option<String>,
+	pub win: Option<String>,
+	pub mac: Option<String>,
+	pub ios: Option<String>
+}
+
+#[derive(Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum GDVersion {
+	Simple(String),
+	Detailed(DetailedGDVersion)
 }
 
 pub fn try_parse_mod_info(root_path: &Path) -> Result<ModFileInfo, String> {
