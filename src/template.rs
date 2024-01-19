@@ -142,7 +142,8 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 			break;
 		}
 
-		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx || *)\nCheck https://docs.geode-sdk.org/mods/configuring for more details.");
+		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx || *)");
+		info!("Check https://docs.geode-sdk.org/mods/configuring for more details.")
 	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
