@@ -72,12 +72,12 @@ fn create_template(
 	// Default mod.json
 	let mod_json = json!({
 		"geode":        get_version().to_string(),
+		"gd":           gd,
 		"version":      version,
 		"id":           id,
 		"name":         name,
 		"developer":    developer,
 		"description":  description,
-		"gd": gd
 	});
 
 	// Format neatly
@@ -135,6 +135,9 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let location = location.absolutize().unwrap();
 
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
+
+	info!("This is what Geometry Dash version your mod targets.");
+	info!("See https://docs.geode-sdk.org/mods/configuring for more details.");
 	let mut gd;
 	loop {
 		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
@@ -143,7 +146,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		}
 
 		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx or *)");
-		info!("Check https://docs.geode-sdk.org/mods/configuring for more details.")
 	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
