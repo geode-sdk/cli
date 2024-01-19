@@ -1,6 +1,5 @@
 
 use crate::config::Config;
-use crate::gd::{get_gd_versions, get_latest_gd_version};
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn, NiceUnwrap};
@@ -138,15 +137,12 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
 	let mut gd = String::from("");
 	loop {
-		gd = ask_value("Geometry Dash Version", Some(&get_latest_gd_version()), true);
-
-		let accepted_versions = get_gd_versions();
-		let accepted_versions_str = accepted_versions.join(", ");
-		let found = accepted_versions.into_iter().find(|x| { x == &gd.as_str() });
-		if found.is_some() {
+		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
+		if gd.starts_with("2.") {
 			break;
 		}
-		info!("Geometry Dash version isn't valid, please choose a valid version ({})", accepted_versions_str);
+
+		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx)");
 	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
