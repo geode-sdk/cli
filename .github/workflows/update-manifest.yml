@@ -40,15 +40,10 @@ jobs:
       with:
         result-encoding: string
         script: |
-          let rel = await github.request('GET /repos/{owner}/{repo}/releases/latest', {
+          let rel = await github.rest.repos.getLatestRelease({
             owner: 'geode-sdk',
             repo: 'cli',
-            headers: {
-              'X-GitHub-Api-Version': '2022-11-28'
-            },
           });
-
-          console.log(rel);
 
           for (let asset of rel.data.assets) {
             if (asset.name.endsWith('-mac.zip')) {
@@ -63,7 +58,7 @@ jobs:
         GEODE_HASH=$(curl -L $URL | sha256sum | awk '{print $1}')
         cd homebrew-geode/Formula
         cp geode-cli.rb.in geode-cli.rb
-        sed -i -e "s/DOWNLOAD_URL/$URL/g" geode-cli.rb
+        sed -i -e "s|DOWNLOAD_URL|$URL|g" geode-cli.rb
         sed -i -e "s/HASH/$GEODE_HASH/g" geode-cli.rb
 
     - name: Push to repo
