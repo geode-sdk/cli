@@ -16,16 +16,16 @@ jobs:
     name: Trigger site build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
-        script: |
-          await github.rest.actions.createWorkflowDispatch({
-            owner: 'geode-sdk',
-            repo: 'website',
-            workflow_id: 'build.yml',
-            ref: 'main'
-          })
+    # - uses: actions/github-script@v6
+    #   with:
+    #     github-token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
+    #     script: |
+    #       await github.rest.actions.createWorkflowDispatch({
+    #         owner: 'geode-sdk',
+    #         repo: 'website',
+    #         workflow_id: 'build.yml',
+    #         ref: 'main'
+    #       })
 
     - name: Checkout Index
       uses: actions/checkout@v4
@@ -45,6 +45,8 @@ jobs:
             repo: 'cli',
           });
 
+          console.log(rel);
+
           for (let asset of rel.assets) {
             if (asset.name.endsWith('-mac.zip')) {
               return asset.browser_download_url;
@@ -52,6 +54,7 @@ jobs:
           }
 
     - name: Update mac homebrew repo
+      shell: bash
       run: |
         URL="${{ steps.fetch-mac-release.outputs.result }}"
         GEODE_HASH=$(curl -L $URL | sha256sum | awk '{print $1}')
@@ -59,3 +62,14 @@ jobs:
         cp geode-cli.rb.in geode-cli.rb
         sed -i -e "s/DOWNLOAD_URL/$URL/g" geode-cli.rb
         sed -i -e "s/HASH/$GEODE_HASH/g" geode-cli.rb
+
+    - name: Push to repo
+      shell: bash
+      working-directory: ${{ github.workspace }}/homebrew-geode
+      run: |
+        git config --local user.email "${{ secrets.GEODE_BOT_EMAIL }}"
+        git config --local user.name "GeodeBot"
+        git add -A
+        git commit -m "Update CLI"
+        git remote set-url origin "https://GeodeBot:${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}@github.com/geode-sdk/mods.git"
+        git push -u origin main || true
