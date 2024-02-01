@@ -1,5 +1,6 @@
 # Update cli manifest in the geode-sdk/website repository
-# in the future should update geode-sdk/homebrew-geode too
+# and in geode-sdk/homebrew-geode too
+# TODO: update the winget one too :P
 name: Update CLI Manifests
 
 on:
@@ -25,3 +26,36 @@ jobs:
             workflow_id: 'build.yml',
             ref: 'main'
           })
+
+    - name: Checkout Index
+      uses: actions/checkout@v4
+      with:
+        repository: geode-sdk/homebrew-geode
+        path: homebrew-geode
+        token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
+
+    - name: Fetch release info
+      uses: actions/github-script@v6
+      id: fetch-mac-release
+      with:
+        result-encoding: string
+        script: |
+          let rel = await github.rest.repos.getLatestRelease({
+            owner: 'geode-sdk',
+            repo: 'cli',
+          });
+
+          for (let asset of rel.assets) {
+            if (asset.name.endsWith('-mac.zip')) {
+              return asset.browser_download_url;
+            }
+          }
+
+    - name: Update mac homebrew repo
+      run: |
+        URL="${{ steps.fetch-mac-release.outputs.result }}"
+        GEODE_HASH=$(curl -L $URL | sha256sum | awk '{print $1}')
+        cd homebrew-geode/Formula
+        cp geode-cli.rb.in geode-cli.rb
+        sed -i -e "s/DOWNLOAD_URL/$URL/g" geode-cli.rb
+        sed -i -e "s/HASH/$GEODE_HASH/g" geode-cli.rb
