@@ -58,8 +58,8 @@ pub enum Profile {
 
 		/// Run Geometry Dash in the background instead of the foreground
 		#[clap(long)]
-		background: bool
-	}
+		background: bool,
+	},
 }
 
 fn is_valid_geode_dir(_dir: &Path) -> bool {
@@ -68,10 +68,14 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 }
 
 pub fn run_profile(config: &Config, profile: Option<String>, mut background: bool) {
-	let path = &profile.clone()
+	let path = &profile
+		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 		.unwrap_or(Some(config.get_current_profile()))
-		.nice_unwrap(format!("Profile '{}' does not exist", profile.unwrap_or(String::new())))
+		.nice_unwrap(format!(
+			"Profile '{}' does not exist",
+			profile.unwrap_or(String::new())
+		))
 		.gd_path;
 
 	if cfg!(target_os = "windows") {
@@ -90,16 +94,21 @@ pub fn run_profile(config: &Config, profile: Option<String>, mut background: boo
 		if path.join("Contents/MacOS/steam_appid.txt").exists() {
 			warn!("Steam version detected. Output may not be available.");
 
-			out.env("DYLD_INSERT_LIBRARIES", path
-				.parent().unwrap()
-				.parent().unwrap()
-				.parent().unwrap()
-				.parent().unwrap()
-				.join("Steam.AppBundle")
-				.join("Steam")
-				.join("Contents")
-				.join("MacOS")
-				.join("steamloader.dylib")
+			out.env(
+				"DYLD_INSERT_LIBRARIES",
+				path.parent()
+					.unwrap()
+					.parent()
+					.unwrap()
+					.parent()
+					.unwrap()
+					.parent()
+					.unwrap()
+					.join("Steam.AppBundle")
+					.join("Steam")
+					.join("Contents")
+					.join("MacOS")
+					.join("steamloader.dylib"),
 			);
 		}
 
@@ -173,6 +182,9 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 			config.rename_profile(&old, new);
 		}
 
-		Profile::Run { profile, background } => run_profile(config, profile, background)
+		Profile::Run {
+			profile,
+			background,
+		} => run_profile(config, profile, background),
 	}
 }

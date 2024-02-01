@@ -1,11 +1,11 @@
-use crate::config::{geode_root};
+use crate::config::geode_root;
+use crate::package::mod_json_from_archive;
 use crate::util::logging::ask_value;
+use crate::{done, fatal, info, warn, NiceUnwrap};
+use colored::Colorize;
+use git2::{IndexAddOption, Repository, ResetType, Signature};
 use std::fs;
 use std::path::PathBuf;
-use git2::{Repository, ResetType, IndexAddOption, Signature};
-use crate::package::mod_json_from_archive;
-use crate::{info, done, fatal, warn, NiceUnwrap};
-use colored::Colorize;
 
 fn reset_and_commit(repo: &Repository, msg: &str) {
 	let head = repo.head().nice_unwrap("Broken repository, can't get HEAD");
@@ -18,16 +18,22 @@ fn reset_and_commit(repo: &Repository, msg: &str) {
 		commit = commit.parent(0).unwrap();
 	}
 
-	repo.reset(commit.as_object(), ResetType::Soft, None).nice_unwrap("Unable to refresh repository");
-	
+	repo.reset(commit.as_object(), ResetType::Soft, None)
+		.nice_unwrap("Unable to refresh repository");
+
 	let mut index = repo.index().nice_unwrap("cannot get the Index file");
-	index.add_all(["."].iter(), IndexAddOption::DEFAULT, None).nice_unwrap("Unable to add changes");
+	index
+		.add_all(["."].iter(), IndexAddOption::DEFAULT, None)
+		.nice_unwrap("Unable to add changes");
 	index.write().nice_unwrap("Unable to write changes");
 
 	let sig = Signature::now("GeodeBot", "hjfodgames@gmail.com").unwrap();
 
-	let tree = repo.find_tree(index.write_tree().nice_unwrap("Unable to get write tree")).unwrap();
-	repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &[&commit]).nice_unwrap("Unable to commit");
+	let tree = repo
+		.find_tree(index.write_tree().nice_unwrap("Unable to get write tree"))
+		.unwrap();
+	repo.commit(Some("HEAD"), &sig, &sig, msg, &tree, &[&commit])
+		.nice_unwrap("Unable to commit");
 }
 
 pub fn indexer_path() -> PathBuf {
@@ -74,7 +80,10 @@ pub fn list_mods() {
 		let path = dir.unwrap().path();
 
 		if path.is_dir() && path.join("mod.geode").exists() {
-			println!("    - {}", path.file_name().unwrap().to_str().unwrap().bright_green());
+			println!(
+				"    - {}",
+				path.file_name().unwrap().to_str().unwrap().bright_green()
+			);
 		}
 	}
 }
@@ -97,7 +106,10 @@ pub fn remove_mod(id: String) {
 
 	done!("Succesfully removed {}\n", id);
 	info!("You will need to force-push to sync your changes.");
-	info!("Run `git -C {} push -f` to sync your changes", indexer_path.to_str().unwrap());
+	info!(
+		"Run `git -C {} push -f` to sync your changes",
+		indexer_path.to_str().unwrap()
+	);
 }
 
 pub fn add_mod(package: PathBuf) {
@@ -110,8 +122,9 @@ pub fn add_mod(package: PathBuf) {
 		fatal!("Package path {} does not exist!", package.display());
 	}
 
-	let mut archive = zip::ZipArchive::new(fs::File::open(&package).unwrap()).nice_unwrap("Unable to read package");
-	
+	let mut archive = zip::ZipArchive::new(fs::File::open(&package).unwrap())
+		.nice_unwrap("Unable to read package");
+
 	let mod_json = mod_json_from_archive(&mut archive);
 
 	let major_version = mod_json
@@ -142,25 +155,32 @@ pub fn add_mod(package: PathBuf) {
 	fs::copy(package, mod_path.join("mod.geode"))
 		.nice_unwrap("Unable to copy .geode package to local Indexer");
 
-	let repo = Repository::open(&indexer_path)
-			.nice_unwrap("Unable to open local Indexer repository");
+	let repo =
+		Repository::open(&indexer_path).nice_unwrap("Unable to open local Indexer repository");
 	reset_and_commit(&repo, &format!("Add/Update {}", &mod_id));
 
-	match repo.find_remote("origin").and_then(|mut o| o.push(&["main"], None)) {
+	match repo
+		.find_remote("origin")
+		.and_then(|mut o| o.push(&["main"], None))
+	{
 		Ok(_) => {
 			done!(
 				"Succesfully added {}@{} to your indexer!",
-				mod_id, major_version
+				mod_id,
+				major_version
 			);
-		},
-		Err(_) => {	
+		}
+		Err(_) => {
 			done!("Successfully added {}@{}\n", mod_id, major_version);
 			warn!(
 				"Unable to automatically sync the changes to Github. \
 				You will need to push this commit yourself."
 			);
-			info!("Run `git -C {} push -f` to push the commit", indexer_path.to_str().unwrap());
-		},
+			info!(
+				"Run `git -C {} push -f` to push the commit",
+				indexer_path.to_str().unwrap()
+			);
+		}
 	}
 	if let Some(url) = repo.find_remote("origin").unwrap().url() {
 		info!(
@@ -169,8 +189,7 @@ pub fn add_mod(package: PathBuf) {
 			{}/compare/geode-sdk:indexer:main...main",
 			url
 		);
-	}
-	else {
+	} else {
 		info!(
 			"To let us know you're ready to publish your mod, please open \
 			a Pull Request on your Indexer fork repository."

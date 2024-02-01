@@ -1,6 +1,5 @@
-
 use std::fs::{self, read_dir};
-use std::io::{Read, Write, Seek};
+use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
@@ -10,10 +9,10 @@ use zip::ZipWriter;
 use crate::config::Config;
 use crate::util::bmfont;
 use crate::util::cache::CacheBundle;
-use crate::util::mod_file::{ModFileInfo, parse_mod_info};
+use crate::util::mod_file::{parse_mod_info, ModFileInfo};
 use crate::util::spritesheet;
 use crate::{cache, project};
-use crate::{done, info, warn, fatal, NiceUnwrap};
+use crate::{done, fatal, info, warn, NiceUnwrap};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -48,7 +47,7 @@ pub enum Package {
 	/// Merge multiple packages
 	Merge {
 		/// Packages to merge
-		packages: Vec<PathBuf>
+		packages: Vec<PathBuf>,
 	},
 
 	/// Check the dependencies of a project.
@@ -149,11 +148,9 @@ pub fn get_working_dir(id: &String) -> PathBuf {
 }
 
 fn create_resources(
-	#[allow(unused)]
-	config: &mut Config,
+	#[allow(unused)] config: &mut Config,
 	mod_info: &ModFileInfo,
-	#[allow(unused_mut)]
-	mut cache_bundle: &mut Option<CacheBundle>,
+	#[allow(unused_mut)] mut cache_bundle: &mut Option<CacheBundle>,
 	cache: &mut cache::ResourceCache,
 	working_dir: &Path,
 	output_dir: &PathBuf,
@@ -304,12 +301,7 @@ fn create_package(
 	);
 
 	// Custom hardcoded resources
-	for file in &[
-		"logo.png",
-		"about.md",
-		"changelog.md",
-		"support.md"
-	] {
+	for file in &["logo.png", "about.md", "changelog.md", "support.md"] {
 		let path = root_path.join(file);
 		if path.exists() {
 			std::fs::copy(path, working_dir.join(file))
@@ -322,23 +314,31 @@ fn create_package(
 		for header in &api.include {
 			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
-			fs::copy(root_path.join(&header), &out)
-				.nice_unwrap(&format!("Unable to copy header {} to {}", header.display(), out.display()));
+			fs::copy(root_path.join(&header), &out).nice_unwrap(&format!(
+				"Unable to copy header {} to {}",
+				header.display(),
+				out.display()
+			));
 		}
 	}
 
 	let mut binaries_added = false;
 	for file in read_dir(root_path).nice_unwrap("Unable to read root directory") {
-		let Ok(file) = file else { continue; };
+		let Ok(file) = file else {
+			continue;
+		};
 		let path = file.path();
-		let Some(name) = path.file_stem() else { continue; };
-		let Some(ext) = path.extension() else { continue; };
+		let Some(name) = path.file_stem() else {
+			continue;
+		};
+		let Some(ext) = path.extension() else {
+			continue;
+		};
 		if name.to_string_lossy() == mod_file_info.id
 			&& matches!(
 				ext.to_string_lossy().as_ref(),
 				"ios.dylib" | "dylib" | "dll" | "lib" | "so" | "android32.so" | "android64.so"
-			)
-		{
+			) {
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
 			std::fs::copy(path, working_dir.join(&binary))
 				.nice_unwrap(&format!("Unable to copy binary '{}'", binary));
@@ -349,7 +349,18 @@ fn create_package(
 	// Copy other binaries
 	for binary in &binaries {
 		let mut binary_name = binary.file_name().unwrap().to_str().unwrap().to_string();
-		if let Some(ext) = [".ios.dylib", ".dylib", ".dll", ".lib", ".android32.so", ".android64.so", ".so"].iter().find(|x| binary_name.ends_with(**x)) {
+		if let Some(ext) = [
+			".ios.dylib",
+			".dylib",
+			".dll",
+			".lib",
+			".android32.so",
+			".android64.so",
+			".so",
+		]
+		.iter()
+		.find(|x| binary_name.ends_with(**x))
+		{
 			binary_name = mod_file_info.id.to_string() + ext;
 		}
 
@@ -376,39 +387,52 @@ fn create_package(
 pub fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> serde_json::Value {
 	let mut text = String::new();
 
-	input.by_name("mod.json")
-		 .nice_unwrap("Unable to find mod.json in package")
-		 .read_to_string(&mut text)
-		 .nice_unwrap("Unable to read mod.json");
+	input
+		.by_name("mod.json")
+		.nice_unwrap("Unable to find mod.json in package")
+		.read_to_string(&mut text)
+		.nice_unwrap("Unable to read mod.json");
 
 	serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json")
 }
 
 fn merge_packages(inputs: Vec<PathBuf>) {
-	let mut archives: Vec<_> = inputs.iter().map(|x| {
-		zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap()).nice_unwrap("Unable to unzip")
-	}).collect();
+	let mut archives: Vec<_> = inputs
+		.iter()
+		.map(|x| {
+			zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap())
+				.nice_unwrap("Unable to unzip")
+		})
+		.collect();
 
 	// Sanity check
-	let mut mod_ids: Vec<_> = archives.iter_mut().map(|x|
-		mod_json_from_archive(x)
-			.get("id")
-			.nice_unwrap("[mod.json]: Missing key 'id'")
-			.as_str()
-			.nice_unwrap("[mod.json].id: Expected string")
-			.to_string()
-	).collect();
+	let mut mod_ids: Vec<_> = archives
+		.iter_mut()
+		.map(|x| {
+			mod_json_from_archive(x)
+				.get("id")
+				.nice_unwrap("[mod.json]: Missing key 'id'")
+				.as_str()
+				.nice_unwrap("[mod.json].id: Expected string")
+				.to_string()
+		})
+		.collect();
 
 	let mod_id = mod_ids.remove(0);
 
 	// They have to be the same mod
 	mod_ids.iter().for_each(|x| {
 		if *x != mod_id {
-			fatal!("Cannot merge packages with different mod id: {} and {}", x, mod_id);
+			fatal!(
+				"Cannot merge packages with different mod id: {} and {}",
+				x,
+				mod_id
+			);
 		}
 	});
 
-	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner()).nice_unwrap("Unable to create zip writer");
+	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner())
+		.nice_unwrap("Unable to create zip writer");
 
 	for archive in &mut archives {
 		let potential_names = [".dylib", ".so", ".dll", ".lib"];
@@ -417,18 +441,26 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
 
 		for file in files {
-			if potential_names.iter().filter(|x| file.ends_with(*x)).next().is_some() {
+			if potential_names
+				.iter()
+				.filter(|x| file.ends_with(*x))
+				.next()
+				.is_some()
+			{
 				println!("{}", file);
 
-				out_archive.raw_copy_file(
-					archive.by_name(&file).nice_unwrap("Unable to fetch file")
-				).nice_unwrap("Unable to transfer binary");
+				out_archive
+					.raw_copy_file(archive.by_name(&file).nice_unwrap("Unable to fetch file"))
+					.nice_unwrap("Unable to transfer binary");
 			}
 		}
 	}
 
 	out_archive.finish().nice_unwrap("Unable to write to zip");
-	done!("Successfully merged binaries into {}", inputs[0].to_str().unwrap());
+	done!(
+		"Successfully merged binaries into {}",
+		inputs[0].to_str().unwrap()
+	);
 }
 
 pub fn subcommand(config: &mut Config, cmd: Package) {
@@ -447,13 +479,13 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 				fatal!("Merging requires at least two packages");
 			}
 			merge_packages(packages)
-		},
+		}
 
 		#[allow(deprecated)]
 		Package::Setup {
 			input,
 			output,
-			externals
+			externals,
 		} => project::check_dependencies(config, input, output, externals, false),
 
 		Package::Resources {

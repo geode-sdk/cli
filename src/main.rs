@@ -1,17 +1,16 @@
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod file;
+mod index;
+mod indexer;
 mod info;
 mod package;
 mod profile;
+mod project;
 mod sdk;
 mod template;
 mod util;
-mod index;
-mod file;
-mod indexer;
-mod project;
 
 use util::*;
 
@@ -28,7 +27,7 @@ enum GeodeCommands {
 	/// Initialize a new Geode project
 	New {
 		/// The target directory to create the project in
-		path: Option<PathBuf>
+		path: Option<PathBuf>,
 	},
 
 	/// Options for managing profiles (installations of Geode)
@@ -71,15 +70,15 @@ enum GeodeCommands {
 	Run {
 		/// Run Geometry Dash in the background instead of the foreground
 		#[clap(long)]
-		background: bool
-	}
+		background: bool,
+	},
 }
 
 fn main() {
 	#[cfg(windows)]
 	match ansi_term::enable_ansi_support() {
-		Ok(_) => {},
-		Err(_) => println!("Unable to enable color support, output may look weird!")
+		Ok(_) => {}
+		Err(_) => println!("Unable to enable color support, output may look weird!"),
 	};
 
 	let args = Args::parse();
@@ -94,7 +93,7 @@ fn main() {
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
 		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
-		GeodeCommands::Run { background } => profile::run_profile(&config, None, background)
+		GeodeCommands::Run { background } => profile::run_profile(&config, None, background),
 	}
 
 	config.save();

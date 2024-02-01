@@ -1,4 +1,3 @@
-
 use crate::config::Config;
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
@@ -20,7 +19,7 @@ fn create_template(
 	developer: String,
 	description: String,
 	gd: String,
-	strip: bool
+	strip: bool,
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
@@ -36,7 +35,8 @@ fn create_template(
 	Repository::clone(
 		"https://github.com/geode-sdk/example-mod",
 		&project_location,
-	).nice_unwrap("Unable to clone repository");
+	)
+	.nice_unwrap("Unable to clone repository");
 
 	if let Err(_) = fs::remove_dir_all(project_location.join(".git")) {
 		warn!("Unable to remove .git directory");
@@ -62,11 +62,15 @@ fn create_template(
 		let cmake_regex = Regex::new(r"\n#.*").unwrap();
 		let cpp_regex = Regex::new(r".*/\*\*\r?\n(?:\s*\* .*\r?\n)*\s*\*/\r?\n?").unwrap();
 
-		let cmake_text = fs::read_to_string(&cmake_path).nice_unwrap("Unable to read template file CMakeLists.txt");
-		let cpp_text = fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
+		let cmake_text = fs::read_to_string(&cmake_path)
+			.nice_unwrap("Unable to read template file CMakeLists.txt");
+		let cpp_text =
+			fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
 
-		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, "")).nice_unwrap("Unable to access template file CMakeLists.txt");
-		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, "")).nice_unwrap("Unable to access template file main.cpp");
+		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, ""))
+			.nice_unwrap("Unable to access template file CMakeLists.txt");
+		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, ""))
+			.nice_unwrap("Unable to access template file main.cpp");
 	}
 
 	// Default mod.json
@@ -90,12 +94,14 @@ fn create_template(
 	fs::write(
 		&project_location.join("mod.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
-	).nice_unwrap("Unable to write to project");
+	)
+	.nice_unwrap("Unable to write to project");
 
 	// FIXME: should this be here? at least have an option,
 	// right now you can't even tell its running cmake
 	// made macOS only as windows requires -A win32
-	#[cfg(target_os = "macos")] {
+	#[cfg(target_os = "macos")]
+	{
 		// Generate build folder and compiler_commands.json
 		if let Ok(path) = which::which("cmake") {
 			std::process::Command::new(path)
@@ -115,12 +121,18 @@ fn create_template(
 
 fn possible_name(path: &Option<PathBuf>) -> Option<String> {
 	let dir_name;
-	let Some(path) = path else { return None; };
+	let Some(path) = path else {
+		return None;
+	};
 	if path.is_absolute() {
 		dir_name = path.file_name()?.to_string_lossy().to_string();
-	}
-	else {
-		dir_name = std::env::current_dir().ok()?.join(path).file_name()?.to_string_lossy().to_string();
+	} else {
+		dir_name = std::env::current_dir()
+			.ok()?
+			.join(path)
+			.file_name()?
+			.to_string_lossy()
+			.to_string();
 	}
 	Some(dir_name)
 }
@@ -174,7 +186,8 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	);
 
 	let strip = ask_confirm(
-		"Do you want to remove comments from the default template?", false
+		"Do you want to remove comments from the default template?",
+		false,
 	);
 
 	info!("Creating project {}", mod_id);
@@ -187,6 +200,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_developer,
 		final_description,
 		gd,
-		strip
+		strip,
 	);
 }
