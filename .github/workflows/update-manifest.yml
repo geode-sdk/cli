@@ -27,7 +27,7 @@ jobs:
     #         ref: 'main'
     #       })
 
-    - name: Checkout Index
+    - name: Checkout homebrew tap
       uses: actions/checkout@v4
       with:
         repository: geode-sdk/homebrew-geode
@@ -67,7 +67,7 @@ jobs:
       run: |
         git config --local user.email "${{ secrets.GEODE_BOT_EMAIL }}"
         git config --local user.name "GeodeBot"
-        git add -A
+        git add .
         git commit -m "Update CLI"
-        git remote set-url origin "https://GeodeBot:${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}@github.com/geode-sdk/mods.git"
-        git push -u origin main || true
+        git remote set-url origin "https://GeodeBot:${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}@github.com/geode-sdk/homebrew-geode.git"
+        git push || true
