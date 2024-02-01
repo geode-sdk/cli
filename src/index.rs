@@ -90,8 +90,8 @@ pub fn update_index(config: &Config) {
 	let mut zip_archive = ZipArchive::new(zip_data).nice_unwrap("Unable to decode index zip");
 
 
-	let before_items = if target_index_dir.join("mods").exists() {
-		let mut items = fs::read_dir(&target_index_dir.join("mods"))
+	let before_items = if target_index_dir.join("mods-v2").exists() {
+		let mut items = fs::read_dir(&target_index_dir.join("mods-v2"))
 			.unwrap()
 			.into_iter()
 			.map(|x| x.unwrap().path())
@@ -119,7 +119,7 @@ pub fn update_index(config: &Config) {
 	// we don't care if temp dir removal fails
 	drop(fs::remove_dir_all(extract_dir));
 	
-	let mut after_items = fs::read_dir(target_index_dir.join("mods"))
+	let mut after_items = fs::read_dir(target_index_dir.join("mods-v2"))
 		.unwrap()
 		.into_iter()
 		.map(|x| x.unwrap().path())
@@ -149,7 +149,7 @@ pub fn update_index(config: &Config) {
 }
 
 pub fn index_mods_dir(config: &Config) -> PathBuf {
-	config.get_current_profile().index_dir().join("geode-sdk_mods").join("mods")
+	config.get_current_profile().index_dir().join("geode-sdk_mods").join("mods-v2")
 }
 
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
