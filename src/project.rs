@@ -470,31 +470,14 @@ pub fn check_dependencies(
     }
 }
 
-pub fn publish_project(_config: &Config, dir: &Path, package_path: Option<PathBuf>) {
-    let pkg = package_path.or(get_built_package(dir)).nice_unwrap(
-	    	"Unable to find the project's .geode package - please try manually \
-	    	specifying the path to the project's built .geode package using \
-	    	the `--package <path>` option.\nThis issue is likely caused by \
-	    	an outdated Geode SDK version (at least 1.0.0-beta.8 needed) or \
-	    	by building multiple projects from the same directory."
-    );
-
-    // initialize indexer and add mod there
-    if !indexer::is_initialized() {
-        indexer::initialize();
-    }
-    indexer::add_mod(pkg);
+pub fn publish_project(_config: &Config, _dir: &Path, _package_path: Option<PathBuf>) {
+	warn!("geode project publish is currently deprecated.");
+	info!("Please follow the new instructions over at https://docs.geode-sdk.org/mods/publishing/");
 }
 
-pub fn unpublish_project(id: Option<String>) {
-    if !indexer::is_initialized() {
-        fatal!("You don't seem to have any mods published!");
-    }
-    else {
-        indexer::remove_mod(
-            id.unwrap_or_else(|| parse_mod_info(&std::env::current_dir().unwrap()).id)
-        );
-    }
+pub fn unpublish_project(_id: Option<String>) {
+	warn!("geode project unpublish is currently deprecated.");
+	info!("Currently there is no way to unpublish your mods other than asking one of the staff, lol!");
 }
 
 pub fn subcommand(config: &mut Config, cmd: Project) {

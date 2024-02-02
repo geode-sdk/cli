@@ -1,17 +1,17 @@
-
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod file;
+mod index;
+mod indexer;
 mod info;
 mod package;
 mod profile;
+mod project;
+mod project_build;
 mod sdk;
 mod template;
 mod util;
-mod index;
-mod file;
-mod indexer;
-mod project;
 
 use util::*;
 
@@ -28,7 +28,7 @@ enum GeodeCommands {
 	/// Initialize a new Geode project
 	New {
 		/// The target directory to create the project in
-		path: Option<PathBuf>
+		path: Option<PathBuf>,
 	},
 
 	/// Options for managing profiles (installations of Geode)
@@ -71,15 +71,42 @@ enum GeodeCommands {
 	Run {
 		/// Run Geometry Dash in the background instead of the foreground
 		#[clap(long)]
-		background: bool
-	}
+		background: bool,
+	},
+
+	/// Builds the project at the current directory
+	Build {
+		/// Which platform to cross-compile to, if possible
+		#[clap(long, short)]
+		platform: Option<String>,
+
+		/// Whether to only configure cmake
+		#[clap(long, short, default_value_t = false)]
+		configure_only: bool,
+
+		/// Whether to only build project
+		#[clap(long, short, default_value_t = false)]
+		build_only: bool,
+
+		/// Android NDK path, uses ANDROID_NDK_ROOT env var otherwise
+		#[clap(long)]
+		ndk: Option<String>,
+
+		/// Sets the cmake build type, defaults to Debug or RelWithDebInfo depending on platform
+		#[clap(long)]
+		config: Option<String>,
+
+		/// Extra cmake arguments when configuring
+		#[clap(last = true, allow_hyphen_values = true)]
+		extra_conf_args: Vec<String>,
+	},
 }
 
 fn main() {
 	#[cfg(windows)]
 	match ansi_term::enable_ansi_support() {
-		Ok(_) => {},
-		Err(_) => println!("Unable to enable color support, output may look weird!")
+		Ok(_) => {}
+		Err(_) => println!("Unable to enable color support, output may look weird!"),
 	};
 
 	let args = Args::parse();
@@ -94,7 +121,22 @@ fn main() {
 		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
 		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
 		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
-		GeodeCommands::Run { background } => profile::run_profile(&config, None, background)
+		GeodeCommands::Run { background } => profile::run_profile(&config, None, background),
+		GeodeCommands::Build {
+			platform,
+			configure_only,
+			build_only,
+			ndk,
+			config,
+			extra_conf_args,
+		} => project_build::build_project(
+			platform,
+			configure_only,
+			build_only,
+			ndk,
+			config,
+			extra_conf_args,
+		),
 	}
 
 	config.save();
