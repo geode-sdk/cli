@@ -88,7 +88,7 @@ fn create_template(
 
 	// Write formatted json
 	fs::write(
-		&project_location.join("mod.json"),
+		project_location.join("mod.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
 	).nice_unwrap("Unable to write to project");
 

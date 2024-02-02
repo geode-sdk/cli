@@ -71,14 +71,6 @@ fn find_build_directory(root: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Get the project's built .geode file. Path argument should point to the 
-/// directory with the project's mod.json
-pub fn get_built_package(root: &Path) -> Option<PathBuf> {
-    let mod_info = try_parse_mod_info(root).ok()?;
-    let geode_pkg = find_build_directory(root)?.join(format!("{}.geode", mod_info.id));
-    geode_pkg.exists().then_some(geode_pkg)
-}
-
 fn clear_cache(dir: &Path) {
 	// Parse mod.json
 	let mod_info = parse_mod_info(dir);
