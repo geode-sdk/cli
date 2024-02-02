@@ -54,7 +54,7 @@ pub enum Package {
 	/// Check the dependencies of a project.
 	/// Currently just an alias for `geode project check`, will be removed in
 	/// CLI v3.0.0!
-	#[deprecated(since = "v2.0.0", note = "Will be removed in v3.0.0")]
+	#[deprecated(since = "2.0.0", note = "Will be removed in v3.0.0")]
 	Setup {
 		/// Location of package
 		input: PathBuf,
@@ -322,7 +322,7 @@ fn create_package(
 		for header in &api.include {
 			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
-			fs::copy(root_path.join(&header), &out)
+			fs::copy(root_path.join(header), &out)
 				.nice_unwrap(&format!("Unable to copy header {} to {}", header.display(), out.display()));
 		}
 	}
@@ -417,7 +417,7 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
 
 		for file in files {
-			if potential_names.iter().filter(|x| file.ends_with(*x)).next().is_some() {
+			if potential_names.iter().any(|x| file.ends_with(*x)) {
 				println!("{}", file);
 
 				out_archive.raw_copy_file(

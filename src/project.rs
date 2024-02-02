@@ -90,7 +90,7 @@ fn clear_cache(dir: &Path) {
     // Remove cached .geode package
     let dir = find_build_directory(dir);
     if let Some(dir) = dir {
-        for file in fs::read_dir(&dir).nice_unwrap("Unable to read build directory") {
+        for file in fs::read_dir(dir).nice_unwrap("Unable to read build directory") {
             let path = file.unwrap().path();
             let Some(ext) = path.extension() else { continue };
             if ext == "geode" {

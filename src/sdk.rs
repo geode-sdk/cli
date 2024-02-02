@@ -394,7 +394,7 @@ fn install_binaries(config: &mut Config, platform: Option<String>) {
 	}
 
 	let res = reqwest::blocking::Client::new()
-		.get(&format!(
+		.get(format!(
 			"https://api.github.com/repos/geode-sdk/geode/releases/tags/{}",
 			release_tag
 		))

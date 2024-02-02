@@ -69,9 +69,8 @@ where
 {
 	// semver doesn't accept "v" prefixes and the string will be validated at 
 	// runtime by Geode anyway so let's just crudely remove all 'v's for now
-	Ok(Version::parse(&<String>::deserialize(deserializer)?.replace("v", ""))
-		.map_err(serde::de::Error::custom)?
-	)
+	Version::parse(&<String>::deserialize(deserializer)?.replace('v', ""))
+		.map_err(serde::de::Error::custom)
 }
 
 fn parse_comparable_version<'de, D>(deserializer: D) -> Result<VersionReq, D::Error>
@@ -80,9 +79,8 @@ where
 {
 	// semver doesn't accept "v" prefixes and the string will be validated at 
 	// runtime by Geode anyway so let's just crudely remove all 'v's for now
-	Ok(VersionReq::parse(&<String>::deserialize(deserializer)?.replace("v", ""))
-		.map_err(serde::de::Error::custom)?
-	)
+	VersionReq::parse(&<String>::deserialize(deserializer)?.replace('v', ""))
+		.map_err(serde::de::Error::custom)
 }
 
 fn parse_fonts<'de, D>(deserializer: D) -> Result<HashMap<String, BitmapFont>, D::Error>
@@ -104,9 +102,7 @@ fn parse_color<'de, D>(deserializer: D) -> Result<Color, D::Error>
 where
     D: Deserializer<'de>,
 {
-	Ok(Color::parse_hex(
-		&<String>::deserialize(deserializer)?
-	).map_err(serde::de::Error::custom)?)
+	Color::parse_hex(&<String>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
 }
 
 #[derive(Clone, PartialEq, Debug)]

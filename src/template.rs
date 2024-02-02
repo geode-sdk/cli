@@ -38,7 +38,7 @@ fn create_template(
 		&project_location,
 	).nice_unwrap("Unable to clone repository");
 
-	if let Err(_) = fs::remove_dir_all(project_location.join(".git")) {
+	if fs::remove_dir_all(project_location.join(".git")).is_err() {
 		warn!("Unable to remove .git directory");
 	}
 
@@ -114,15 +114,13 @@ fn create_template(
 }
 
 fn possible_name(path: &Option<PathBuf>) -> Option<String> {
-	let dir_name;
-	let Some(path) = path else { return None; };
-	if path.is_absolute() {
-		dir_name = path.file_name()?.to_string_lossy().to_string();
+	let path = path.as_ref()?;
+	Some(if path.is_absolute() {
+		path.file_name()?.to_string_lossy().to_string()
 	}
 	else {
-		dir_name = std::env::current_dir().ok()?.join(path).file_name()?.to_string_lossy().to_string();
-	}
-	Some(dir_name)
+		std::env::current_dir().ok()?.join(path).file_name()?.to_string_lossy().to_string()
+	})
 }
 
 pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
@@ -141,7 +139,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut gd;
 	loop {
 		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
-		if gd.starts_with("2.") || gd == "*".to_string() {
+		if gd.starts_with("2.") || gd == "*" {
 			break;
 		}
 

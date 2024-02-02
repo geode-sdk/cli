@@ -62,7 +62,7 @@ pub fn update_index(config: &Config) {
 	let target_index_dir = index_dir.join("geode-sdk_mods");
 	// note to loader devs: never change the format pretty please
 	let checksum = index_dir.join("geode-sdk_mods.checksum");
-	let current_sha = fs::read_to_string(&checksum).unwrap_or(String::new());
+	let current_sha = fs::read_to_string(&checksum).unwrap_or_default();
 
 	let client = reqwest::blocking::Client::new();
 
@@ -91,9 +91,8 @@ pub fn update_index(config: &Config) {
 
 
 	let before_items = if target_index_dir.join("mods-v2").exists() {
-		let mut items = fs::read_dir(&target_index_dir.join("mods-v2"))
+		let mut items = fs::read_dir(target_index_dir.join("mods-v2"))
 			.unwrap()
-			.into_iter()
 			.map(|x| x.unwrap().path())
 			.collect::<Vec<_>>();
 		items.sort();
@@ -121,7 +120,6 @@ pub fn update_index(config: &Config) {
 	
 	let mut after_items = fs::read_dir(target_index_dir.join("mods-v2"))
 		.unwrap()
-		.into_iter()
 		.map(|x| x.unwrap().path())
 		.collect::<Vec<_>>();
 	after_items.sort();
@@ -167,8 +165,8 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 }
 
 pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBuf {
-	let entry = get_entry(config, &id, &version)
-		.nice_unwrap(&format!("Unable to find '{id}' version '{version}'"));
+	let entry = get_entry(config, id, version)
+		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
 	
 	let plat = if cfg!(windows) {
 		"windows"
@@ -193,7 +191,7 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 
 	let mut hasher = Sha3_256::new();
 	hasher.update(&bytes);
-	let hash = hex::encode(hasher.finalize().to_vec());
+	let hash = hex::encode(hasher.finalize());
 
 	if hash != entry.r#mod.hash {
 		fatal!(
@@ -231,16 +229,16 @@ fn create_index_json(path: &Path) {
 	let hash = hasher.finalize();
 
 	let platform_str = ask_value("Supported platforms (comma separated)", None, true);
-	let platforms = platform_str.split(",").collect::<Vec<_>>();
+	let platforms = platform_str.split(',').collect::<Vec<_>>();
 
 	let category_str = ask_value("Categories (comma separated)", None, true);
-	let categories = category_str.split(",").collect::<Vec<_>>();
+	let categories = category_str.split(',').collect::<Vec<_>>();
 
 	let index_json = json!({
 		"download": {
 			"url": url,
 			"name": file_name,
-			"hash": hex::encode(hash.to_vec()),
+			"hash": hex::encode(hash),
 			"platforms": platforms
 		},
 		"categories": categories
@@ -254,7 +252,7 @@ fn create_index_json(path: &Path) {
 
 	// Write formatted json
 	std::fs::write(
-		&path.join("index.json"),
+		path.join("index.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
 	).nice_unwrap("Unable to write to project");
 }

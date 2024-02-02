@@ -71,7 +71,7 @@ pub fn run_profile(config: &Config, profile: Option<String>, mut background: boo
 	let path = &profile.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 		.unwrap_or(Some(config.get_current_profile()))
-		.nice_unwrap(format!("Profile '{}' does not exist", profile.unwrap_or(String::new())))
+		.nice_unwrap(format!("Profile '{}' does not exist", profile.unwrap_or_default()))
 		.gd_path;
 
 	if cfg!(target_os = "windows") {

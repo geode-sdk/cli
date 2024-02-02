@@ -1,4 +1,4 @@
-use crate::config::{geode_root};
+use crate::config::geode_root;
 use crate::util::logging::ask_value;
 use std::fs;
 use std::path::PathBuf;
@@ -119,7 +119,7 @@ pub fn add_mod(package: PathBuf) {
 		.nice_unwrap("[mod.json]: Missing key 'version'")
 		.as_str()
 		.nice_unwrap("[mod.json].version: Expected string")
-		.split(".")
+		.split('.')
 		.next()
 		.unwrap()
 		.chars()
