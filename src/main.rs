@@ -80,6 +80,19 @@ enum GeodeCommands {
 		#[clap(long, short)]
 		platform: Option<String>,
 
+		/// Whether to only configure cmake
+		#[clap(long, short, default_value_t = false)]
+		configure_only: bool,
+
+		/// Whether to only build project
+		#[clap(long, short, default_value_t = false)]
+		build_only: bool,
+
+		/// Android NDK path, uses ANDROID_NDK_ROOT env var otherwise
+		#[clap(long)]
+		ndk: Option<String>,
+
+		/// Extra cmake arguments when configuring
 		#[clap(last = true)]
 		extra_conf_args: Option<String>,
 	},
@@ -107,8 +120,13 @@ fn main() {
 		GeodeCommands::Run { background } => profile::run_profile(&config, None, background),
 		GeodeCommands::Build {
 			platform,
+			configure_only,
+			build_only,
+			ndk,
 			extra_conf_args,
-		} => project_build::build_project(platform, extra_conf_args),
+		} => {
+			project_build::build_project(platform, configure_only, build_only, ndk, extra_conf_args)
+		}
 	}
 
 	config.save();
