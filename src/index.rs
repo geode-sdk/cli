@@ -1,20 +1,20 @@
-use clap::Subcommand;
-use semver::VersionReq;
-use zip::ZipArchive;
 use crate::config::Config;
 use crate::file::copy_dir_recursive;
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
-use crate::{done, info, warn, fatal, NiceUnwrap};
-use sha3::{Digest, Sha3_256};
-use serde::{Serialize, Deserialize};
+use crate::{done, fatal, info, warn, NiceUnwrap};
+use clap::Subcommand;
+use colored::Colorize;
+use reqwest::header::{AUTHORIZATION, USER_AGENT};
+use semver::VersionReq;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use reqwest::header::{USER_AGENT, AUTHORIZATION};
+use sha3::{Digest, Sha3_256};
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::io;
-use colored::Colorize;
+use std::path::{Path, PathBuf};
+use zip::ZipArchive;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -22,7 +22,7 @@ pub enum Index {
 	/// Create a new entry to be used in the index
 	New {
 		/// Output folder of entry
-		output: PathBuf
+		output: PathBuf,
 	},
 
 	/// Install a mod from the index to the current profile
@@ -58,7 +58,7 @@ pub struct Entry {
 
 pub fn update_index(config: &Config) {
 	let index_dir = config.get_current_profile().index_dir();
-	
+
 	let target_index_dir = index_dir.join("geode-sdk_mods");
 	// note to loader devs: never change the format pretty please
 	let checksum = index_dir.join("geode-sdk_mods.checksum");
@@ -66,11 +66,15 @@ pub fn update_index(config: &Config) {
 
 	let client = reqwest::blocking::Client::new();
 
-	let response = client.get("https://api.github.com/repos/geode-sdk/mods/commits/main")
+	let response = client
+		.get("https://api.github.com/repos/geode-sdk/mods/commits/main")
 		.header("Accept", "application/vnd.github.sha")
 		.header("If-None-Match", format!("\"{}\"", current_sha))
 		.header(USER_AGENT, "GeodeCli")
-		.header(AUTHORIZATION, std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")))
+		.header(
+			AUTHORIZATION,
+			std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")),
+		)
 		.send()
 		.nice_unwrap("Unable to fetch index version");
 
@@ -78,17 +82,25 @@ pub fn update_index(config: &Config) {
 		done!("Index is up-to-date");
 		return;
 	}
-	assert!(response.status() == 200, "Version check received status code {}", response.status());
-	let latest_sha = response.text().nice_unwrap("Unable to decode index version");
+	assert!(
+		response.status() == 200,
+		"Version check received status code {}",
+		response.status()
+	);
+	let latest_sha = response
+		.text()
+		.nice_unwrap("Unable to decode index version");
 
 	let mut zip_data = io::Cursor::new(Vec::new());
 
-	client.get("https://github.com/geode-sdk/mods/zipball/main")
-		.send().nice_unwrap("Unable to download index")
-		.copy_to(&mut zip_data).nice_unwrap("Unable to write to index");
+	client
+		.get("https://github.com/geode-sdk/mods/zipball/main")
+		.send()
+		.nice_unwrap("Unable to download index")
+		.copy_to(&mut zip_data)
+		.nice_unwrap("Unable to write to index");
 
 	let mut zip_archive = ZipArchive::new(zip_data).nice_unwrap("Unable to decode index zip");
-
 
 	let before_items = if target_index_dir.join("mods-v2").exists() {
 		let mut items = fs::read_dir(target_index_dir.join("mods-v2"))
@@ -108,16 +120,21 @@ pub fn update_index(config: &Config) {
 		fs::remove_dir_all(&extract_dir).nice_unwrap("Unable to prepare new index");
 	}
 	fs::create_dir(&extract_dir).unwrap();
-	zip_archive.extract(&extract_dir).nice_unwrap("Unable to extract new index");
+	zip_archive
+		.extract(&extract_dir)
+		.nice_unwrap("Unable to extract new index");
 
-	
-	let new_root_dir = fs::read_dir(&extract_dir).unwrap().next().unwrap().unwrap().path();
-	copy_dir_recursive(&new_root_dir, &target_index_dir)
-		.nice_unwrap("Unable to copy new index");
+	let new_root_dir = fs::read_dir(&extract_dir)
+		.unwrap()
+		.next()
+		.unwrap()
+		.unwrap()
+		.path();
+	copy_dir_recursive(&new_root_dir, &target_index_dir).nice_unwrap("Unable to copy new index");
 
 	// we don't care if temp dir removal fails
 	drop(fs::remove_dir_all(extract_dir));
-	
+
 	let mut after_items = fs::read_dir(target_index_dir.join("mods-v2"))
 		.unwrap()
 		.map(|x| x.unwrap().path())
@@ -130,13 +147,21 @@ pub fn update_index(config: &Config) {
 
 			for i in &before_items {
 				if !after_items.contains(i) {
-					println!("            {} {}", "-".red(), i.file_name().unwrap().to_str().unwrap());
+					println!(
+						"            {} {}",
+						"-".red(),
+						i.file_name().unwrap().to_str().unwrap()
+					);
 				}
 			}
 
 			for i in &after_items {
 				if !before_items.contains(i) {
-					println!("            {} {}", "+".green(), i.file_name().unwrap().to_str().unwrap());
+					println!(
+						"            {} {}",
+						"+".green(),
+						i.file_name().unwrap().to_str().unwrap()
+					);
 				}
 			}
 		}
@@ -147,18 +172,30 @@ pub fn update_index(config: &Config) {
 }
 
 pub fn index_mods_dir(config: &Config) -> PathBuf {
-	config.get_current_profile().index_dir().join("geode-sdk_mods").join("mods-v2")
+	config
+		.get_current_profile()
+		.index_dir()
+		.join("geode-sdk_mods")
+		.join("mods-v2")
 }
 
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
-	for dir in index_mods_dir(config).read_dir().nice_unwrap("Unable to read index") {
+	for dir in index_mods_dir(config)
+		.read_dir()
+		.nice_unwrap("Unable to read index")
+	{
 		let path = dir.unwrap().path();
-		let Ok(mod_info) = try_parse_mod_info(&path) else { continue; };
+		let Ok(mod_info) = try_parse_mod_info(&path) else {
+			continue;
+		};
 		if &mod_info.id == id && version.matches(&mod_info.version) {
-			return Some(serde_json::from_str(
-				&fs::read_to_string(path.join("entry.json"))
-				.nice_unwrap("Unable to read index entry")
-			).nice_unwrap("Unable to parse index entry"));
+			return Some(
+				serde_json::from_str(
+					&fs::read_to_string(path.join("entry.json"))
+						.nice_unwrap("Unable to read index entry"),
+				)
+				.nice_unwrap("Unable to parse index entry"),
+			);
 		}
 	}
 	None
@@ -167,7 +204,7 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBuf {
 	let entry = get_entry(config, id, version)
 		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
-	
+
 	let plat = if cfg!(windows) {
 		"windows"
 	} else if cfg!(target_os = "macos") {
@@ -179,15 +216,18 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 	if !entry.platforms.contains(plat) {
 		fatal!("Mod '{}' is not available on '{}'", id, plat);
 	}
-	
+
 	info!("Installing mod '{}' version '{}'", id, version);
 
 	let bytes = reqwest::blocking::get(entry.r#mod.download)
 		.nice_unwrap("Unable to download mod")
 		.bytes()
 		.nice_unwrap("Unable to download mod");
-	
-	let dest = config.get_current_profile().mods_dir().join(format!("{id}.geode"));
+
+	let dest = config
+		.get_current_profile()
+		.mods_dir()
+		.join(format!("{id}.geode"));
 
 	let mut hasher = Sha3_256::new();
 	hasher.update(&bytes);
@@ -214,10 +254,17 @@ fn create_index_json(path: &Path) {
 
 	let response = reqwest::blocking::get(&url).nice_unwrap("Unable to access .geode file at URL");
 
-	let file_name = reqwest::Url::parse(&url).unwrap()
+	let file_name = reqwest::Url::parse(&url)
+		.unwrap()
 		.path_segments()
 		.and_then(|segments| segments.last())
-		.and_then(|name| if name.is_empty() { None } else { Some(name.to_string()) })
+		.and_then(|name| {
+			if name.is_empty() {
+				None
+			} else {
+				Some(name.to_string())
+			}
+		})
 		.unwrap_or_else(|| ask_value("Filename", None, true));
 
 	let file_contents = response
@@ -254,7 +301,8 @@ fn create_index_json(path: &Path) {
 	std::fs::write(
 		path.join("index.json"),
 		String::from_utf8(ser.into_inner()).unwrap(),
-	).nice_unwrap("Unable to write to project");
+	)
+	.nice_unwrap("Unable to write to project");
 }
 
 fn create_entry(out_path: &Path) {
@@ -303,6 +351,6 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			update_index(config);
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR));
 			done!("Mod installed");
-		},
+		}
 	}
 }

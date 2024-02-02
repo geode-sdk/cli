@@ -55,39 +55,43 @@ pub fn build_project(
 			conf_args.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15".into())
 		}
 		"android32" | "android64" => {
-            if !build_only {
-                let ndk_path = ndk_path.unwrap_or_else(|| 
-                    std::env::var("ANDROID_NDK_ROOT").nice_unwrap(
+			if !build_only {
+				let ndk_path = ndk_path.unwrap_or_else(||
+					std::env::var("ANDROID_NDK_ROOT").nice_unwrap(
                         "Failed to get NDK path, either pass it through --ndk or set the ANDROID_NDK_ROOT enviroment variable"
                     )
                 );
-                let toolchain_path = Path::new(ndk_path.as_str()).join("build/cmake/android.toolchain.cmake");
-                if !toolchain_path.exists() {
-                    fatal!("Invalid NDK path {ndk_path:?}, could not find toolchain");
-                }
-                conf_args.push(format!("-DCMAKE_TOOLCHAIN_FILE={}", toolchain_path.to_string_lossy()));
-                if platform == "android32" {
-                    conf_args.push("-DANDROID_ABI=armeabi-v7a".into());
-                } else {
-                    conf_args.push("-DANDROID_ABI=arm64-v8a".into());
-                }
-                // TODO: let the user change this? idk
-                conf_args.push("-DANDROID_PLATFORM=23".into());
-                if cfg!(target_os = "windows") && !extra_conf_args.contains(&"-G".to_owned()) {
-                    conf_args.extend(["-G", "Ninja"].map(String::from));
-                }
-            }
-        }
+				let toolchain_path =
+					Path::new(ndk_path.as_str()).join("build/cmake/android.toolchain.cmake");
+				if !toolchain_path.exists() {
+					fatal!("Invalid NDK path {ndk_path:?}, could not find toolchain");
+				}
+				conf_args.push(format!(
+					"-DCMAKE_TOOLCHAIN_FILE={}",
+					toolchain_path.to_string_lossy()
+				));
+				if platform == "android32" {
+					conf_args.push("-DANDROID_ABI=armeabi-v7a".into());
+				} else {
+					conf_args.push("-DANDROID_ABI=arm64-v8a".into());
+				}
+				// TODO: let the user change this? idk
+				conf_args.push("-DANDROID_PLATFORM=23".into());
+				if cfg!(target_os = "windows") && !extra_conf_args.contains(&"-G".to_owned()) {
+					conf_args.extend(["-G", "Ninja"].map(String::from));
+				}
+			}
+		}
 		_ => unreachable!("invalid platform"),
 	}
 
-	let build_type = config_type.unwrap_or_else(|| 
+	let build_type = config_type.unwrap_or_else(|| {
 		if platform == "win" {
 			"RelWithDebInfo".into()
 		} else {
-	   		"Debug".into()
+			"Debug".into()
 		}
-	);
+	});
 
 	if !build_only {
 		// Configure project

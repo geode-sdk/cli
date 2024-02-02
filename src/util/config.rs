@@ -1,4 +1,4 @@
-use std::cell::{RefCell, Ref};
+use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,12 @@ pub fn geode_root() -> PathBuf {
 	{
 		data_dir = PathBuf::from("/Users/Shared/Geode");
 	};
-	#[cfg(not(any(windows, target_os = "macos", target_os = "linux", target_os = "android")))]
+	#[cfg(not(any(
+		windows,
+		target_os = "macos",
+		target_os = "linux",
+		target_os = "android"
+	)))]
 	{
 		use std::compile_error;
 		compile_error!("implement root directory");
@@ -112,8 +117,11 @@ fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
 		path.push("GeometryDash.exe");
 
 		if !path.exists() {
-			warn!("Unable to find GeometryDash.exe in profile \
-				  '{}', please update the GD path for it", name);
+			warn!(
+				"Unable to find GeometryDash.exe in profile \
+				  '{}', please update the GD path for it",
+				name
+			);
 		}
 	} else if path.file_name().unwrap() == "Contents" {
 		path = path.parent().unwrap().to_path_buf();
@@ -132,7 +140,7 @@ impl Profile {
 	}
 
 	pub fn geode_dir(&self) -> PathBuf {
-		if cfg!(target_os = "windows") || cfg!(target_os = "linux")  {
+		if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
 			self.gd_path.parent().unwrap().join("geode")
 		} else {
 			self.gd_path.join("Contents/geode")
@@ -158,22 +166,20 @@ impl Config {
 	}
 
 	pub fn get_current_profile(&self) -> Ref<Profile> {
-		self
-			.get_profile(&self.current_profile)
+		self.get_profile(&self.current_profile)
 			.nice_unwrap("No current profile found!")
 			.borrow()
 	}
 
 	pub fn try_sdk_path() -> Result<PathBuf, String> {
-		let sdk_var = std::env::var("GEODE_SDK")
-			.map_err(|_|
-				"Unable to find Geode SDK (GEODE_SDK isn't set). Please install \
+		let sdk_var = std::env::var("GEODE_SDK").map_err(|_| {
+			"Unable to find Geode SDK (GEODE_SDK isn't set). Please install \
 				it using `geode sdk install` or use `geode sdk set-path` to set \
 				it to an existing clone. If you just installed the SDK using \
 				`geode sdk install`, please restart your terminal / computer to \
 				apply changes."
-			)?;
-	
+		})?;
+
 		let path = PathBuf::from(sdk_var);
 		if !path.is_dir() {
 			return Err(format!(
@@ -186,10 +192,11 @@ impl Config {
 		if !path.join("VERSION").exists() {
 			return Err(
 				"Internal Error: GEODE_SDK/VERSION not found. Please reinstall \
-				the Geode SDK using `geode sdk install --reinstall`".into()
+				the Geode SDK using `geode sdk install --reinstall`"
+					.into(),
 			);
 		}
-	
+
 		Ok(path)
 	}
 

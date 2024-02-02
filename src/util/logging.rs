@@ -58,7 +58,9 @@ pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String 
 		let line = line_reader
 			.readline_with_initial(&text, (default.unwrap_or(""), ""))
 			.expect("Error reading line");
-		line_reader.add_history_entry(&line).expect("Error reading line");
+		line_reader
+			.add_history_entry(&line)
+			.expect("Error reading line");
 
 		if line.is_empty() {
 			if required {
