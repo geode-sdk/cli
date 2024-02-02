@@ -7,6 +7,7 @@ pub fn build_project(
 	configure_only: bool,
 	build_only: bool,
 	ndk_path: Option<String>,
+	config_type: Option<String>,
 	extra_conf_args: Vec<String>,
 ) {
 	if !Path::new("CMakeLists.txt").exists() {
@@ -42,13 +43,14 @@ pub fn build_project(
 	match platform.as_str() {
 		"win" => {
 			if cross_compiling {
-				fatal!("sorry i cant be bothered");
+				fail!("Sorry! but this cannot cross-compile to windows yet.");
+				fatal!("See the docs for more info: https://docs.geode-sdk.org/getting-started/cpp-stuff#linux");
 			}
 			conf_args.extend(["-A", "Win32"].map(String::from));
 		}
 		"mac" => {
 			if cross_compiling {
-				fatal!("this is impossible sorry");
+				fatal!("Sorry! but we do not know of any way to cross-compile to MacOS.");
 			}
 			conf_args.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15".into())
 		}
@@ -79,11 +81,13 @@ pub fn build_project(
 		_ => unreachable!("invalid platform"),
 	}
 
-	let build_type = if platform == "win" {
-		"RelWithDebInfo"
-	} else {
-		"Debug"
-	};
+	let build_type = config_type.unwrap_or_else(|| 
+		if platform == "win" {
+			"RelWithDebInfo".into()
+		} else {
+	   		"Debug".into()
+		}
+	);
 
 	if !build_only {
 		// Configure project
@@ -107,7 +111,7 @@ pub fn build_project(
 		// Build project
 		let status = Command::new("cmake")
 			.args(["--build", &build_folder])
-			.args(["--config", build_type])
+			.args(["--config", build_type.as_str()])
 			.spawn()
 			.nice_unwrap("Failed to run cmake build")
 			.wait()

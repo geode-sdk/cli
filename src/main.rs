@@ -92,6 +92,10 @@ enum GeodeCommands {
 		#[clap(long)]
 		ndk: Option<String>,
 
+		/// Sets the cmake build type, defaults to Debug or RelWithDebInfo depending on platform
+		#[clap(long)]
+		config: Option<String>,
+
 		/// Extra cmake arguments when configuring
 		#[clap(last = true, allow_hyphen_values = true)]
 		extra_conf_args: Vec<String>,
@@ -123,10 +127,16 @@ fn main() {
 			configure_only,
 			build_only,
 			ndk,
+			config,
 			extra_conf_args,
-		} => {
-			project_build::build_project(platform, configure_only, build_only, ndk, extra_conf_args)
-		}
+		} => project_build::build_project(
+			platform,
+			configure_only,
+			build_only,
+			ndk,
+			config,
+			extra_conf_args,
+		),
 	}
 
 	config.save();
