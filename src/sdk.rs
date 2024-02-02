@@ -152,6 +152,8 @@ fn set_sdk_env(path: &Path) -> bool {
 
 	#[cfg(any(target_os = "linux", target_os = "android"))] {
 		warn!("set_sdk_env is not implemented on linux");
+		warn!("Please set the GEODE_SDK enviroment variable yourself to:");
+		warn!("{}", path.to_str().unwrap());
 		env_success = false;
 	}
 
