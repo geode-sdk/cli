@@ -93,8 +93,8 @@ enum GeodeCommands {
 		ndk: Option<String>,
 
 		/// Extra cmake arguments when configuring
-		#[clap(last = true)]
-		extra_conf_args: Option<String>,
+		#[clap(last = true, allow_hyphen_values = true)]
+		extra_conf_args: Vec<String>,
 	},
 }
 

@@ -7,8 +7,12 @@ pub fn build_project(
 	configure_only: bool,
 	build_only: bool,
 	ndk_path: Option<String>,
-	extra_conf_args: Option<String>,
+	extra_conf_args: Vec<String>,
 ) {
+	if !Path::new("CMakeLists.txt").exists() {
+		fatal!("Could not find CMakeLists.txt. Please run this within a Geode project!");
+	}
+
 	let platform = platform.map(|x| x.to_lowercase());
 	let platform = platform
 		.map(|x| match x.as_str() {
@@ -67,7 +71,7 @@ pub fn build_project(
                 }
                 // TODO: let the user change this? idk
                 conf_args.push("-DANDROID_PLATFORM=23".into());
-                if cfg!(target_os = "windows") && !extra_conf_args.clone().is_some_and(|s| s.contains("-G ")) {
+                if cfg!(target_os = "windows") && !extra_conf_args.contains(&"-G".to_owned()) {
                     conf_args.extend(["-G", "Ninja"].map(String::from));
                 }
             }
@@ -81,14 +85,13 @@ pub fn build_project(
 		"Debug"
 	};
 
-    dbg!(&extra_conf_args);
-    std::process::exit(1);
-
 	if !build_only {
+		// Configure project
 		let status = Command::new("cmake")
 			.args(["-B", &build_folder])
 			.arg(format!("-DCMAKE_BUILD_TYPE={build_type}"))
 			.args(conf_args)
+			.args(extra_conf_args)
 			.spawn()
 			.nice_unwrap("Failed to run cmake")
 			.wait()
@@ -101,6 +104,7 @@ pub fn build_project(
 	}
 
 	if !configure_only {
+		// Build project
 		let status = Command::new("cmake")
 			.args(["--build", &build_folder])
 			.args(["--config", build_type])
