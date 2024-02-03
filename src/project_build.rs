@@ -80,6 +80,9 @@ pub fn build_project(
 				if cfg!(target_os = "windows") && !extra_conf_args.contains(&"-G".to_owned()) {
 					conf_args.extend(["-G", "Ninja"].map(String::from));
 				}
+				conf_args.push("-DCMAKE_EXPORT_COMPILE_COMMANDS=1".into());
+				// TODO: cli cant install to a mobile device, yet
+				conf_args.push("-DGEODE_DONT_INSTALL_MODS=1".into());
 			}
 		}
 		_ => unreachable!("invalid platform"),
