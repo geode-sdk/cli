@@ -1,5 +1,6 @@
 use semver::{VersionReq, Version};
 use serde::{Deserialize, Deserializer};
+use vec1::Vec1;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
@@ -193,6 +194,7 @@ pub enum DependencyImportance {
 	Recommended,
 	Suggested,
 }
+
 #[derive(Default, Deserialize, PartialEq)]
 pub struct Dependency {
 	pub id: String,
@@ -209,16 +211,41 @@ pub struct ModApi {
 	pub include: Vec<PathBuf>,
 }
 
+#[derive(PartialEq)]
+pub struct Developers {
+	list: Vec1<String>,
+}
+
+impl<'de> Deserialize<'de> for Developers {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+		where D: Deserializer<'de>
+	{
+		#[derive(Deserialize)]
+		struct Parse {
+			pub developer: Option<String>,
+			pub developers: Option<Vec1<String>>,
+		}
+		let parsed = Parse::deserialize(deserializer)?;
+		match (parsed.developer, parsed.developers) {
+			(Some(_), Some(_)) => Err(serde::de::Error::custom("can not specify both \"developer\" and \"developers\""))?,
+			(Some(dev), None) => Ok(Self { list: Vec1::new(dev) }),
+			(None, Some(list)) => Ok(Self { list }),
+			(None, None) => Err(serde::de::Error::missing_field("developer"))?,
+		}
+	}
+}
+
 #[derive(Deserialize, PartialEq)]
 pub struct ModFileInfo {
 	#[serde(deserialize_with = "parse_version")]
 	pub geode: Version,
+	pub gd: GDVersion,
 	pub id: String,
 	pub name: String,
 	#[serde(deserialize_with = "parse_version")]
 	pub version: Version,
-	pub developer: String,
-	pub gd: GDVersion,
+	#[serde(flatten)]
+	pub developers: Developers,
 	pub description: String,
 	#[serde(default)]
 	pub resources: ModResources,
