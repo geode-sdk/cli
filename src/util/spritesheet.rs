@@ -81,9 +81,6 @@ pub fn downscale(img: &mut RgbaImage, factor: u32) {
 		img.height() / factor,
 		imageops::FilterType::Lanczos3,
 	);
-
-	// Dither
-	//imageops::dither(img, &RGBA4444);
 }
 
 fn initialize_spritesheet_bundle(
