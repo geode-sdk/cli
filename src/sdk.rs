@@ -1,16 +1,16 @@
-use clap::Subcommand;
-use colored::Colorize;
-use path_absolutize::Absolutize;
 use crate::config::Config;
 use crate::util::logging::ask_confirm;
-use git2::build::{RepoBuilder, CheckoutBuilder};
+use clap::Subcommand;
+use colored::Colorize;
+use git2::build::{CheckoutBuilder, RepoBuilder};
 use git2::{FetchOptions, RemoteCallbacks, Repository};
-use reqwest::header::{USER_AGENT, AUTHORIZATION};
-use semver::{Version, Prerelease};
+use path_absolutize::Absolutize;
+use reqwest::header::{AUTHORIZATION, USER_AGENT};
+use semver::{Prerelease, Version};
 use serde::Deserialize;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::env;
 
 #[cfg(target_os = "macos")]
 use crate::launchctl;
@@ -63,7 +63,7 @@ pub enum Sdk {
 	InstallBinaries {
 		/// Force platform to install binaries for
 		#[clap(long, short)]
-		platform: Option<String>
+		platform: Option<String>,
 	},
 
 	/// Uninstall SDK
@@ -82,7 +82,7 @@ pub enum Sdk {
 		r#move: bool,
 
 		/// New SDK path
-		path: PathBuf
+		path: PathBuf,
 	},
 
 	/// Get SDK version
@@ -94,7 +94,7 @@ fn uninstall() -> bool {
 
 	if !ask_confirm(
 		&format!("Are you sure you want to uninstall Geode SDK? (Installed at {sdk_path:?})"),
-		false
+		false,
 	) {
 		fail!("Aborting");
 		return false;
@@ -112,7 +112,8 @@ fn uninstall() -> bool {
 fn set_sdk_env(path: &Path) -> bool {
 	let env_success: bool;
 
-	#[cfg(windows)] {
+	#[cfg(windows)]
+	{
 		let hklm = RegKey::predef(winreg::enums::HKEY_CURRENT_USER);
 		if hklm
 			.create_subkey("Environment")
@@ -131,31 +132,60 @@ fn set_sdk_env(path: &Path) -> bool {
 
 			#[link(name = "user32")]
 			extern "system" {
-				fn SendMessageTimeoutW(hwnd: *const c_void, msg: u32, wparam: *const c_void, lparam: *const c_void, flags: u32, timeout: u32, result: *mut c_void) -> i32;
+				fn SendMessageTimeoutW(
+					hwnd: *const c_void,
+					msg: u32,
+					wparam: *const c_void,
+					lparam: *const c_void,
+					flags: u32,
+					timeout: u32,
+					result: *mut c_void,
+				) -> i32;
 			}
 			unsafe {
 				const HWND_BROADCAST: *const c_void = 0xffff as *const c_void;
 				const WM_SETTINGCHANGE: u32 = 0x1a;
 				const SMTO_ABORTIFHUNG: u32 = 0x2;
 
-				let param = ['E', 'n', 'v', 'i', 'r', 'o', 'n', 'm', 'e', 'n', 't', '\0'].map(|x| x as i8);
+				let param =
+					['E', 'n', 'v', 'i', 'r', 'o', 'n', 'm', 'e', 'n', 't', '\0'].map(|x| x as i8);
 				let param_wide = param.map(|x| x as i16);
 
 				// This should properly update the enviroment variable change to new cmd instances for example,
 				// existing terminals will still have to reload though
 				// Do it for both narrow and wide because i saw it on stackoverflow idk
-				SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, std::ptr::null(), param.as_ptr() as *const c_void, SMTO_ABORTIFHUNG, 1000, std::ptr::null_mut());
-				SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, std::ptr::null(), param_wide.as_ptr() as *const c_void, SMTO_ABORTIFHUNG, 1000, std::ptr::null_mut());
+				SendMessageTimeoutW(
+					HWND_BROADCAST,
+					WM_SETTINGCHANGE,
+					std::ptr::null(),
+					param.as_ptr() as *const c_void,
+					SMTO_ABORTIFHUNG,
+					1000,
+					std::ptr::null_mut(),
+				);
+				SendMessageTimeoutW(
+					HWND_BROADCAST,
+					WM_SETTINGCHANGE,
+					std::ptr::null(),
+					param_wide.as_ptr() as *const c_void,
+					SMTO_ABORTIFHUNG,
+					1000,
+					std::ptr::null_mut(),
+				);
 			}
 		}
 	}
 
-	#[cfg(any(target_os = "linux", target_os = "android"))] {
+	#[cfg(any(target_os = "linux", target_os = "android"))]
+	{
 		warn!("set_sdk_env is not implemented on linux");
+		warn!("Please set the GEODE_SDK enviroment variable yourself to:");
+		warn!("{}", path.to_str().unwrap());
 		env_success = false;
 	}
 
-	#[cfg(target_os = "macos")] {
+	#[cfg(target_os = "macos")]
+	{
 		env_success = launchctl::set_sdk_env(path.to_str().unwrap());
 	}
 
@@ -163,12 +193,9 @@ fn set_sdk_env(path: &Path) -> bool {
 }
 
 fn get_sdk_path() -> Option<PathBuf> {
-	if std::env::var("GEODE_SDK").is_ok() &&
-		Config::try_sdk_path().is_ok()
-	{
+	if std::env::var("GEODE_SDK").is_ok() && Config::try_sdk_path().is_ok() {
 		Some(Config::sdk_path())
-	}
-	else {
+	} else {
 		None
 	}
 }
@@ -179,7 +206,10 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 
 	if !force && std::env::var("GEODE_SDK").is_ok() {
 		if Config::try_sdk_path().is_ok() {
-			fail!("SDK is already installed at {}", Config::sdk_path().display());
+			fail!(
+				"SDK is already installed at {}",
+				Config::sdk_path().display()
+			);
 			info!("Use --reinstall if you want to remove the existing installation");
 			return;
 		} else {
@@ -269,7 +299,11 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 
 fn update(config: &mut Config, branch: Option<String>) {
 	// Switch branch if necessary
-	match branch.as_deref().unwrap_or(if config.sdk_nightly { "nightly" } else { "stable" }) {
+	match branch.as_deref().unwrap_or(if config.sdk_nightly {
+		"nightly"
+	} else {
+		"stable"
+	}) {
 		"nightly" => {
 			info!("Switching to nightly");
 			config.sdk_nightly = true;
@@ -304,7 +338,7 @@ fn update(config: &mut Config, branch: Option<String>) {
 		// Change head and checkout
 
 		switch_to_tag(config, &repo);
-		
+
 		done!("Successfully updated SDK.");
 	} else {
 		fail!("Cannot update SDK, it has local changes");
@@ -320,17 +354,21 @@ fn switch_to_ref(repo: &Repository, name: &str) {
 	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
 	let fetch_commit = repo.reference_to_annotated_commit(&fetch_head).unwrap();
 
-	reference.set_target(fetch_commit.id(), "Fast-Forward").unwrap();
+	reference
+		.set_target(fetch_commit.id(), "Fast-Forward")
+		.unwrap();
 	repo.set_head("refs/heads/main").unwrap();
 	repo.checkout_head(Some(CheckoutBuilder::default().force()))
 		.nice_unwrap("Failed to checkout main");
 
 	let (obj, refer) = repo.revparse_ext(name).unwrap();
-	repo.checkout_tree(&obj, None).nice_unwrap("Unable to checkout tree");
+	repo.checkout_tree(&obj, None)
+		.nice_unwrap("Unable to checkout tree");
 	match refer {
 		Some(refer) => repo.set_head(refer.name().unwrap()),
 		None => repo.set_head_detached(obj.id()),
-	}.nice_unwrap("Failed to update head");
+	}
+	.nice_unwrap("Failed to update head");
 }
 
 fn switch_to_tag(config: &mut Config, repo: &Repository) {
@@ -399,14 +437,20 @@ fn install_binaries(config: &mut Config, platform: Option<String>) {
 			release_tag
 		))
 		.header(USER_AGENT, "github_api/1.0")
-		.header(AUTHORIZATION, std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")))
+		.header(
+			AUTHORIZATION,
+			std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")),
+		)
 		.send()
 		.nice_unwrap("Unable to get download info from GitHub")
 		.json::<GithubReleaseResponse>()
 		.nice_unwrap(format!("Could not parse Geode release \"{}\"", release_tag));
 
 	let mut target_url: Option<String> = None;
-	let platform = platform.as_deref().unwrap_or(env::consts::OS).to_lowercase();
+	let platform = platform
+		.as_deref()
+		.unwrap_or(env::consts::OS)
+		.to_lowercase();
 	for asset in res.assets {
 		// skip installers
 		if asset.name.to_lowercase().contains("installer") {
@@ -466,23 +510,44 @@ fn install_binaries(config: &mut Config, platform: Option<String>) {
 
 fn set_sdk_path(path: PathBuf, do_move: bool) {
 	if do_move {
-		let old = std::env::var("GEODE_SDK").map(PathBuf::from)
+		let old = std::env::var("GEODE_SDK")
+			.map(PathBuf::from)
 			.nice_unwrap("Cannot locate SDK.");
 
-		assert!(old.is_dir(), 
+		assert!(
+			old.is_dir(),
 			"Internal Error: GEODE_SDK doesn't point to a directory ({}). This \
 			might be caused by having run `geode sdk set-path` - try restarting \
 			your terminal / computer, or reinstall using `geode sdk install --reinstall`",
 			old.display()
 		);
-		assert!(old.join("VERSION").exists(), "Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK.");
-		assert!(!path.exists(), "Cannot move SDK to existing path {}", path.to_str().unwrap());
+		assert!(
+			old.join("VERSION").exists(),
+			"Internal Error: $GEODE_SDK/VERSION not found. Please reinstall the Geode SDK."
+		);
+		assert!(
+			!path.exists(),
+			"Cannot move SDK to existing path {}",
+			path.to_str().unwrap()
+		);
 
 		fs::rename(old, &path).nice_unwrap("Unable to move SDK");
 	} else {
-		assert!(path.exists(), "Cannot set SDK path to nonexistent directory {}", path.to_str().unwrap());
-		assert!(path.is_dir(), "Cannot set SDK path to non-directory {}", path.to_str().unwrap());
-		assert!(path.join("VERSION").exists(), "{} is either malformed or not a Geode SDK installation", path.to_str().unwrap());
+		assert!(
+			path.exists(),
+			"Cannot set SDK path to nonexistent directory {}",
+			path.to_str().unwrap()
+		);
+		assert!(
+			path.is_dir(),
+			"Cannot set SDK path to non-directory {}",
+			path.to_str().unwrap()
+		);
+		assert!(
+			path.join("VERSION").exists(),
+			"{} is either malformed or not a Geode SDK installation",
+			path.to_str().unwrap()
+		);
 	}
 
 	if set_sdk_env(&path) {
@@ -504,7 +569,11 @@ pub fn get_version() -> Version {
 
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
 	match cmd {
-		Sdk::Install { reinstall, force, path } => {
+		Sdk::Install {
+			reinstall,
+			force,
+			path,
+		} => {
 			if reinstall && !uninstall() && !force {
 				return;
 			}

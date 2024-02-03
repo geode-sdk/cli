@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 use image::{imageops, ImageFormat, RgbaImage};
 use serde_json::json;
 use texture_packer::exporter::ImageExporter;
-use texture_packer::{TexturePacker, TexturePackerConfig};
 use texture_packer::texture::Texture;
+use texture_packer::{TexturePacker, TexturePackerConfig};
 
 use crate::cache::CacheBundle;
 use crate::{done, info, NiceUnwrap};
@@ -166,8 +166,8 @@ fn initialize_spritesheet_bundle(
 	// Using BTreeMap to make sure all packings for the same input produce
 	// identical output via sorted keys
 
-	let texture_file_name = mod_info.id.to_owned()
-		+ "/" + bundle.png.file_name().unwrap().to_str().unwrap();
+	let texture_file_name =
+		mod_info.id.to_owned() + "/" + bundle.png.file_name().unwrap().to_str().unwrap();
 
 	// Write plist
 	let plist_file = json!({
@@ -236,12 +236,18 @@ fn try_extract_bundles_from_cache(
 			let bundles = SheetBundles::new(p.to_path_buf());
 
 			// Extract all files
-			try_extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up).then_some(())?;
-			try_extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
-			try_extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up).then_some(())?;
-			try_extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
-			try_extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up).then_some(())?;
-			try_extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle, shut_up).then_some(())?;
+			try_extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
+			try_extract_from_cache(&bundles.sd.plist, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
+			try_extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
+			try_extract_from_cache(&bundles.hd.plist, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
+			try_extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
+			try_extract_from_cache(&bundles.uhd.plist, working_dir, cache_bundle, shut_up)
+				.then_some(())?;
 
 			done!("Fetched {} from cache", sheet.name.bright_yellow());
 			return Some(bundles);
@@ -261,12 +267,10 @@ pub fn get_spritesheet_bundles(
 		info!("Fetching spritesheet {}", sheet.name.bright_yellow());
 	}
 
-	if let Some(cached) = try_extract_bundles_from_cache(
-		sheet, working_dir, cache, shut_up
-	) {
+	if let Some(cached) = try_extract_bundles_from_cache(sheet, working_dir, cache, shut_up) {
 		return cached;
 	}
-	
+
 	if !shut_up {
 		info!("Sheet is not cached, building from scratch");
 	}

@@ -72,11 +72,7 @@ fn gen_outline<T: DistanceStorage>(sdf: SignedDistanceField<T>, size: f32) -> im
 	img
 }*/
 
-fn generate_char(
-	font: &BitmapFont,
-	metrics: fontdue::Metrics,
-	data: Vec<u8>,
-) -> Option<RgbaImage> {
+fn generate_char(font: &BitmapFont, metrics: fontdue::Metrics, data: Vec<u8>) -> Option<RgbaImage> {
 	if data.is_empty() {
 		return None;
 	}
@@ -108,7 +104,7 @@ fn generate_char(
 			font.color.red,
 			font.color.green,
 			font.color.blue,
-			data[(x + width * y) as usize]
+			data[(x + width * y) as usize],
 		])
 	}))
 }
@@ -131,7 +127,11 @@ fn initialize_font_bundle(
 				.collect::<Vec<u32>>()
 		})
 		.flat_map(|x| {
-			assert!(x.len() <= 2, "Invalid charset '{}'", font.charset.as_ref().unwrap());
+			assert!(
+				x.len() <= 2,
+				"Invalid charset '{}'",
+				font.charset.as_ref().unwrap()
+			);
 			*x.first().unwrap()..*x.last().unwrap() + 1
 		})
 		.map(|c| char::from_u32(c).unwrap())

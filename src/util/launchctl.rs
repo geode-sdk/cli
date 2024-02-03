@@ -1,10 +1,11 @@
-use dirs::home_dir;
-use std::process::Command;
-use std::fs;
 use crate::{fail, warn};
+use dirs::home_dir;
+use std::fs;
+use std::process::Command;
 
 fn format_env(path: &str) -> String {
-	format!(r#"
+	format!(
+		r#"
 		<?xml version="1.0" encoding="UTF-8"?>
 
 		<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -23,14 +24,13 @@ fn format_env(path: &str) -> String {
 		    <true/>
 		</dict>
 		</plist>
-		"#, path)
+		"#,
+		path
+	)
 }
 
 fn start_service(path: &str) -> bool {
-	if let Err(e) = Command::new("launchctl")
-		.arg("load")
-		.arg(path)
-		.spawn() {
+	if let Err(e) = Command::new("launchctl").arg("load").arg(path).spawn() {
 		fail!("Unable to start launchctl service: {}", e);
 		false
 	} else {
@@ -39,11 +39,7 @@ fn start_service(path: &str) -> bool {
 }
 
 fn restart_service(path: &str) -> bool {
-	if let Err(e) = Command::new("launchctl")
-		.arg("unload")
-		.arg(path)
-		.spawn() {
-
+	if let Err(e) = Command::new("launchctl").arg("unload").arg(path).spawn() {
 		fail!("Unable to stop launchctl service: {}", e);
 		false
 	} else {
@@ -52,7 +48,11 @@ fn restart_service(path: &str) -> bool {
 }
 
 pub fn set_sdk_env(path: &str) -> bool {
-	let env_dir = home_dir().unwrap().join("Library").join("LaunchAgents").join("com.geode-sdk.env.plist");
+	let env_dir = home_dir()
+		.unwrap()
+		.join("Library")
+		.join("LaunchAgents")
+		.join("com.geode-sdk.env.plist");
 	let reinstall = env_dir.exists();
 
 	if let Err(e) = fs::write(&env_dir, format_env(path)) {

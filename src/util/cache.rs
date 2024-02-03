@@ -41,8 +41,7 @@ impl CacheBundle {
 			CacheBundleSource::Directory(dir) => {
 				if dir.join(name) != *output {
 					std::fs::copy(dir.join(name), output).is_ok()
-				}
-				else {
+				} else {
 					false
 				}
 			}
@@ -93,7 +92,9 @@ pub fn get_cache_bundle_from_dir(path: &Path) -> Option<CacheBundle> {
 pub fn get_cache_bundle(path: &Path) -> Option<CacheBundle> {
 	path.exists()
 		.then(|| {
-			match zip::ZipArchive::new(File::open(path).nice_unwrap("Unable to open cached package")) {
+			match zip::ZipArchive::new(
+				File::open(path).nice_unwrap("Unable to open cached package"),
+			) {
 				Ok(mut archive) => {
 					let cache: ResourceCache = if archive.by_name(".geode_cache").is_ok() {
 						let mut cache_data = String::new();
@@ -135,8 +136,7 @@ impl ResourceCache {
 	}
 
 	pub fn load(cache_data: String) -> ResourceCache {
-		serde_json::from_str::<ResourceCache>(&cache_data)
-			.nice_unwrap("Unable to parse cache file")
+		serde_json::from_str::<ResourceCache>(&cache_data).nice_unwrap("Unable to parse cache file")
 	}
 
 	pub fn save(&self, path: &Path) {

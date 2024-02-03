@@ -138,13 +138,12 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 							continue;
 						}
 					} else {
-						if !path.is_dir() ||
-						   path.extension().and_then(|p| p.to_str()).unwrap_or("") != "app"
+						if !path.is_dir()
+							|| path.extension().and_then(|p| p.to_str()).unwrap_or("") != "app"
 						{
 							fail!("The path must point to the Geometry Dash app");
 							continue;
-						} else if !path.join("Contents/MacOS/Geometry Dash").exists()
-						{
+						} else if !path.join("Contents/MacOS/Geometry Dash").exists() {
 							fail!("The path must point to the Geometry Dash app, not a Steam shortcut");
 							continue;
 						}
@@ -171,7 +170,8 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				done!("Profile added");
 			}
 
-			config.sdk_nightly = Config::try_sdk_path().map_or(false, |path| path.join("bin/nightly").exists());
+			config.sdk_nightly =
+				Config::try_sdk_path().map_or(false, |path| path.join("bin/nightly").exists());
 
 			done!("Config setup finished");
 		}
