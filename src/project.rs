@@ -116,8 +116,6 @@ enum Found {
 	None,
 	/// No matching dependency found, but one with a similar ID was found
 	Maybe(String),
-	/// Dependency found, but it was not an API
-	NotAnApi,
 	/// Dependency found, but it was the wrong version
 	Wrong(Version),
 	/// Dependency found
@@ -129,9 +127,8 @@ impl Found {
 		match self {
 			Found::None         => 0,
 			Found::Maybe(_)     => 1,
-			Found::NotAnApi     => 2,
-			Found::Wrong(_)     => 3,
-			Found::Some(_, _)   => 4,
+			Found::Wrong(_)     => 2,
+			Found::Some(_, _)   => 3,
 		}
 	}
 
@@ -169,17 +166,12 @@ fn find_dependency(
 		};
 		// check if the id matches
 		if dep.id == info.id {
-			if info.api.is_some() {
-				if dep.version.matches(&info.version) {
-					found.promote(Found::Some(dir, info));
-					break;
-				}
-				else {
-					found.promote(Found::Wrong(info.version));
-				}
+			if dep.version.matches(&info.version) {
+				found.promote(Found::Some(dir, info));
+				break;
 			}
 			else {
-				found.promote(Found::NotAnApi);
+				found.promote(Found::Wrong(info.version));
 			}
 		}
 		// otherwise check if maybe the id was misspelled
@@ -334,23 +326,6 @@ pub fn check_dependencies(
 						"Another mod with a similar ID was found in {}: {m} \
 						- maybe you misspelled?",
 						if matches!(in_index, Found::Maybe(_)) {
-							"index"
-						} else {
-							"installed mods"
-						}
-					);
-				},
-				_ => {},
-			}
-			// not-an-api message
-			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::NotAnApi, _) | (in_index, Found::NotAnApi) => {
-					info!(
-						"A mod with the ID '{}' was found in {}, but it was not marked \
-						as an API - this may be a mistake; if you are the developer \
-						of the dependency, add the \"api\" key to its mod.json",
-						dep.id,
-						if matches!(in_index, Found::NotAnApi) {
 							"index"
 						} else {
 							"installed mods"
