@@ -40,6 +40,7 @@ hex = "0.4.3"
 edit-distance = "2.1.0"
 which = "4.3.0"
 vec1 = { version = "1.10.1", features = ["serde"] }
+crossterm_input = "0.5.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.51.0"

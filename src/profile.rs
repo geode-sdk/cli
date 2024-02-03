@@ -1,6 +1,6 @@
 use crate::config::{Config, Profile as CfgProfile};
 use crate::{done, fail, info, warn, NiceUnwrap};
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use colored::Colorize;
 use std::cell::RefCell;
 use std::process::Command;
@@ -57,9 +57,20 @@ pub enum Profile {
 		profile: Option<String>,
 
 		/// Run Geometry Dash in the background instead of the foreground
-		#[clap(long)]
+		#[clap(long, conflicts_with = "stay")]
 		background: bool,
+
+		/// Do not exit CLI after Geometry Dash exits if running in foreground
+		#[clap(long, conflicts_with = "background")]
+		stay: bool
 	},
+}
+
+#[derive(ValueEnum, PartialEq, Clone, Debug)]
+pub enum RunBackground {
+	Foreground,
+	Background,
+	ForegroundStay
 }
 
 fn is_valid_geode_dir(_dir: &Path) -> bool {
@@ -67,7 +78,7 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 	true
 }
 
-pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
+pub fn run_profile(config: &Config, profile: Option<String>, background: RunBackground) {
 	let path = &profile
 		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
@@ -112,8 +123,13 @@ pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
 	info!("Starting Geometry Dash");
 
 	let mut child = cmd.spawn().nice_unwrap("Unable to start Geometry Dash");
-	if !background {
+	if background != RunBackground::Background {
 		child.wait().unwrap();
+	}
+
+	if background == RunBackground::ForegroundStay {
+		info!("Press any key to exit");
+		crossterm_input::input().read_char().unwrap_or('\0');
 	}
 }
 
@@ -179,6 +195,12 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		Profile::Run {
 			profile,
 			background,
-		} => run_profile(config, profile, background),
+			stay
+		} => run_profile(config, profile, match (background, stay) {
+			(false, false) => RunBackground::Foreground,
+			(false, true) => RunBackground::ForegroundStay,
+			(true, false) => RunBackground::Background,
+			(true, true) => panic!("Impossible argument combination (background and stay)")
+		}),
 	}
 }
