@@ -139,6 +139,14 @@ impl Profile {
 		}
 	}
 
+	pub fn gd_dir(&self) -> PathBuf {
+		if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
+			self.gd_path.parent().unwrap().to_path_buf()
+		} else {
+			self.gd_path.clone()
+		}
+	}
+
 	pub fn geode_dir(&self) -> PathBuf {
 		if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
 			self.gd_path.parent().unwrap().join("geode")

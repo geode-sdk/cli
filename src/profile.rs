@@ -20,6 +20,17 @@ pub enum Profile {
 	/// List profiles
 	List,
 
+	/// Get the GD path for a profile
+	Path {
+		/// The profile to get a path for, or none for default
+		profile: Option<String>,
+
+		/// Whether to get the parent directory of the path 
+		/// (by default on Windows, the path leads to the .exe itself)
+		#[clap(short, long)]
+		dir: bool,
+	},
+
 	/// Switch main profile
 	Switch {
 		/// New main profile
@@ -153,6 +164,17 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 					path.to_string_lossy().bright_green()
 				);
 			}
+		}
+
+		Profile::Path { profile, dir } => {
+			let profile = profile.clone()
+				.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
+				.unwrap_or(Some(config.get_current_profile()))
+				.nice_unwrap(format!(
+					"Profile '{}' does not exist",
+					profile.unwrap_or_default()
+				));
+			println!("{}", if dir { profile.gd_dir() } else { profile.gd_path.clone() }.display());
 		}
 
 		Profile::Switch { profile } => {
