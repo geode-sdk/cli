@@ -67,7 +67,7 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 	true
 }
 
-pub fn run_profile(config: &Config, profile: Option<String>, mut background: bool) {
+pub fn run_profile(config: &Config, profile: Option<String>, background: bool) {
 	let path = &profile
 		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
@@ -77,12 +77,6 @@ pub fn run_profile(config: &Config, profile: Option<String>, mut background: boo
 			profile.unwrap_or_default()
 		))
 		.gd_path;
-
-	if cfg!(target_os = "windows") {
-		// No point in waiting for the gd process,
-		// since windows doesnt show the console logs
-		background = true;
-	}
 
 	let mut cmd = if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
 		let mut out = Command::new(path);
