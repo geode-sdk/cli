@@ -226,3 +226,15 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		}),
 	}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::is_valid_geode_dir;
+    use std::path::Path;
+
+    #[test]
+    fn does_bool_return_true() {
+        // lol
+        assert_eq!(is_valid_geode_dir(&Path::new("/")), true);
+    }
+}

@@ -177,3 +177,13 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::get_bool;
+
+    #[test]
+    fn test_get_bool() {
+        assert_eq!(get_bool("true").unwrap(), true);
+    }
+}

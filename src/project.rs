@@ -1,4 +1,3 @@
-
 use std::{fs, path::{PathBuf, Path}, collections::HashMap};
 use clap::Subcommand;
 use semver::{Version, VersionReq};
@@ -483,6 +482,6 @@ pub fn subcommand(config: &mut Config, cmd: Project) {
             config, &std::env::current_dir().unwrap(), package
         ),
         Project::Unpublish { id } => unpublish_project(id),
-        Project::ListPublished => indexer::list_mods(),
+        Project::ListPublished => indexer::list_mods().expect("couldn't list published mods!"),
 	}
 }
