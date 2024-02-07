@@ -201,11 +201,11 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 	None
 }
 
-pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBuf {
+pub fn install_mod(config: &Config, id: &String, version: &VersionReq, ignore_platform: bool) -> PathBuf {
 	let entry = get_entry(config, id, version)
 		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
 
-	let plat = if cfg!(windows) {
+	let plat = if cfg!(windows) || cfg!(target_os = "linux") {
 		"windows"
 	} else if cfg!(target_os = "macos") {
 		"macos"
@@ -214,7 +214,11 @@ pub fn install_mod(config: &Config, id: &String, version: &VersionReq) -> PathBu
 	};
 
 	if !entry.platforms.contains(plat) {
-		fatal!("Mod '{}' is not available on '{}'", id, plat);
+		if ignore_platform {
+			warn!("Mod '{}' is not available on '{}'", id, plat);
+		} else {
+			fatal!("Mod '{}' is not available on '{}'", id, plat);
+		}
 	}
 
 	info!("Installing mod '{}' version '{}'", id, version);
@@ -349,7 +353,7 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		Index::Update => update_index(config),
 		Index::Install { id, version } => {
 			update_index(config);
-			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR));
+			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
 	}

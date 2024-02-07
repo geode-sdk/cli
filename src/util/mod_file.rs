@@ -3,7 +3,7 @@ use crate::NiceUnwrap;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 use vec1::Vec1;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -191,6 +191,20 @@ pub struct ModResources {
 	pub fonts: HashMap<String, BitmapFont>,
 }
 
+#[derive(Deserialize, Hash, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PlatformName {
+	Win,
+	Mac,
+	Android32,
+	Android64,
+}
+
+fn all_platforms() -> HashSet<PlatformName> {
+	use PlatformName as P;
+	HashSet::from([P::Win, P::Mac, P::Android32, P::Android64])
+}
+
 #[derive(Default, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum DependencyImportance {
@@ -208,6 +222,8 @@ pub struct Dependency {
 	#[serde(default)]
 	pub importance: DependencyImportance,
 	pub required: Option<bool>,
+	#[serde(default = "all_platforms")]
+	pub platforms: HashSet<PlatformName>,
 }
 
 #[derive(Default, Deserialize, PartialEq)]
