@@ -395,7 +395,8 @@ pub fn check_dependencies(
 				);
 				path_to_dep_geode = install_mod(
 					config, &indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap()
+					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
+					true
 				);
 				_geode_info = indx_info;
 			}
@@ -407,7 +408,8 @@ pub fn check_dependencies(
 				);
 				path_to_dep_geode = install_mod(
 					config, &indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap()
+					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
+					true
 				);
 				_geode_info = indx_info;
 			}
