@@ -192,7 +192,7 @@ pub struct ModResources {
 }
 
 #[derive(Deserialize, Hash, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum PlatformName {
 	Windows,
 	MacOS,
