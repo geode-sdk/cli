@@ -150,14 +150,25 @@ impl Found {
 fn find_dependency(
 	dep: &Dependency,
 	dir: &PathBuf,
-	search_recursive: bool
+	search_recursive: bool,
+	mods_v2: bool
 ) -> Result<Found, std::io::Error> {
 	// for checking if the id was possibly misspelled, it must be at most 3 
 	// steps away from the searched one
 	let mut closest_score = 4usize;
 	let mut found = Found::None;
+	let mut dir = dir.clone();
+	
+	// this doesnt work with the fuzzy search misspelling check or whatever
+	// someone else can fix it i dont care kthx
+	if mods_v2 {
+		dir = dir.join(&dep.id);
+		if !dir.exists() {
+			return Ok(Found::None);
+		}
+	}
 	for dir in if search_recursive {
-		read_dir_recursive(dir)?
+		read_dir_recursive(&dir)?
 	} else {
 		dir.read_dir()?.map(|d| d.unwrap().path()).collect()
 	} {
@@ -273,12 +284,12 @@ pub fn check_dependencies(
 
 		// check index
 		let found_in_index = find_dependency(
-			&dep, &index_mods_dir(config), false
+			&dep, &index_mods_dir(config), true, true
 		).nice_unwrap("Unable to read index");
 
 		// check installed mods
 		let found_in_installed = find_dependency(
-			&dep, &config.get_current_profile().mods_dir(), true
+			&dep, &config.get_current_profile().mods_dir(), true, false
 		).nice_unwrap("Unable to read installed mods");
 
 		// if not found in either        hjfod  code

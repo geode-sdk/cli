@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::file::copy_dir_recursive;
+use crate::file::{copy_dir_recursive, read_dir_recursive};
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
 use crate::{done, fatal, info, warn, NiceUnwrap};
@@ -180,11 +180,12 @@ pub fn index_mods_dir(config: &Config) -> PathBuf {
 }
 
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
-	for dir in index_mods_dir(config)
-		.read_dir()
-		.nice_unwrap("Unable to read index")
-	{
-		let path = dir.unwrap().path();
+	let dir = index_mods_dir(config).join(id);
+
+	for path in {
+		read_dir_recursive(&dir)
+			.nice_unwrap("Unable to read index")
+	} {
 		let Ok(mod_info) = try_parse_mod_info(&path) else {
 			continue;
 		};
@@ -198,6 +199,7 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 			);
 		}
 	}
+
 	None
 }
 

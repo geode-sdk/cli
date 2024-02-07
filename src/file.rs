@@ -8,7 +8,8 @@ pub fn read_dir_recursive(src: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {
 	for item in fs::read_dir(src)? {
 		let path = item?.path();
 		if path.is_dir() {
-			res.extend(read_dir_recursive(src)?);
+			res.extend(read_dir_recursive(&path)?);
+			res.push(path);
 		} else {
 			res.push(path);
 		}
