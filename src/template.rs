@@ -97,25 +97,6 @@ fn create_template(
 	)
 	.nice_unwrap("Unable to write to project");
 
-	// FIXME: should this be here? at least have an option,
-	// right now you can't even tell its running cmake
-	// made macOS only as windows requires -A win32
-	#[cfg(target_os = "macos")]
-	{
-		// Generate build folder and compiler_commands.json
-		if let Ok(path) = which::which("cmake") {
-			std::process::Command::new(path)
-				.current_dir(&project_location)
-				.arg("-B")
-				.arg("build")
-				.arg("-DCMAKE_EXPORT_COMPILE_COMMANDS=1")
-				.output()
-				.nice_unwrap("Unable to initialize project with CMake");
-		} else {
-			warn!("CMake not found. CMake is required to build Geode projects.");
-		}
-	}
-
 	done!("Succesfully initialized project! Happy modding :)");
 }
 
