@@ -25,7 +25,7 @@ pub enum Profile {
 		/// The profile to get a path for, or none for default
 		profile: Option<String>,
 
-		/// Whether to get the parent directory of the path 
+		/// Whether to get the parent directory of the path
 		/// (by default on Windows, the path leads to the .exe itself)
 		#[clap(short, long)]
 		dir: bool,
@@ -73,7 +73,11 @@ pub enum Profile {
 
 		/// Do not exit CLI after Geometry Dash exits if running in foreground
 		#[clap(long, conflicts_with = "background")]
-		stay: bool
+		stay: bool,
+
+		/// Launch arguments for Geometry Dash
+		#[clap(last = true, allow_hyphen_values = true)]
+		launch_args: Vec<String>,
 	},
 }
 
@@ -81,7 +85,7 @@ pub enum Profile {
 pub enum RunBackground {
 	Foreground,
 	Background,
-	ForegroundStay
+	ForegroundStay,
 }
 
 fn is_valid_geode_dir(_dir: &Path) -> bool {
@@ -89,7 +93,12 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 	true
 }
 
-pub fn run_profile(config: &Config, profile: Option<String>, background: RunBackground) {
+pub fn run_profile(
+	config: &Config,
+	profile: Option<String>,
+	background: RunBackground,
+	launch_args: Vec<String>,
+) {
 	let path = &profile
 		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
@@ -102,10 +111,12 @@ pub fn run_profile(config: &Config, profile: Option<String>, background: RunBack
 
 	let mut cmd = if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
 		let mut out = Command::new(path);
+		out.args(launch_args);
 		out.current_dir(path.parent().unwrap());
 		out
 	} else {
 		let mut out = Command::new(path.join("Contents/MacOS/Geometry Dash"));
+		out.args(launch_args);
 
 		if path.join("Contents/MacOS/steam_appid.txt").exists() {
 			warn!("Steam version detected. Output may not be available.");
@@ -167,14 +178,23 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		}
 
 		Profile::Path { profile, dir } => {
-			let profile = profile.clone()
+			let profile = profile
+				.clone()
 				.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 				.unwrap_or(Some(config.get_current_profile()))
 				.nice_unwrap(format!(
 					"Profile '{}' does not exist",
 					profile.unwrap_or_default()
 				));
-			println!("{}", if dir { profile.gd_dir() } else { profile.gd_path.clone() }.display());
+			println!(
+				"{}",
+				if dir {
+					profile.gd_dir()
+				} else {
+					profile.gd_path.clone()
+				}
+				.display()
+			);
 		}
 
 		Profile::Switch { profile } => {
@@ -217,12 +237,18 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		Profile::Run {
 			profile,
 			background,
-			stay
-		} => run_profile(config, profile, match (background, stay) {
-			(false, false) => RunBackground::Foreground,
-			(false, true) => RunBackground::ForegroundStay,
-			(true, false) => RunBackground::Background,
-			(true, true) => panic!("Impossible argument combination (background and stay)")
-		}),
+			stay,
+			launch_args,
+		} => run_profile(
+			config,
+			profile,
+			match (background, stay) {
+				(false, false) => RunBackground::Foreground,
+				(false, true) => RunBackground::ForegroundStay,
+				(true, false) => RunBackground::Background,
+				(true, true) => panic!("Impossible argument combination (background and stay)"),
+			},
+			launch_args,
+		),
 	}
 }
