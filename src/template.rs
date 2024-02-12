@@ -20,6 +20,7 @@ fn create_template(
 	description: String,
 	gd: String,
 	strip: bool,
+	action: bool
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
@@ -71,6 +72,15 @@ fn create_template(
 			.nice_unwrap("Unable to access template file CMakeLists.txt");
 		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, ""))
 			.nice_unwrap("Unable to access template file main.cpp");
+	}
+
+	// Add cross-platform action
+	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
+	if action {
+		let action_path = project_location.join(".github/workflows/multi-platform.yml");
+		fs::create_dir_all(action_path.parent().unwrap()).nice_unwrap("Unable to create .github/workflows directory");
+		let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
+		fs::write(action_path, action.text().nice_unwrap("Unable to write action")).nice_unwrap("Unable to write action");
 	}
 
 	// Default mod.json
@@ -162,6 +172,11 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_name.to_lowercase().replace(' ', "_")
 	);
 
+	let action = ask_confirm(
+		"Do you want to add the cross-platform Github action?",
+		true,
+	);
+
 	let strip = ask_confirm(
 		"Do you want to remove comments from the default template?",
 		false,
@@ -178,5 +193,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_description,
 		gd,
 		strip,
+		action
 	);
 }
