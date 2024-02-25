@@ -20,7 +20,7 @@ fn create_template(
 	description: String,
 	gd: String,
 	strip: bool,
-	action: bool
+	action: bool,
 ) {
 	if project_location.exists() {
 		warn!("The provided location already exists.");
@@ -61,7 +61,7 @@ fn create_template(
 		let cpp_path = project_location.join("src/main.cpp");
 
 		let cmake_regex = Regex::new(r"\n#.*").unwrap();
-		let cpp_regex = Regex::new(r".*/\*\*\r?\n(?:\s*\* .*\r?\n)*\s*\*/\r?\n?").unwrap();
+		let cpp_regex = Regex::new(r"(?m)^.*/\*[\s\S]*?\*/\r?\n?|^.*//.*\r?\n?").unwrap();
 
 		let cmake_text = fs::read_to_string(&cmake_path)
 			.nice_unwrap("Unable to read template file CMakeLists.txt");
@@ -78,9 +78,14 @@ fn create_template(
 	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
 	if action {
 		let action_path = project_location.join(".github/workflows/multi-platform.yml");
-		fs::create_dir_all(action_path.parent().unwrap()).nice_unwrap("Unable to create .github/workflows directory");
+		fs::create_dir_all(action_path.parent().unwrap())
+			.nice_unwrap("Unable to create .github/workflows directory");
 		let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
-		fs::write(action_path, action.text().nice_unwrap("Unable to write action")).nice_unwrap("Unable to write action");
+		fs::write(
+			action_path,
+			action.text().nice_unwrap("Unable to write action"),
+		)
+		.nice_unwrap("Unable to write action");
 	}
 
 	// Default mod.json
@@ -172,10 +177,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_name.to_lowercase().replace(' ', "_")
 	);
 
-	let action = ask_confirm(
-		"Do you want to add the cross-platform Github action?",
-		true,
-	);
+	let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
 
 	let strip = ask_confirm(
 		"Do you want to remove comments from the default template?",
@@ -193,6 +195,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_description,
 		gd,
 		strip,
-		action
+		action,
 	);
 }
