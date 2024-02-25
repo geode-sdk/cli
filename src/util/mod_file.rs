@@ -2,11 +2,11 @@ use crate::spritesheet::SpriteSheet;
 use crate::NiceUnwrap;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
-use vec1::Vec1;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use vec1::Vec1;
 
 trait Glob {
 	fn glob(self) -> Self;
@@ -239,7 +239,8 @@ pub struct Developers {
 
 impl<'de> Deserialize<'de> for Developers {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-		where D: Deserializer<'de>
+	where
+		D: Deserializer<'de>,
 	{
 		#[derive(Deserialize)]
 		struct Parse {
@@ -248,8 +249,12 @@ impl<'de> Deserialize<'de> for Developers {
 		}
 		let parsed = Parse::deserialize(deserializer)?;
 		match (parsed.developer, parsed.developers) {
-			(Some(_), Some(_)) => Err(serde::de::Error::custom("can not specify both \"developer\" and \"developers\""))?,
-			(Some(dev), None) => Ok(Self { list: Vec1::new(dev) }),
+			(Some(_), Some(_)) => Err(serde::de::Error::custom(
+				"can not specify both \"developer\" and \"developers\"",
+			))?,
+			(Some(dev), None) => Ok(Self {
+				list: Vec1::new(dev),
+			}),
 			(None, Some(list)) => Ok(Self { list }),
 			(None, None) => Err(serde::de::Error::missing_field("developer"))?,
 		}

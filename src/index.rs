@@ -182,10 +182,7 @@ pub fn index_mods_dir(config: &Config) -> PathBuf {
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
 	let dir = index_mods_dir(config).join(id);
 
-	for path in {
-		read_dir_recursive(&dir)
-			.nice_unwrap("Unable to read index")
-	} {
+	for path in read_dir_recursive(&dir).nice_unwrap("Unable to read index") {
 		let Ok(mod_info) = try_parse_mod_info(&path) else {
 			continue;
 		};
@@ -203,7 +200,12 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 	None
 }
 
-pub fn install_mod(config: &Config, id: &String, version: &VersionReq, ignore_platform: bool) -> PathBuf {
+pub fn install_mod(
+	config: &Config,
+	id: &String,
+	version: &VersionReq,
+	ignore_platform: bool,
+) -> PathBuf {
 	let entry = get_entry(config, id, version)
 		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
 
