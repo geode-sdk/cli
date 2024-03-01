@@ -1,9 +1,11 @@
 use crate::config::Config;
 use crate::file::{copy_dir_recursive, read_dir_recursive};
+use crate::server::ApiResponse;
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
 use crate::{done, fatal, info, warn, NiceUnwrap};
 use clap::Subcommand;
+use cli_clipboard::ClipboardProvider;
 use colored::Colorize;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::VersionReq;
@@ -24,6 +26,15 @@ pub enum Index {
 		/// Output folder of entry
 		output: PathBuf,
 	},
+
+	/// Login with your GitHub account
+	Login,
+
+	/// Invalidate all existing access tokens (logout)
+	Invalidate,
+
+	/// Submit a mod to the index
+	SubmitMod,
 
 	/// Install a mod from the index to the current profile
 	Install {
@@ -54,6 +65,14 @@ pub struct Entry {
 	tags: Vec<String>,
 	#[serde(default)]
 	featured: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct LoginAttempt {
+	uuid: String,
+	interval: i32,
+	uri: String,
+	code: String,
 }
 
 pub fn update_index(config: &Config) {
@@ -182,10 +201,7 @@ pub fn index_mods_dir(config: &Config) -> PathBuf {
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
 	let dir = index_mods_dir(config).join(id);
 
-	for path in {
-		read_dir_recursive(&dir)
-			.nice_unwrap("Unable to read index")
-	} {
+	for path in { read_dir_recursive(&dir).nice_unwrap("Unable to read index") } {
 		let Ok(mod_info) = try_parse_mod_info(&path) else {
 			continue;
 		};
@@ -203,7 +219,12 @@ pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<E
 	None
 }
 
-pub fn install_mod(config: &Config, id: &String, version: &VersionReq, ignore_platform: bool) -> PathBuf {
+pub fn install_mod(
+	config: &Config,
+	id: &String,
+	version: &VersionReq,
+	ignore_platform: bool,
+) -> PathBuf {
 	let entry = get_entry(config, id, version)
 		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
 
@@ -349,6 +370,215 @@ fn create_entry(out_path: &Path) {
 	}
 }
 
+fn login(config: &mut Config) {
+	if config.index_token.is_some() {
+		warn!("You are already logged in");
+		let token = config.index_token.clone().unwrap();
+		info!("{}", token);
+		return;
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	let response: reqwest::blocking::Response = client
+		.post("http://localhost:3000/v1/login/github")
+		.header(USER_AGENT, "GeodeCli")
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 200 {
+		fatal!("Unable to connect to Geode Index");
+	}
+
+	let parsed = response
+		.json::<ApiResponse<LoginAttempt>>()
+		.nice_unwrap("Unable to parse login response");
+
+	let login_data = parsed
+		.payload
+		.nice_unwrap("Invalid response received from Geode Index");
+
+	info!("You will need to complete the login process in your web browser");
+	info!("Your login code is: {}", &login_data.code);
+	if let Ok(mut ctx) = cli_clipboard::ClipboardContext::new() {
+		if ctx.set_contents(login_data.code.to_string()).is_ok() {
+			info!("The code has been copied to your clipboard");
+		}
+	}
+	open::that(&login_data.uri).nice_unwrap("Unable to open browser");
+
+	loop {
+		info!("Checking login status");
+		if let Some(token) = poll_login(&client, &login_data.uuid) {
+			config.index_token = Some(token);
+			config.save();
+			done!("Login successful");
+			break;
+		}
+
+		std::thread::sleep(std::time::Duration::from_secs(login_data.interval as u64));
+	}
+}
+
+fn poll_login(client: &reqwest::blocking::Client, uuid: &str) -> Option<String> {
+	#[derive(Serialize)]
+	struct LoginPoll {
+		uuid: String,
+	}
+
+	let body: LoginPoll = LoginPoll {
+		uuid: uuid.to_string(),
+	};
+	let response = client
+		.post("http://localhost:3000/v1/login/github/poll")
+		.json(&body)
+		.header(USER_AGENT, "GeodeCLI")
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 200 {
+		return None;
+	}
+
+	let parsed = response
+		.json::<ApiResponse<String>>()
+		.nice_unwrap("Unable to parse login response");
+
+	parsed.payload
+}
+
+fn invalidate(config: &mut Config) {
+	if config.index_token.is_none() {
+		warn!("You are not logged in");
+		return;
+	}
+	loop {
+		let response = ask_value(
+			"Do you want to log out of all devices (y/n)",
+			Some("n"),
+			true,
+		);
+
+		match response.to_lowercase().as_str() {
+			"y" => {
+				invalidate_index_tokens(config.index_token.as_ref().unwrap());
+				config.index_token = None;
+				config.save();
+				done!("All tokens for the current account have been invalidated successfully");
+				break;
+			}
+			"n" => {
+				done!("Operation cancelled");
+				break;
+			}
+			_ => {
+				warn!("Invalid response");
+			}
+		}
+	}
+}
+
+pub fn invalidate_index_tokens(auth_token: &str) {
+	let client = reqwest::blocking::Client::new();
+
+	let response = client
+		.delete("http://localhost:3000/v1/me/tokens")
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(auth_token)
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() == 401 {
+		fatal!("Invalid token");
+	}
+	if response.status() != 204 {
+		fatal!("Unable to invalidate token");
+	}
+}
+
+fn submit(config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let download_link = ask_value("Download URL for the .geode file", None, true);
+	let id = ask_value("Mod ID (leave empty if submitting a new mod)", None, false);
+
+	if !id.is_empty() {
+		update_mod(&id, &download_link, config);
+	} else {
+		create_mod(&download_link, config);
+	}
+}
+
+fn create_mod(download_link: &str, config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	#[derive(Serialize)]
+	struct Payload {
+		download_link: String,
+	}
+
+	let payload = Payload {
+		download_link: download_link.to_string(),
+	};
+
+	let response = client
+		.post("http://localhost:3000/v1/mods")
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.json(&payload)
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 204 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to create mod: {}", body.error.unwrap());
+	}
+
+	info!("Mod created successfully");
+}
+
+fn update_mod(id: &str, download_link: &str, config: &Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	#[derive(Serialize)]
+	struct Payload {
+		download_link: String,
+	}
+
+	let payload = Payload {
+		download_link: download_link.to_string(),
+	};
+
+	let response = client
+		.post(format!("http://localhost:3000/v1/mods/{}/versions", id))
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.json(&payload)
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 204 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to create version for mod: {}", body.error.unwrap());
+	}
+
+	info!("Mod updated successfully");
+}
+
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
@@ -358,5 +588,8 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
+		Index::Login => login(config),
+		Index::Invalidate => invalidate(config),
+		Index::SubmitMod => submit(config),
 	}
 }

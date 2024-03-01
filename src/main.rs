@@ -10,11 +10,12 @@ mod profile;
 mod project;
 mod project_build;
 mod sdk;
+mod server;
 mod template;
 mod util;
 
-use util::*;
 use crate::profile::RunBackground;
+use util::*;
 
 /// Command-line interface for Geode
 #[derive(Parser, Debug)]
@@ -76,7 +77,7 @@ enum GeodeCommands {
 
 		/// Do not exit CLI after Geometry Dash exits if running in foreground
 		#[clap(long, conflicts_with = "background")]
-		stay: bool
+		stay: bool,
 	},
 
 	/// Builds the project at the current directory
@@ -133,8 +134,8 @@ fn main() {
 				(false, false) => RunBackground::Foreground,
 				(false, true) => RunBackground::ForegroundStay,
 				(true, false) => RunBackground::Background,
-				(true, true) => panic!("Impossible argument combination (background and stay)")
-			}
+				(true, true) => panic!("Impossible argument combination (background and stay)"),
+			},
 		),
 		GeodeCommands::Build {
 			platform,
