@@ -36,6 +36,12 @@ pub enum Index {
 	/// Submit a mod to the index
 	SubmitMod,
 
+	/// List your published mods
+	Published,
+
+	/// List mods that are pending validation
+	Pending,
+
 	/// Install a mod from the index to the current profile
 	Install {
 		/// Mod ID to install
@@ -73,6 +79,22 @@ struct LoginAttempt {
 	interval: i32,
 	uri: String,
 	code: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SimpleDevMod {
+	pub id: String,
+	pub featured: bool,
+	pub download_count: i32,
+	pub versions: Vec<SimpleDevModVersion>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct SimpleDevModVersion {
+	pub name: String,
+	pub version: String,
+	pub download_count: i32,
+	pub validated: bool,
 }
 
 pub fn update_index(config: &Config) {
@@ -579,6 +601,82 @@ fn update_mod(id: &str, download_link: &str, config: &Config) {
 	info!("Mod updated successfully");
 }
 
+fn get_own_mods(validated: bool, config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	let validated_str = match validated {
+		true => "true",
+		false => "false",
+	};
+
+	let response = client
+		.get(format!(
+			"http://localhost:3000/v1/me/mods?validated={}",
+			validated_str
+		))
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 200 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to fetch mods: {}", body.error.unwrap());
+	}
+
+	let mods = response
+		.json::<ApiResponse<Vec<SimpleDevMod>>>()
+		.nice_unwrap("Unable to parse response from Geode Index");
+
+	let payload = match mods.payload {
+		Some(payload) => payload,
+		None => {
+			if validated {
+				info!("You have no published mods");
+			} else {
+				info!("You have no pending mods");
+			}
+			return;
+		}
+	};
+
+	if payload.is_empty() {
+		if validated {
+			info!("You have no published mods");
+		} else {
+			info!("You have no pending mods");
+		}
+		return;
+	}
+
+	if validated {
+		info!("Your published mods:");
+	} else {
+		info!("Your pending mods:");
+	}
+	for (i, entry) in payload.iter().enumerate() {
+		info!("{}. ID: {}", i + 1, &entry.id);
+		info!("  Featured: {}", entry.featured);
+		info!("  Download count: {}", entry.download_count);
+		info!("  Versions:");
+		for (i, version) in entry.versions.iter().enumerate() {
+			info!("    {}. Name: {}", i + 1, version.name);
+			info!("      Version: {}", version.version);
+			info!("      Download count: {}", version.download_count);
+			info!("      Validated: {}", version.validated);
+		}
+		if i != payload.len() - 1 {
+			info!("");
+		}
+	}
+}
+
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
@@ -591,5 +689,7 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		Index::Login => login(config),
 		Index::Invalidate => invalidate(config),
 		Index::SubmitMod => submit(config),
+		Index::Published => get_own_mods(true, config),
+		Index::Pending => get_own_mods(false, config),
 	}
 }
