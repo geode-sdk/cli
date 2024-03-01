@@ -14,7 +14,7 @@ use serde_json::json;
 use sha3::{Digest, Sha3_256};
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, Cursor, Read};
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use zip::read::ZipFile;
 use zip::ZipArchive;
@@ -34,23 +34,14 @@ pub enum Index {
 	/// Invalidate all existing access tokens (logout)
 	Invalidate,
 
-	/// Set the URL for the index (pass default to reset)
-	Url {
-		/// URL to set
-		url: String,
-	},
+	/// Edit your developer profile
+	Profile,
 
-	/// Submit a mod to the index
-	Submit {
-		/// Whether to submit a new mod or update an existing one
-		action: IndexModAction,
-	},
+	/// Submit a mod (or a mod update) to the index
+	Submit { action: CreateModAction },
 
-	/// List your published mods
-	Published,
-
-	/// List mods that are pending validation
-	Pending,
+	/// Interact with your own mods
+	Mods { action: MyModAction },
 
 	/// Install a mod from the index to the current profile
 	Install {
@@ -63,12 +54,45 @@ pub enum Index {
 
 	/// Updates the index cache
 	Update,
+
+	/// Set the URL for the index (pass default to reset)
+	Url {
+		/// URL to set
+		url: String,
+	},
+
+	/// Secrets...
+	Admin { action: AdminAction },
 }
 
 #[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
-pub enum IndexModAction {
+pub enum CreateModAction {
+	/// Create a new mod
 	Create,
+	/// Update an existing mod
 	Update,
+}
+
+#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
+pub enum MyModAction {
+	/// List your published mods
+	Published,
+	/// List your pending mods
+	Pending,
+	/// Edit data about a mod
+	Edit,
+}
+
+#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
+pub enum AdminAction {
+	/// List mods that are pending verification
+	ListPending,
+	/// Validate a mod that is pending verification
+	Validate,
+	/// Reject a mod that is pending verification
+	Reject,
+	/// Alter a developer's verified status
+	DevStatus,
 }
 
 #[allow(unused)]
@@ -113,6 +137,15 @@ pub struct SimpleDevModVersion {
 	pub validated: bool,
 }
 
+#[derive(Deserialize, Clone)]
+pub struct DeveloperProfile {
+	pub id: i32,
+	pub username: String,
+	pub display_name: String,
+	pub verified: bool,
+	pub admin: bool,
+}
+
 pub fn update_index(config: &Config) {
 	let index_dir = config.get_current_profile().index_dir();
 
@@ -148,7 +181,7 @@ pub fn update_index(config: &Config) {
 		.text()
 		.nice_unwrap("Unable to decode index version");
 
-	let mut zip_data = io::Cursor::new(Vec::new());
+	let mut zip_data = Cursor::new(Vec::new());
 
 	client
 		.get("https://github.com/geode-sdk/mods/zipball/main")
@@ -239,7 +272,7 @@ pub fn index_mods_dir(config: &Config) -> PathBuf {
 pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
 	let dir = index_mods_dir(config).join(id);
 
-	for path in { read_dir_recursive(&dir).nice_unwrap("Unable to read index") } {
+	for path in read_dir_recursive(&dir).nice_unwrap("Unable to read index") {
 		let Ok(mod_info) = try_parse_mod_info(&path) else {
 			continue;
 		};
@@ -546,7 +579,7 @@ pub fn invalidate_index_tokens(config: &mut Config) {
 	}
 }
 
-fn submit(action: IndexModAction, config: &mut Config) {
+fn submit(action: CreateModAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
@@ -558,9 +591,9 @@ fn submit(action: IndexModAction, config: &mut Config) {
 		id: String,
 	}
 
-	if action == IndexModAction::Update {
+	if action == CreateModAction::Update {
 		info!("Fetching mod id from .geode file");
-		let mut zip_data: Cursor<Vec<u8>> = io::Cursor::new(vec![]);
+		let mut zip_data: Cursor<Vec<u8>> = Cursor::new(vec![]);
 
 		let mut response =
 			reqwest::blocking::get(&download_link).nice_unwrap("Unable to download mod");
@@ -676,7 +709,46 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 	info!("Mod updated successfully");
 }
 
-fn get_own_mods(validated: bool, config: &mut Config) {
+fn print_own_mods(validated: bool, config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let payload = get_own_mods(validated, config);
+
+	if payload.is_empty() {
+		if validated {
+			done!("You have no published mods");
+		} else {
+			done!("You have no pending mods");
+		}
+		return;
+	}
+
+	if validated {
+		info!("Your published mods:");
+	} else {
+		info!("Your pending mods:");
+	}
+
+	for (i, entry) in payload.iter().enumerate() {
+		info!("{}. ID: {}", i + 1, &entry.id);
+		info!("  Featured: {}", entry.featured);
+		info!("  Download count: {}", entry.download_count);
+		info!("  Versions:");
+		for (i, version) in entry.versions.iter().enumerate() {
+			info!("    {}. Name: {}", i + 1, version.name);
+			info!("      Version: {}", version.version);
+			info!("      Download count: {}", version.download_count);
+			info!("      Validated: {}", version.validated);
+		}
+		if i != payload.len() - 1 {
+			info!("");
+		}
+	}
+}
+
+fn get_own_mods(validated: bool, config: &mut Config) -> Vec<SimpleDevMod> {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
@@ -714,45 +786,193 @@ fn get_own_mods(validated: bool, config: &mut Config) {
 		.json::<ApiResponse<Vec<SimpleDevMod>>>()
 		.nice_unwrap("Unable to parse response from Geode Index");
 
-	let payload = match mods.payload {
-		Some(payload) => payload,
-		None => {
-			if validated {
-				info!("You have no published mods");
-			} else {
-				info!("You have no pending mods");
-			}
-			return;
-		}
-	};
+	mods.payload.unwrap_or_else(Vec::new)
+}
 
-	if payload.is_empty() {
-		if validated {
-			info!("You have no published mods");
-		} else {
-			info!("You have no pending mods");
-		}
-		return;
+fn edit_own_mods(config: &mut Config) {
+	let mods = get_own_mods(true, config);
+	if mods.is_empty() {
+		fatal!("You have no published mods");
 	}
 
-	if validated {
-		info!("Your published mods:");
-	} else {
-		info!("Your pending mods:");
-	}
-	for (i, entry) in payload.iter().enumerate() {
+	info!("Select a mod to edit:");
+	for (i, entry) in mods.iter().enumerate() {
 		info!("{}. ID: {}", i + 1, &entry.id);
-		info!("  Featured: {}", entry.featured);
-		info!("  Download count: {}", entry.download_count);
-		info!("  Versions:");
-		for (i, version) in entry.versions.iter().enumerate() {
-			info!("    {}. Name: {}", i + 1, version.name);
-			info!("      Version: {}", version.version);
-			info!("      Download count: {}", version.download_count);
-			info!("      Validated: {}", version.validated);
+	}
+
+	loop {
+		let response = ask_value("Mod number (enter q to go back)", None, true);
+		if response == "q" {
+			break;
 		}
-		if i != payload.len() - 1 {
-			info!("");
+		if let Ok(index) = response.parse::<usize>() {
+			if index > 0 && index <= mods.len() {
+				let should_break = edit_mod(&mods[index - 1], config);
+				if should_break {
+					break;
+				}
+			} else {
+				warn!("Invalid number");
+			}
+		} else {
+			warn!("Invalid number");
+		}
+	}
+}
+
+fn edit_mod(mod_to_edit: &SimpleDevMod, config: &mut Config) -> bool {
+	info!("Editing mod '{}'", mod_to_edit.id);
+
+	loop {
+		info!("----------------");
+		info!("Possible actions:");
+		info!("1. Add a developer");
+		info!("2. Remove a developer");
+		info!("3. Transfer ownership");
+		let response = ask_value("Action number (enter q to go back)", None, true);
+		if response == "q" {
+			return true;
+		}
+		if let Ok(index) = response.parse::<usize>() {
+			match index {
+				1 => add_developer(mod_to_edit, config),
+				2 => remove_developer(mod_to_edit, config),
+				// coming soon
+				3 => unimplemented!(),
+				_ => warn!("Invalid number"),
+			}
+		} else {
+			warn!("Invalid number");
+		}
+	}
+}
+
+fn add_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
+	let username = ask_value("Username", None, true);
+
+	let client = reqwest::blocking::Client::new();
+	let url = get_index_url(format!("/v1/mods/{}/developers", mod_to_edit.id), config);
+
+	let response = client
+		.post(url)
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.json(&json!({ "username": username }))
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 204 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to add developer: {}", body.error.unwrap());
+	}
+
+	info!("Developer added successfully");
+}
+
+fn remove_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
+	let username = ask_value("Username", None, true);
+
+	let client = reqwest::blocking::Client::new();
+	let url = get_index_url(
+		format!("/v1/mods/{}/developers/{}", mod_to_edit.id, username),
+		config,
+	);
+
+	let response = client
+		.delete(url)
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 204 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to remove developer: {}", body.error.unwrap());
+	}
+
+	info!("Developer removed successfully");
+}
+
+fn edit_profile(config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	let url = get_index_url("/v1/me".to_string(), config);
+
+	let response = client
+		.get(url)
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 200 {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to fetch profile: {}", body.error.unwrap());
+	}
+
+	let profile = response
+		.json::<ApiResponse<DeveloperProfile>>()
+		.nice_unwrap("Unable to parse response from Geode Index");
+
+	let mut profile = profile
+		.payload
+		.nice_unwrap("Invalid response received from Geode Index");
+
+	info!("Your profile:");
+	info!("Username: {}", profile.username);
+	info!("Display name: {}", profile.display_name);
+	info!("Verified: {}", profile.verified);
+	info!("Admin: {}", profile.admin);
+
+	loop {
+		info!("----------------");
+		info!("Possible actions:");
+		info!("1. Change display name");
+		let response = ask_value("Action number (enter q to go back)", None, true);
+		if response == "q" {
+			break;
+		}
+		if let Ok(index) = response.parse::<usize>() {
+			match index {
+				1 => {
+					let new_display_name = ask_value("New display name", None, true);
+					let url = get_index_url("/v1/me".to_string(), config);
+					let response = client
+						.put(url)
+						.header(USER_AGENT, "GeodeCLI")
+						.bearer_auth(config.index_token.clone().unwrap())
+						.json(&json![
+							{
+								"display_name": new_display_name
+							}
+						])
+						.send()
+						.nice_unwrap("Unable to connect to Geode Index");
+
+					if response.status() != 204 {
+						let body: ApiResponse<String> = response
+							.json()
+							.nice_unwrap("Unable to parse response from Geode Index");
+						fatal!("Unable to update profile: {}", body.error.unwrap());
+					}
+
+					profile.display_name = new_display_name;
+					info!("Display name updated successfully");
+				}
+				_ => warn!("Invalid number"),
+			}
+		} else {
+			warn!("Invalid number");
 		}
 	}
 }
@@ -788,7 +1008,12 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		Index::Invalidate => invalidate(config),
 		Index::Url { url } => set_index_url(url, config),
 		Index::Submit { action } => submit(action, config),
-		Index::Published => get_own_mods(true, config),
-		Index::Pending => get_own_mods(false, config),
+		Index::Mods { action } => match action {
+			MyModAction::Published => print_own_mods(true, config),
+			MyModAction::Pending => print_own_mods(false, config),
+			MyModAction::Edit => edit_own_mods(config),
+		},
+		Index::Profile => edit_profile(config),
+		Index::Admin { action } => (),
 	}
 }
