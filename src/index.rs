@@ -14,8 +14,9 @@ use serde_json::json;
 use sha3::{Digest, Sha3_256};
 use std::collections::HashSet;
 use std::fs;
-use std::io;
+use std::io::{self, Cursor, Read};
 use std::path::{Path, PathBuf};
+use zip::read::ZipFile;
 use zip::ZipArchive;
 
 #[derive(Subcommand, Debug)]
@@ -40,7 +41,10 @@ pub enum Index {
 	},
 
 	/// Submit a mod to the index
-	SubmitMod,
+	Submit {
+		/// Whether to submit a new mod or update an existing one
+		action: IndexModAction,
+	},
 
 	/// List your published mods
 	Published,
@@ -58,6 +62,12 @@ pub enum Index {
 	},
 
 	/// Updates the index cache
+	Update,
+}
+
+#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
+pub enum IndexModAction {
+	Create,
 	Update,
 }
 
@@ -536,15 +546,42 @@ pub fn invalidate_index_tokens(config: &mut Config) {
 	}
 }
 
-fn submit(config: &mut Config) {
+fn submit(action: IndexModAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
 
 	let download_link = ask_value("Download URL for the .geode file", None, true);
-	let id = ask_value("Mod ID (leave empty if submitting a new mod)", None, false);
+	let mut id: Option<String> = None;
+	#[derive(Deserialize)]
+	struct SimpleModJson {
+		id: String,
+	}
 
-	if !id.is_empty() {
+	if action == IndexModAction::Update {
+		info!("Fetching mod id from .geode file");
+		let mut zip_data: Cursor<Vec<u8>> = io::Cursor::new(vec![]);
+
+		let mut response =
+			reqwest::blocking::get(&download_link).nice_unwrap("Unable to download mod");
+		response
+			.copy_to(&mut zip_data)
+			.nice_unwrap("Unable to write to index");
+
+		let mut zip_archive =
+			zip::ZipArchive::new(zip_data).nice_unwrap("Unable to decode .geode file");
+
+		let json_file = zip_archive
+			.by_name("mod.json")
+			.nice_unwrap("Unable to read mod.json");
+
+		let json = serde_json::from_reader::<ZipFile, SimpleModJson>(json_file)
+			.nice_unwrap("Unable to parse mod.json");
+
+		id = Some(json.id);
+	}
+
+	if let Some(id) = id {
 		update_mod(&id, &download_link, config);
 	} else {
 		create_mod(&download_link, config);
@@ -568,6 +605,8 @@ fn create_mod(download_link: &str, config: &mut Config) {
 	};
 
 	let url = get_index_url("/v1/mods".to_string(), config);
+
+	info!("Creating mod");
 
 	let response = client
 		.post(url)
@@ -610,6 +649,8 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 	};
 
 	let url = get_index_url(format!("/v1/mods/{}/versions", id), config);
+
+	info!("Updating mod");
 
 	let response = client
 		.post(url)
@@ -746,7 +787,7 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		Index::Login => login(config),
 		Index::Invalidate => invalidate(config),
 		Index::Url { url } => set_index_url(url, config),
-		Index::SubmitMod => submit(config),
+		Index::Submit { action } => submit(action, config),
 		Index::Published => get_own_mods(true, config),
 		Index::Pending => get_own_mods(false, config),
 	}
