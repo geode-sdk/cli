@@ -407,10 +407,6 @@ fn login(config: &mut Config) {
 	}
 
 	let client = reqwest::blocking::Client::new();
-	
-	struct EmptyBody {}
-
-	let emptyBody: EmptyBody = EmptyBody {};
 
 	let response: reqwest::blocking::Response = client
 		.post(get_index_url("/v1/login/github".to_string(), config))
