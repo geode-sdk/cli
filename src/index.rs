@@ -511,7 +511,7 @@ pub fn invalidate_index_tokens(auth_token: &str) {
 		.nice_unwrap("Unable to connect to Geode Index");
 
 	if response.status() == 401 {
-		fatal!("Invalid token");
+		fatal!("Invalid token. Please login again.");
 	}
 	if response.status() != 204 {
 		fatal!("Unable to invalidate token");
@@ -557,6 +557,12 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
+	if response.status() == 401 {
+		config.index_token = None;
+		config.save();
+		fatal!("Invalid token. Please login again.");
+	}
+
 	if response.status() != 204 {
 		let body: ApiResponse<String> = response
 			.json()
@@ -590,6 +596,12 @@ fn update_mod(id: &str, download_link: &str, config: &Config) {
 		.json(&payload)
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() == 401 {
+		config.index_token = None;
+		config.save();
+		fatal!("Invalid token. Please login again.");
+	}
 
 	if response.status() != 204 {
 		let body: ApiResponse<String> = response
@@ -628,6 +640,12 @@ fn get_own_mods(validated: bool, config: &mut Config) {
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
 		fatal!("Unable to fetch mods: {}", body.error.unwrap());
+	}
+
+	if response.status() == 401 {
+		config.index_token = None;
+		config.save();
+		fatal!("Invalid token. Please login again.");
 	}
 
 	let mods = response
