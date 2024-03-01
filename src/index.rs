@@ -727,7 +727,7 @@ fn set_index_url(url: String, config: &mut Config) {
 
 fn get_index_url(path: String, config: &Config) -> String {
 	format!(
-		"{}{}",
+		"{}/{}",
 		config.index_url.trim_end_matches('/'),
 		path.trim_start_matches('/')
 	)
