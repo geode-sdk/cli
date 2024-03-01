@@ -414,7 +414,7 @@ fn login(config: &mut Config) {
 
 	let response: reqwest::blocking::Response = client
 		.post(get_index_url("/v1/login/github".to_string(), config))
-		.json({})
+		.json(&{})
 		.header(USER_AGENT, "GeodeCli")
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
