@@ -573,7 +573,7 @@ fn create_mod(download_link: &str, config: &mut Config) {
 	info!("Mod created successfully");
 }
 
-fn update_mod(id: &str, download_link: &str, config: &Config) {
+fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
