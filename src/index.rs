@@ -399,10 +399,6 @@ fn create_entry(out_path: &Path) {
 }
 
 fn login(config: &mut Config) {
-	struct EmptyBody {}
-
-	let body: EmptyBody = EmptyBody {};
-	
 	if config.index_token.is_some() {
 		warn!("You are already logged in");
 		let token = config.index_token.clone().unwrap();
@@ -411,10 +407,14 @@ fn login(config: &mut Config) {
 	}
 
 	let client = reqwest::blocking::Client::new();
+	
+	struct EmptyBody {}
+
+	let body: EmptyBody = EmptyBody {};
 
 	let response: reqwest::blocking::Response = client
 		.post(get_index_url("/v1/login/github".to_string(), config))
-		.json(")
+		.json()
 		.header(USER_AGENT, "GeodeCli")
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
