@@ -3,7 +3,7 @@ use crate::file::{copy_dir_recursive, read_dir_recursive};
 use crate::server::ApiResponse;
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
-use crate::{done, fatal, info, warn, NiceUnwrap};
+use crate::{done, fatal, index_admin, info, warn, NiceUnwrap};
 use clap::Subcommand;
 use cli_clipboard::ClipboardProvider;
 use colored::Colorize;
@@ -466,9 +466,7 @@ fn login(config: &mut Config) {
 		.json::<ApiResponse<LoginAttempt>>()
 		.nice_unwrap("Unable to parse login response");
 
-	let login_data = parsed
-		.payload
-		.nice_unwrap("Invalid response received from Geode Index");
+	let login_data = parsed.payload;
 
 	info!("You will need to complete the login process in your web browser");
 	info!("Your login code is: {}", &login_data.code);
@@ -521,7 +519,7 @@ fn poll_login(
 		.json::<ApiResponse<String>>()
 		.nice_unwrap("Unable to parse login response");
 
-	parsed.payload
+	Some(parsed.payload)
 }
 
 fn invalidate(config: &mut Config) {
@@ -572,6 +570,8 @@ pub fn invalidate_index_tokens(config: &mut Config) {
 		.nice_unwrap("Unable to connect to Geode Index");
 
 	if response.status() == 401 {
+		config.index_token = None;
+		config.save();
 		fatal!("Invalid token. Please login again.");
 	}
 	if response.status() != 204 {
@@ -659,7 +659,7 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to create mod: {}", body.error.unwrap());
+		fatal!("Unable to create mod: {}", body.error);
 	}
 
 	info!("Mod created successfully");
@@ -703,7 +703,7 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to create version for mod: {}", body.error.unwrap());
+		fatal!("Unable to create version for mod: {}", body.error);
 	}
 
 	info!("Mod updated successfully");
@@ -773,7 +773,7 @@ fn get_own_mods(validated: bool, config: &mut Config) -> Vec<SimpleDevMod> {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to fetch mods: {}", body.error.unwrap());
+		fatal!("Unable to fetch mods: {}", body.error);
 	}
 
 	if response.status() == 401 {
@@ -786,7 +786,7 @@ fn get_own_mods(validated: bool, config: &mut Config) -> Vec<SimpleDevMod> {
 		.json::<ApiResponse<Vec<SimpleDevMod>>>()
 		.nice_unwrap("Unable to parse response from Geode Index");
 
-	mods.payload.unwrap_or_else(Vec::new)
+	mods.payload
 }
 
 fn edit_own_mods(config: &mut Config) {
@@ -865,7 +865,7 @@ fn add_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to add developer: {}", body.error.unwrap());
+		fatal!("Unable to add developer: {}", body.error);
 	}
 
 	info!("Developer added successfully");
@@ -891,13 +891,13 @@ fn remove_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to remove developer: {}", body.error.unwrap());
+		fatal!("Unable to remove developer: {}", body.error);
 	}
 
 	info!("Developer removed successfully");
 }
 
-fn edit_profile(config: &mut Config) {
+pub fn get_user_profile(config: &mut Config) -> DeveloperProfile {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
@@ -917,16 +917,20 @@ fn edit_profile(config: &mut Config) {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to fetch profile: {}", body.error.unwrap());
+		fatal!("Unable to fetch profile: {}", body.error);
 	}
 
 	let profile = response
 		.json::<ApiResponse<DeveloperProfile>>()
 		.nice_unwrap("Unable to parse response from Geode Index");
 
-	let mut profile = profile
-		.payload
-		.nice_unwrap("Invalid response received from Geode Index");
+	profile.payload
+}
+
+fn edit_profile(config: &mut Config) {
+	let mut profile = get_user_profile(config);
+
+	let client = reqwest::blocking::Client::new();
 
 	info!("Your profile:");
 	info!("Username: {}", profile.username);
@@ -938,7 +942,7 @@ fn edit_profile(config: &mut Config) {
 		info!("----------------");
 		info!("Possible actions:");
 		info!("1. Change display name");
-		let response = ask_value("Action number (enter q to go back)", None, true);
+		let response = ask_value("Action number (enter q to exit)", None, true);
 		if response == "q" {
 			break;
 		}
@@ -963,7 +967,7 @@ fn edit_profile(config: &mut Config) {
 						let body: ApiResponse<String> = response
 							.json()
 							.nice_unwrap("Unable to parse response from Geode Index");
-						fatal!("Unable to update profile: {}", body.error.unwrap());
+						fatal!("Unable to update profile: {}", body.error);
 					}
 
 					profile.display_name = new_display_name;
@@ -983,11 +987,12 @@ fn set_index_url(url: String, config: &mut Config) {
 	} else {
 		config.index_url = url;
 	}
+	config.index_token = None;
 	config.save();
 	info!("Index URL set to: {}", config.index_url);
 }
 
-fn get_index_url(path: String, config: &Config) -> String {
+pub fn get_index_url(path: String, config: &Config) -> String {
 	format!(
 		"{}/{}",
 		config.index_url.trim_end_matches('/'),
@@ -1014,6 +1019,6 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			MyModAction::Edit => edit_own_mods(config),
 		},
 		Index::Profile => edit_profile(config),
-		Index::Admin { action } => (),
+		Index::Admin { action } => index_admin::admin_dashboard(action, config),
 	}
 }

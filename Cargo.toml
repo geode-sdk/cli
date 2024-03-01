@@ -43,6 +43,7 @@ vec1 = { version = "1.10.1", features = ["serde"] }
 crossterm_input = "0.5.0"
 open = "5.0.2"
 cli-clipboard = "0.4.0"
+rand = "0.8.5"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.51.0"

@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod file;
 mod index;
+mod index_admin;
 mod indexer;
 mod info;
 mod package;
