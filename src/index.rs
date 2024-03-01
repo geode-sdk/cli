@@ -33,6 +33,12 @@ pub enum Index {
 	/// Invalidate all existing access tokens (logout)
 	Invalidate,
 
+	/// Set the URL for the index (pass default to reset)
+	Url {
+		/// URL to set
+		url: String,
+	},
+
 	/// Submit a mod to the index
 	SubmitMod,
 
@@ -403,7 +409,7 @@ fn login(config: &mut Config) {
 	let client = reqwest::blocking::Client::new();
 
 	let response: reqwest::blocking::Response = client
-		.post("http://localhost:3000/v1/login/github")
+		.post(get_index_url("/v1/login/github".to_string(), config))
 		.header(USER_AGENT, "GeodeCli")
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
@@ -431,7 +437,7 @@ fn login(config: &mut Config) {
 
 	loop {
 		info!("Checking login status");
-		if let Some(token) = poll_login(&client, &login_data.uuid) {
+		if let Some(token) = poll_login(&client, &login_data.uuid, config) {
 			config.index_token = Some(token);
 			config.save();
 			done!("Login successful");
@@ -442,7 +448,11 @@ fn login(config: &mut Config) {
 	}
 }
 
-fn poll_login(client: &reqwest::blocking::Client, uuid: &str) -> Option<String> {
+fn poll_login(
+	client: &reqwest::blocking::Client,
+	uuid: &str,
+	config: &mut Config,
+) -> Option<String> {
 	#[derive(Serialize)]
 	struct LoginPoll {
 		uuid: String,
@@ -451,8 +461,9 @@ fn poll_login(client: &reqwest::blocking::Client, uuid: &str) -> Option<String> 
 	let body: LoginPoll = LoginPoll {
 		uuid: uuid.to_string(),
 	};
+
 	let response = client
-		.post("http://localhost:3000/v1/login/github/poll")
+		.post(get_index_url("/v1/login/github/poll".to_string(), config))
 		.json(&body)
 		.header(USER_AGENT, "GeodeCLI")
 		.send()
@@ -483,7 +494,7 @@ fn invalidate(config: &mut Config) {
 
 		match response.to_lowercase().as_str() {
 			"y" => {
-				invalidate_index_tokens(config.index_token.as_ref().unwrap());
+				invalidate_index_tokens(config);
 				config.index_token = None;
 				config.save();
 				done!("All tokens for the current account have been invalidated successfully");
@@ -500,13 +511,19 @@ fn invalidate(config: &mut Config) {
 	}
 }
 
-pub fn invalidate_index_tokens(auth_token: &str) {
+pub fn invalidate_index_tokens(config: &mut Config) {
+	if config.index_token.is_none() {
+		fatal!("You are not logged in");
+	}
+
+	let token = config.index_token.clone().unwrap();
+
 	let client = reqwest::blocking::Client::new();
 
 	let response = client
-		.delete("http://localhost:3000/v1/me/tokens")
+		.delete(get_index_url("/v1/me/tokens".to_string(), config))
 		.header(USER_AGENT, "GeodeCLI")
-		.bearer_auth(auth_token)
+		.bearer_auth(token)
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
@@ -549,8 +566,10 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		download_link: download_link.to_string(),
 	};
 
+	let url = get_index_url("/v1/mods".to_string(), config);
+
 	let response = client
-		.post("http://localhost:3000/v1/mods")
+		.post(url)
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
 		.json(&payload)
@@ -589,8 +608,10 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 		download_link: download_link.to_string(),
 	};
 
+	let url = get_index_url(format!("/v1/mods/{}/versions", id), config);
+
 	let response = client
-		.post(format!("http://localhost:3000/v1/mods/{}/versions", id))
+		.post(url)
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
 		.json(&payload)
@@ -625,11 +646,10 @@ fn get_own_mods(validated: bool, config: &mut Config) {
 		false => "false",
 	};
 
+	let url = get_index_url(format!("/v1/me/mods?validated={}", validated_str), config);
+
 	let response = client
-		.get(format!(
-			"http://localhost:3000/v1/me/mods?validated={}",
-			validated_str
-		))
+		.get(url)
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
 		.send()
@@ -695,6 +715,24 @@ fn get_own_mods(validated: bool, config: &mut Config) {
 	}
 }
 
+fn set_index_url(url: String, config: &mut Config) {
+	if url == "default" {
+		config.index_url = "https://api.geode-sdk.org".to_string();
+	} else {
+		config.index_url = url;
+	}
+	config.save();
+	info!("Index URL set to: {}", config.index_url);
+}
+
+fn get_index_url(path: String, config: &Config) -> String {
+	format!(
+		"{}/{}",
+		config.index_url.trim_end_matches('/'),
+		path.trim_start_matches('/')
+	)
+}
+
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
@@ -706,6 +744,7 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		}
 		Index::Login => login(config),
 		Index::Invalidate => invalidate(config),
+		Index::Url { url } => set_index_url(url, config),
 		Index::SubmitMod => submit(config),
 		Index::Published => get_own_mods(true, config),
 		Index::Pending => get_own_mods(false, config),
