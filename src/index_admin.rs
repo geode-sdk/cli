@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
 	config::Config,
 	fatal,
@@ -22,28 +24,35 @@ struct PendingMod {
 	changelog: Option<String>,
 }
 
-impl PendingMod {
-	fn print(&self) {
-		println!("{}", self.id);
-		println!(
+impl Display for PendingMod {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f, "{}", self.id)?;
+		writeln!(
+			f,
 			"- Repository: {}",
 			self.repository.as_deref().unwrap_or("None")
-		);
-		println!("- Tags: {}", self.tags.join(", "));
-		println!("- About");
-		println!("----------------------------");
-		println!("{}", self.about.as_deref().unwrap_or("None"));
-		println!("----------------------------");
+		)?;
+		writeln!(f, "- Tags: {}", self.tags.join(", "))?;
+		writeln!(f, "- About")?;
+		writeln!(f, "----------------------------")?;
+		writeln!(f, "{}", self.about.as_deref().unwrap_or("None"))?;
+		writeln!(f, "----------------------------")?;
 		// To be honest I have no idea if we should show this, it can become quite large
-		// println!("- Changelog");
-		// println!("----------------------------");
-		// println!("{}", self.changelog.as_deref().unwrap_or("None"));
-		// println!("----------------------------");
-		println!("- Versions:");
-		for (i, version) in self.versions.iter().enumerate() {
-			version.print(i + 1);
+		// writeln!(f, "- Changelog");
+		// writeln!(f, "----------------------------");
+		// writeln!(f, "{}", self.changelog.as_deref().unwrap_or("None"));
+		// writeln!(f, "----------------------------");
+		writeln!(f, "- Versions:")?;
+		for version in self.versions.iter() {
+			writeln!(f, "{}", version)?;
 		}
+
+		Ok(())
 	}
+}
+
+impl PendingMod {
+	fn print(&self) {}
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -59,41 +68,45 @@ struct PendingModVersion {
 	incompatibilities: Option<Vec<PendingModDepencency>>,
 }
 
-impl PendingModVersion {
-	fn print(&self, index: usize) {
-		println!("{}. {}", index, self.version);
-		println!("  - Name: {}", self.name);
-		println!(
+impl Display for PendingModVersion {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f, "{}", self.version)?;
+		writeln!(f, "  - Name: {}", self.name)?;
+		writeln!(
+			f,
 			"  - Description: {}",
 			self.description.as_deref().unwrap_or("None")
-		);
-		println!("  - Geode: {}", self.geode);
-		println!("  - Early Load: {}", self.early_load);
-		println!("  - API: {}", self.api);
-		println!("  - GD:");
-		println!("    - Win: {}", self.gd.win.as_deref().unwrap_or("None"));
-		println!("    - Mac: {}", self.gd.mac.as_deref().unwrap_or("None"));
-		println!(
+		)?;
+		writeln!(f, "  - Geode: {}", self.geode)?;
+		writeln!(f, "  - Early Load: {}", self.early_load)?;
+		writeln!(f, "  - API: {}", self.api)?;
+		writeln!(f, "  - GD:")?;
+		writeln!(f, "    - Win: {}", self.gd.win.as_deref().unwrap_or("None"))?;
+		writeln!(f, "    - Mac: {}", self.gd.mac.as_deref().unwrap_or("None"))?;
+		writeln!(
+			f,
 			"    - Android 32: {}",
 			self.gd.android32.as_deref().unwrap_or("None")
-		);
-		println!(
+		)?;
+		writeln!(
+			f,
 			"    - Android 64: {}",
 			self.gd.android64.as_deref().unwrap_or("None")
-		);
-		println!("    - iOS: {}", self.gd.ios.as_deref().unwrap_or("None"));
+		)?;
+		writeln!(f, "    - iOS: {}", self.gd.ios.as_deref().unwrap_or("None"))?;
 		if let Some(deps) = &self.dependencies {
-			println!("  - Dependencies:");
-			for (i, dep) in deps.iter().enumerate() {
-				dep.print(i + 1);
+			writeln!(f, "  - Dependencies:")?;
+			for dep in deps {
+				writeln!(f, "{}", dep)?;
 			}
 		}
 		if let Some(incomps) = &self.incompatibilities {
-			println!("  - Incompatibilities:");
-			for (i, incomp) in incomps.iter().enumerate() {
-				incomp.print(i + 1);
+			writeln!(f, "  - Incompatibilities:")?;
+			for incomp in incomps {
+				writeln!(f, "{}", incomp)?;
 			}
 		}
+		Ok(())
 	}
 }
 
@@ -113,11 +126,11 @@ struct PendingModDepencency {
 	importance: String,
 }
 
-impl PendingModDepencency {
-	fn print(&self, index: usize) {
-		println!("    {}. {}", index, self.mod_id);
-		println!("      - Version: {}", self.version);
-		println!("      - Importance: {}", self.importance);
+impl Display for PendingModDepencency {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f, "    {}", self.mod_id)?;
+		writeln!(f, "      - Version: {}", self.version)?;
+		writeln!(f, "      - Importance: {}", self.importance)
 	}
 }
 
@@ -183,7 +196,7 @@ fn list_pending_mods(config: &Config) {
 		logging::clear_terminal();
 
 		for entry in mods.data.iter() {
-			entry.print();
+			println!("{}", entry);
 		}
 
 		println!("---------------------");
