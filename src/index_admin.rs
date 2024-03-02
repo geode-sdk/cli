@@ -4,7 +4,7 @@ use crate::{
 	config::Config,
 	fatal,
 	index::{self, AdminAction},
-	info,
+	index_dev, info,
 	logging::{self, ask_value},
 	server::{ApiResponse, PaginatedData},
 	warn, NiceUnwrap,
@@ -49,10 +49,6 @@ impl Display for PendingMod {
 
 		Ok(())
 	}
-}
-
-impl PendingMod {
-	fn print(&self) {}
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -138,7 +134,7 @@ pub fn admin_dashboard(action: AdminAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in!");
 	}
-	let profile = index::get_user_profile(config);
+	let profile = index_dev::get_user_profile(config);
 	if !profile.admin {
 		let message = get_random_message();
 		fatal!("{}", message);
