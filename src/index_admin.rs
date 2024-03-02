@@ -182,7 +182,6 @@ fn list_pending_mods(config: &Config) {
 
 	loop {
 		let mods = get_pending_mods(page, config);
-		info!("{:?}", mods);
 
 		if mods.count == 0 {
 			info!("No pending mods on the index");
