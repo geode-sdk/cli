@@ -3,7 +3,7 @@ use crate::{
 	fatal,
 	index::{self, AdminAction},
 	info,
-	logging::ask_value,
+	logging::{self, ask_value},
 	server::{ApiResponse, PaginatedData},
 	warn, NiceUnwrap,
 };
@@ -125,11 +125,11 @@ pub fn admin_dashboard(action: AdminAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in!");
 	}
-	// let profile = index::get_user_profile(config);
-	// if !profile.admin {
-	// 	let message = get_random_message();
-	// 	fatal!("{}", message);
-	// }
+	let profile = index::get_user_profile(config);
+	if !profile.admin {
+		let message = get_random_message();
+		fatal!("{}", message);
+	}
 
 	match action {
 		AdminAction::ListPending => {
@@ -180,7 +180,7 @@ fn list_pending_mods(config: &Config) {
 			break;
 		}
 
-		print!("{esc}c", esc = 27 as char);
+		logging::clear_terminal();
 
 		for entry in mods.data.iter() {
 			entry.print();

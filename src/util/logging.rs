@@ -51,6 +51,10 @@ macro_rules! confirm {
     };
 }
 
+pub fn clear_terminal() {
+	print!("{esc}c", esc = 27 as char);
+}
+
 pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
 	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
 	let mut line_reader = Editor::<(), rustyline::history::DefaultHistory>::new().unwrap();
@@ -75,7 +79,7 @@ pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String 
 }
 
 pub fn ask_confirm(text: &str, default: bool) -> bool {
-	use ::colored::Colorize;
+	use colored::Colorize;
 	// print question
 	print!(
 		"{}{} {} ",

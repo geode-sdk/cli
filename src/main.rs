@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod file;
 mod index;
 mod index_admin;
+mod index_auth;
 mod indexer;
 mod info;
 mod package;

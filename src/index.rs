@@ -3,9 +3,8 @@ use crate::file::{copy_dir_recursive, read_dir_recursive};
 use crate::server::ApiResponse;
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
-use crate::{done, fatal, index_admin, info, warn, NiceUnwrap};
+use crate::{done, fatal, index_admin, index_auth, info, logging, warn, NiceUnwrap};
 use clap::Subcommand;
-use cli_clipboard::ClipboardProvider;
 use colored::Colorize;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::VersionReq;
@@ -111,14 +110,6 @@ pub struct Entry {
 	tags: Vec<String>,
 	#[serde(default)]
 	featured: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct LoginAttempt {
-	uuid: String,
-	interval: i32,
-	uri: String,
-	code: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -438,144 +429,6 @@ fn create_entry(out_path: &Path) {
 		fs::copy(&logo_path, entry_path.join("logo.png")).nice_unwrap("Unable to copy logo.png");
 	} else {
 		warn!("No logo.png found, skipping");
-	}
-}
-
-fn login(config: &mut Config) {
-	if config.index_token.is_some() {
-		warn!("You are already logged in");
-		let token = config.index_token.clone().unwrap();
-		info!("{}", token);
-		return;
-	}
-
-	let client = reqwest::blocking::Client::new();
-
-	let response: reqwest::blocking::Response = client
-		.post(get_index_url("/v1/login/github".to_string(), config))
-		.header(USER_AGENT, "GeodeCli")
-		.json(&{})
-		.send()
-		.nice_unwrap("Unable to connect to Geode Index");
-
-	if response.status() != 200 {
-		fatal!("Unable to connect to Geode Index");
-	}
-
-	let parsed = response
-		.json::<ApiResponse<LoginAttempt>>()
-		.nice_unwrap("Unable to parse login response");
-
-	let login_data = parsed.payload;
-
-	info!("You will need to complete the login process in your web browser");
-	info!("Your login code is: {}", &login_data.code);
-	if let Ok(mut ctx) = cli_clipboard::ClipboardContext::new() {
-		if ctx.set_contents(login_data.code.to_string()).is_ok() {
-			info!("The code has been copied to your clipboard");
-		}
-	}
-	open::that(&login_data.uri).nice_unwrap("Unable to open browser");
-
-	loop {
-		info!("Checking login status");
-		if let Some(token) = poll_login(&client, &login_data.uuid, config) {
-			config.index_token = Some(token);
-			config.save();
-			done!("Login successful");
-			break;
-		}
-
-		std::thread::sleep(std::time::Duration::from_secs(login_data.interval as u64));
-	}
-}
-
-fn poll_login(
-	client: &reqwest::blocking::Client,
-	uuid: &str,
-	config: &mut Config,
-) -> Option<String> {
-	#[derive(Serialize)]
-	struct LoginPoll {
-		uuid: String,
-	}
-
-	let body: LoginPoll = LoginPoll {
-		uuid: uuid.to_string(),
-	};
-
-	let response = client
-		.post(get_index_url("/v1/login/github/poll".to_string(), config))
-		.json(&body)
-		.header(USER_AGENT, "GeodeCLI")
-		.send()
-		.nice_unwrap("Unable to connect to Geode Index");
-
-	if response.status() != 200 {
-		return None;
-	}
-
-	let parsed = response
-		.json::<ApiResponse<String>>()
-		.nice_unwrap("Unable to parse login response");
-
-	Some(parsed.payload)
-}
-
-fn invalidate(config: &mut Config) {
-	if config.index_token.is_none() {
-		warn!("You are not logged in");
-		return;
-	}
-	loop {
-		let response = ask_value(
-			"Do you want to log out of all devices (y/n)",
-			Some("n"),
-			true,
-		);
-
-		match response.to_lowercase().as_str() {
-			"y" => {
-				invalidate_index_tokens(config);
-				config.index_token = None;
-				config.save();
-				done!("All tokens for the current account have been invalidated successfully");
-				break;
-			}
-			"n" => {
-				done!("Operation cancelled");
-				break;
-			}
-			_ => {
-				warn!("Invalid response");
-			}
-		}
-	}
-}
-
-pub fn invalidate_index_tokens(config: &mut Config) {
-	if config.index_token.is_none() {
-		fatal!("You are not logged in");
-	}
-
-	let token = config.index_token.clone().unwrap();
-
-	let client = reqwest::blocking::Client::new();
-
-	let response = client
-		.delete(get_index_url("/v1/me/tokens".to_string(), config))
-		.header(USER_AGENT, "GeodeCLI")
-		.bearer_auth(token)
-		.send()
-		.nice_unwrap("Unable to connect to Geode Index");
-
-	if response.status() == 401 {
-		config.index_token = None;
-		config.save();
-		fatal!("Invalid token. Please login again.");
-	}
-	if response.status() != 204 {
-		fatal!("Unable to invalidate token");
 	}
 }
 
@@ -931,17 +784,25 @@ fn edit_profile(config: &mut Config) {
 	let mut profile = get_user_profile(config);
 
 	let client = reqwest::blocking::Client::new();
-
-	info!("Your profile:");
-	info!("Username: {}", profile.username);
-	info!("Display name: {}", profile.display_name);
-	info!("Verified: {}", profile.verified);
-	info!("Admin: {}", profile.admin);
+	let mut status_message: Option<String> = None;
 
 	loop {
-		info!("----------------");
-		info!("Possible actions:");
-		info!("1. Change display name");
+		logging::clear_terminal();
+
+		if status_message.is_some() {
+			info!("{}\n", status_message.clone().unwrap());
+			status_message = None;
+		}
+
+		println!("Your profile:");
+		println!("----------------");
+		println!("Username: {}", profile.username);
+		println!("Display name: {}", profile.display_name);
+		println!("Verified: {}", profile.verified);
+		println!("Admin: {}", profile.admin);
+		println!("----------------");
+		println!("Commands:");
+		println!("  - 1: Change display name");
 		let response = ask_value("Action number (enter q to exit)", None, true);
 		if response == "q" {
 			break;
@@ -971,7 +832,7 @@ fn edit_profile(config: &mut Config) {
 					}
 
 					profile.display_name = new_display_name;
-					info!("Display name updated successfully");
+					status_message = Some("Display name updated successfully".to_string());
 				}
 				_ => warn!("Invalid number"),
 			}
@@ -1009,8 +870,8 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
-		Index::Login => login(config),
-		Index::Invalidate => invalidate(config),
+		Index::Login => index_auth::login(config),
+		Index::Invalidate => index_auth::invalidate(config),
 		Index::Url { url } => set_index_url(url, config),
 		Index::Submit { action } => submit(action, config),
 		Index::Mods { action } => match action {
