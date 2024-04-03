@@ -13,6 +13,9 @@ pub struct Profile {
 	pub name: String,
 	pub gd_path: PathBuf,
 
+	#[serde(default = "profile_platform_default")]
+	pub platform: String,
+
 	#[serde(flatten)]
 	other: HashMap<String, Value>,
 }
@@ -48,6 +51,16 @@ pub struct OldConfig {
 	pub default_developer: Option<String>,
 }
 
+fn profile_platform_default() -> String {
+	if cfg!(target_os = "windows") {
+		"win".to_owned()
+	} else if cfg!(target_os = "macos") {
+		"mac".to_owned()
+	} else {
+		"win".to_owned()
+	}
+}
+
 // TODO: remove this in 3.0
 impl OldConfig {
 	pub fn migrate(&self) -> Config {
@@ -65,6 +78,7 @@ impl OldConfig {
 								.unwrap_or(&inst.executable)
 								.into(),
 							gd_path: inst.path.clone(),
+							platform: String::from("win"),
 							other: HashMap::new(),
 						})
 					})
@@ -131,16 +145,17 @@ fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
 }
 
 impl Profile {
-	pub fn new(name: String, location: PathBuf) -> Profile {
+	pub fn new(name: String, location: PathBuf, platform: String) -> Profile {
 		Profile {
 			gd_path: migrate_location(&name, location),
 			name,
+			platform,
 			other: HashMap::<String, Value>::new(),
 		}
 	}
 
 	pub fn gd_dir(&self) -> PathBuf {
-		if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
+		if self.platform == "win" {
 			self.gd_path.parent().unwrap().to_path_buf()
 		} else {
 			self.gd_path.clone()
@@ -148,7 +163,7 @@ impl Profile {
 	}
 
 	pub fn geode_dir(&self) -> PathBuf {
-		if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
+		if self.platform == "win" {
 			self.gd_path.parent().unwrap().join("geode")
 		} else {
 			self.gd_path.join("Contents/geode")
@@ -161,6 +176,10 @@ impl Profile {
 
 	pub fn mods_dir(&self) -> PathBuf {
 		self.geode_dir().join("mods")
+	}
+
+	pub fn platform_str(&self) -> &str {
+		self.platform.as_str()
 	}
 }
 

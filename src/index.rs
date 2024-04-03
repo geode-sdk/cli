@@ -209,13 +209,8 @@ pub fn install_mod(
 	let entry = get_entry(config, id, version)
 		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
 
-	let plat = if cfg!(windows) || cfg!(target_os = "linux") {
-		"windows"
-	} else if cfg!(target_os = "macos") {
-		"macos"
-	} else {
-		fatal!("This platform doesn't support installing mods");
-	};
+	let curr_profile = config.get_current_profile();
+	let plat = curr_profile.platform_str();
 
 	if !entry.platforms.contains(plat) {
 		if ignore_platform {

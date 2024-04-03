@@ -45,6 +45,9 @@ pub enum Profile {
 		/// New profile name
 		#[clap(short, long)]
 		name: String,
+
+		/// Platform of the target
+		platform: Option<String>,
 	},
 
 	/// Remove profile
@@ -99,17 +102,17 @@ pub fn run_profile(
 	background: RunBackground,
 	launch_args: Vec<String>,
 ) {
-	let path = &profile
+	let profile = &profile
 		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 		.unwrap_or(Some(config.get_current_profile()))
 		.nice_unwrap(format!(
 			"Profile '{}' does not exist",
 			profile.unwrap_or_default()
-		))
-		.gd_path;
+		));
+	let path = &profile.gd_path;
 
-	let mut cmd = if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
+	let mut cmd = if profile.platform_str().to_string() == "win".to_string() {
 		let mut out = Command::new(path);
 		out.args(launch_args);
 		out.current_dir(path.parent().unwrap());
@@ -208,16 +211,35 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 			}
 		}
 
-		Profile::Add { name, location } => {
+		Profile::Add { name, location, platform } => {
 			if config.get_profile(&Some(name.to_owned())).is_some() {
 				fail!("A profile named '{}' already exists", name);
 			} else if !is_valid_geode_dir(&location) {
 				fail!("The specified path does not point to a valid Geode installation");
 			} else {
 				done!("A new profile named '{}' has been created", &name);
+				let profile = match platform {
+					Some(platform) => match platform.as_str() {
+						"win" | "windows" => "win",
+						"mac" | "macos" => "mac",
+						"android32" => "android32",
+						"android64" => "android64",
+						_ => "",
+					},
+					None => if cfg!(target_os = "windows") {
+						"win"
+					} else if cfg!(target_os = "macos") {
+						"mac"
+					} else {
+						""
+					},
+				};
+				if profile.is_empty() {
+					fail!("Platform must be specified for this system");
+				}
 				config
 					.profiles
-					.push(RefCell::new(CfgProfile::new(name, location)));
+					.push(RefCell::new(CfgProfile::new(name, location, profile.to_string())));
 			}
 		}
 
