@@ -126,11 +126,11 @@ fn main() {
 	let mut config = config::Config::new();
 
 	match args.command {
-		GeodeCommands::New { path } => template::build_template(&mut config, path),
+		GeodeCommands::New { path } => template::build_template(&mut config, path, false),
         GeodeCommands::Init => {
             let current_dir: Option<PathBuf> = Some(std::env::current_dir().expect("Failed to get current config"));
 
-            template::build_template(&mut config, current_dir);
+            template::build_template(&mut config, current_dir, true);
         },
 		GeodeCommands::Profile { commands } => profile::subcommand(&mut config, commands),
 		GeodeCommands::Config { commands } => info::subcommand(&mut config, commands),

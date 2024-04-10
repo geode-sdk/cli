@@ -490,7 +490,7 @@ pub fn unpublish_project(_id: Option<String>) {
 
 pub fn subcommand(config: &mut Config, cmd: Project) {
 	match cmd {
-		Project::New { path } => template::build_template(config, path),
+		Project::New { path } => template::build_template(config, path, false),
 		Project::ClearCache => clear_cache(&std::env::current_dir().unwrap()),
 		Project::Check {
 			install_dir,
