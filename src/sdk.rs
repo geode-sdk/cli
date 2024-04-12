@@ -439,7 +439,7 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		target_dir = Config::sdk_path().join("bin/nightly");
 	}
 	else if version.is_some() {
-		let ver = Version::parse(version.as_deref().unwrap())
+		let ver = Version::parse(version.as_deref().unwrap().strip_prefix('v').unwrap_or(version.as_deref().unwrap()))
 			.nice_unwrap("Invalid version specified");
 		info!("Installing binaries for {}", ver);
 		
