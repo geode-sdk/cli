@@ -396,7 +396,8 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 		info!("Switched to latest commit");
 		return;
 	} else if let Some(ver) = config.sdk_version.clone() {
-		let ref_str = format!("refs/tags/{ver}");
+		let strip_ver = ver.strip_prefix('v').unwrap_or(&ver);
+		let ref_str = format!("refs/tags/v{strip_ver}");
 		if repo.find_reference(ref_str.as_str()).is_err() {
 			config.sdk_version = None;
 			fatal!("Unable to find tag {ver}");
