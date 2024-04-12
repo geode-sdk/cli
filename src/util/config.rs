@@ -125,9 +125,9 @@ pub fn geode_root() -> PathBuf {
 	data_dir
 }
 
-fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
+fn migrate_location(name: &str, mut path: PathBuf, platform: &str) -> PathBuf {
 	// Migrate folder to executable
-	if (cfg!(target_os = "windows") || cfg!(target_os = "linux")) && path.is_dir() {
+	if (platform == "win") && path.is_dir() {
 		path.push("GeometryDash.exe");
 
 		if !path.exists() {
@@ -147,7 +147,7 @@ fn migrate_location(name: &str, mut path: PathBuf) -> PathBuf {
 impl Profile {
 	pub fn new(name: String, location: PathBuf, platform: String) -> Profile {
 		Profile {
-			gd_path: migrate_location(&name, location),
+			gd_path: migrate_location(&name, location, &platform),
 			name,
 			platform,
 			other: HashMap::<String, Value>::new(),
