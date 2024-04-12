@@ -113,7 +113,7 @@ fn initialize_spritesheet_bundle(
 
 	let mut max_width = (width_sum * mean_height).sqrt() as u32;
 
-	if max_width < largest_width {
+	if max_width < largest_width || sprites.len() == 1 {
 		max_width = largest_width + 2;
 	}
 
