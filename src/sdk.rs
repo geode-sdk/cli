@@ -11,7 +11,6 @@ use semver::{Prerelease, Version};
 use serde::Deserialize;
 use std::env;
 use std::fs;
-use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -271,7 +270,7 @@ fn detect_user_shell() -> Option<UserShell> {
 
 fn get_linux_shell_info(shell: UserShell, path: &Path) -> Option<LinuxShellConfig> {
 	let home = match env::var("HOME") {
-		Err(e) => return None,
+		Err(_) => return None,
 		Ok(h) => h,
 	};
 	match shell {
@@ -397,7 +396,7 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 	}) {
 		// Setting the authentication callback is kinda jank, just call the git process lmao
 		Command::new("git")
-			.args(&["fetch", "origin", "main"])
+			.args(["fetch", "origin", "main"])
 			.current_dir(Config::sdk_path())
 			.spawn()
 			.nice_unwrap("Could not fetch latest update")
