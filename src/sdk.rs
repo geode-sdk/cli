@@ -11,6 +11,7 @@ use serde::Deserialize;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[cfg(target_os = "macos")]
 use crate::launchctl;
@@ -64,6 +65,9 @@ pub enum Sdk {
 		/// Force platform to install binaries for
 		#[clap(long, short)]
 		platform: Option<String>,
+		/// Specify version to install
+		#[clap(long, short)]
+		version: Option<String>,
 	},
 
 	/// Uninstall SDK
@@ -282,13 +286,26 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 		true
 	});
 
-	remote
-		.fetch(
-			&["main"],
-			Some(FetchOptions::new().remote_callbacks(callbacks)),
-			None,
-		)
-		.nice_unwrap("Could not fetch latest update");
+	let res = remote.fetch(
+		&["main"],
+		Some(FetchOptions::new().remote_callbacks(callbacks)),
+		None,
+	);
+	if res.as_ref().is_err_and(|e| {
+		e.message()
+			.contains("authentication required but no callback set")
+	}) {
+		// Setting the authentication callback is kinda jank, just call the git process lmao
+		Command::new("git")
+			.args(&["fetch", "origin", "main"])
+			.current_dir(Config::sdk_path())
+			.spawn()
+			.nice_unwrap("Could not fetch latest update")
+			.wait()
+			.nice_unwrap("Could not fetch latest update");
+	} else {
+		res.nice_unwrap("Could not fetch latest update");
+	}
 
 	// Check if can fast-forward
 	let fetch_head = repo.find_reference("FETCH_HEAD").unwrap();
@@ -379,7 +396,8 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 		info!("Switched to latest commit");
 		return;
 	} else if let Some(ver) = config.sdk_version.clone() {
-		let ref_str = format!("refs/tags/{ver}");
+		let strip_ver = ver.strip_prefix('v').unwrap_or(&ver);
+		let ref_str = format!("refs/tags/v{strip_ver}");
 		if repo.find_reference(ref_str.as_str()).is_err() {
 			config.sdk_version = None;
 			fatal!("Unable to find tag {ver}");
@@ -413,15 +431,25 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	done!("Updated head to v{}", latest_version.unwrap());
 }
 
-fn install_binaries(config: &mut Config, platform: Option<String>) {
-	update(config, None);
+fn install_binaries(config: &mut Config, platform: Option<String>, version: Option<String>) {
 	let release_tag: String;
 	let target_dir: PathBuf;
 	if config.sdk_nightly {
 		info!("Installing nightly binaries");
 		release_tag = "nightly".into();
 		target_dir = Config::sdk_path().join("bin/nightly");
-	} else {
+	}
+	else if version.is_some() {
+		let ver = Version::parse(version.as_deref().unwrap().strip_prefix('v').unwrap_or(version.as_deref().unwrap()))
+			.nice_unwrap("Invalid version specified");
+		info!("Installing binaries for {}", ver);
+		
+		release_tag = format!("v{}", ver);
+		let mut stripped_ver = ver.clone();
+		stripped_ver.pre = Prerelease::EMPTY;
+		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
+	} 
+	else {
 		let ver = get_version();
 		info!("Installing binaries for {}", ver);
 		release_tag = format!("v{}", ver);
@@ -625,6 +653,6 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::SetPath { path, r#move } => set_sdk_path(path, r#move),
 		Sdk::Update { branch } => update(config, branch),
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
-		Sdk::InstallBinaries { platform } => install_binaries(config, platform),
+		Sdk::InstallBinaries { platform, version } => install_binaries(config, platform, version),
 	}
 }

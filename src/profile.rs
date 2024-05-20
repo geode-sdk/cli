@@ -25,7 +25,7 @@ pub enum Profile {
 		/// The profile to get a path for, or none for default
 		profile: Option<String>,
 
-		/// Whether to get the parent directory of the path 
+		/// Whether to get the parent directory of the path
 		/// (by default on Windows, the path leads to the .exe itself)
 		#[clap(short, long)]
 		dir: bool,
@@ -45,6 +45,9 @@ pub enum Profile {
 		/// New profile name
 		#[clap(short, long)]
 		name: String,
+
+		/// Platform of the target
+		platform: Option<String>,
 	},
 
 	/// Remove profile
@@ -73,7 +76,11 @@ pub enum Profile {
 
 		/// Do not exit CLI after Geometry Dash exits if running in foreground
 		#[clap(long, conflicts_with = "background")]
-		stay: bool
+		stay: bool,
+
+		/// Launch arguments for Geometry Dash
+		#[clap(last = true, allow_hyphen_values = true)]
+		launch_args: Vec<String>,
 	},
 }
 
@@ -81,7 +88,7 @@ pub enum Profile {
 pub enum RunBackground {
 	Foreground,
 	Background,
-	ForegroundStay
+	ForegroundStay,
 }
 
 fn is_valid_geode_dir(_dir: &Path) -> bool {
@@ -89,23 +96,30 @@ fn is_valid_geode_dir(_dir: &Path) -> bool {
 	true
 }
 
-pub fn run_profile(config: &Config, profile: Option<String>, background: RunBackground) {
-	let path = &profile
+pub fn run_profile(
+	config: &Config,
+	profile: Option<String>,
+	background: RunBackground,
+	launch_args: Vec<String>,
+) {
+	let profile = &profile
 		.clone()
 		.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 		.unwrap_or(Some(config.get_current_profile()))
 		.nice_unwrap(format!(
 			"Profile '{}' does not exist",
 			profile.unwrap_or_default()
-		))
-		.gd_path;
+		));
+	let path = &profile.gd_path;
 
-	let mut cmd = if cfg!(target_os = "windows") || cfg!(target_os = "linux") {
+	let mut cmd = if profile.platform_str().to_string() == "win".to_string() {
 		let mut out = Command::new(path);
+		out.args(launch_args);
 		out.current_dir(path.parent().unwrap());
 		out
 	} else {
 		let mut out = Command::new(path.join("Contents/MacOS/Geometry Dash"));
+		out.args(launch_args);
 
 		if path.join("Contents/MacOS/steam_appid.txt").exists() {
 			warn!("Steam version detected. Output may not be available.");
@@ -167,14 +181,23 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		}
 
 		Profile::Path { profile, dir } => {
-			let profile = profile.clone()
+			let profile = profile
+				.clone()
 				.map(|p| config.get_profile(&Some(p)).map(|p| p.borrow()))
 				.unwrap_or(Some(config.get_current_profile()))
 				.nice_unwrap(format!(
 					"Profile '{}' does not exist",
 					profile.unwrap_or_default()
 				));
-			println!("{}", if dir { profile.gd_dir() } else { profile.gd_path.clone() }.display());
+			println!(
+				"{}",
+				if dir {
+					profile.gd_dir()
+				} else {
+					profile.gd_path.clone()
+				}
+				.display()
+			);
 		}
 
 		Profile::Switch { profile } => {
@@ -188,16 +211,35 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 			}
 		}
 
-		Profile::Add { name, location } => {
+		Profile::Add { name, location, platform } => {
 			if config.get_profile(&Some(name.to_owned())).is_some() {
 				fail!("A profile named '{}' already exists", name);
 			} else if !is_valid_geode_dir(&location) {
 				fail!("The specified path does not point to a valid Geode installation");
 			} else {
 				done!("A new profile named '{}' has been created", &name);
+				let profile = match platform {
+					Some(platform) => match platform.as_str() {
+						"win" | "windows" => "win",
+						"mac" | "macos" => "mac",
+						"android32" => "android32",
+						"android64" => "android64",
+						_ => "",
+					},
+					None => if cfg!(target_os = "windows") {
+						"win"
+					} else if cfg!(target_os = "macos") {
+						"mac"
+					} else {
+						""
+					},
+				};
+				if profile.is_empty() {
+					fail!("Platform must be specified for this system");
+				}
 				config
 					.profiles
-					.push(RefCell::new(CfgProfile::new(name, location)));
+					.push(RefCell::new(CfgProfile::new(name, location, profile.to_string())));
 			}
 		}
 
@@ -217,12 +259,18 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 		Profile::Run {
 			profile,
 			background,
-			stay
-		} => run_profile(config, profile, match (background, stay) {
-			(false, false) => RunBackground::Foreground,
-			(false, true) => RunBackground::ForegroundStay,
-			(true, false) => RunBackground::Background,
-			(true, true) => panic!("Impossible argument combination (background and stay)")
-		}),
+			stay,
+			launch_args,
+		} => run_profile(
+			config,
+			profile,
+			match (background, stay) {
+				(false, false) => RunBackground::Foreground,
+				(false, true) => RunBackground::ForegroundStay,
+				(true, false) => RunBackground::Background,
+				(true, true) => panic!("Impossible argument combination (background and stay)"),
+			},
+			launch_args,
+		),
 	}
 }

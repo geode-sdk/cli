@@ -110,6 +110,34 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 		Info::Setup {} => {
 			if config.profiles.is_empty() {
+				info!("Please enter the platform you are using (win, mac, android32, android64), empty for host platform:");
+
+				let platform = loop {
+					let mut buf = String::new();
+					match std::io::stdin().lock().read_line(&mut buf) {
+						Ok(_) => {}
+						Err(e) => {
+							fail!("Unable to read input: {}", e);
+							continue;
+						}
+					};
+
+					let platform = buf.trim().to_lowercase();
+					if platform.is_empty() {
+						break std::env::consts::OS;
+					} else if platform == "win" {
+						break "win";
+					} else if platform == "mac" {
+						break "mac";
+					} else if platform == "android32" {
+						break "android32";
+					} else if platform == "android64" {
+						break "android64";
+					} else {
+						fail!("Invalid platform");
+					}
+				};
+
 				info!("Please enter the path to the Geometry Dash app:");
 
 				let path = loop {
@@ -126,7 +154,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					let path = PathBuf::from(buf.trim());
 
 					#[allow(clippy::collapsible_else_if)]
-					if cfg!(windows) || cfg!(target_os = "linux") {
+					if platform == "win" {
 						if path.is_dir() {
 							fail!(
 								"The path must point to the Geometry Dash exe,\
@@ -137,7 +165,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 							fail!("The path must point to a .exe file");
 							continue;
 						}
-					} else {
+					} else if platform == "mac" {
 						if !path.is_dir()
 							|| path.extension().and_then(|p| p.to_str()).unwrap_or("") != "app"
 						{
@@ -147,6 +175,8 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 							fail!("The path must point to the Geometry Dash app, not a Steam shortcut");
 							continue;
 						}
+					} else {
+						break path;
 					}
 
 					break path;
@@ -165,7 +195,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 				config
 					.profiles
-					.push(RefCell::new(Profile::new(name.trim().into(), path)));
+					.push(RefCell::new(Profile::new(name.trim().into(), path, platform.to_string())));
 				config.current_profile = Some(name.trim().into());
 				done!("Profile added");
 			}
