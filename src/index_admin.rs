@@ -4,13 +4,15 @@ use crate::{
 	config::Config,
 	fatal,
 	index::{self, AdminAction},
-	index_dev, info,
-	logging::{self, ask_value},
+	index_dev::{self, DeveloperProfile},
+	info,
+	logging::{self, ask_confirm, ask_value},
 	server::{ApiResponse, PaginatedData},
 	warn, NiceUnwrap,
 };
 
 use rand::Rng;
+use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use serde_json::json;
 
@@ -144,6 +146,9 @@ pub fn admin_dashboard(action: AdminAction, config: &mut Config) {
 		AdminAction::ListPending => {
 			list_pending_mods(config);
 		}
+		AdminAction::DevStatus => {
+			update_dev_status(config);
+		}
 		_ => unimplemented!(),
 	}
 }
@@ -234,7 +239,18 @@ fn list_pending_mods(config: &Config) {
 				}
 			}
 			"r" => {
-				// reject_mod();
+				let version_vec: &Vec<PendingModVersion> = mods.data[0].versions.as_ref();
+
+				if version_vec.len() == 1 {
+					reject_mod(&version_vec[0], &mods.data[0].id, config);
+				} else {
+					let version = ask_value("Version", None, true);
+					if let Some(version) = version_vec.iter().find(|x| x.version == version) {
+						validate_mod(version, &mods.data[0].id, config);
+					} else {
+						warn!("Invalid version");
+					}
+				}
 			}
 			"q" => {
 				break;
@@ -254,6 +270,64 @@ fn list_pending_mods(config: &Config) {
 	}
 }
 
+fn get_developer_profile(username: &str, config: &Config) -> Option<DeveloperProfile> {
+	let client = reqwest::blocking::Client::new();
+
+	let url = index::get_index_url(format!("/v1/developers/{}", username), config);
+
+	let response = client
+		.get(url)
+		.header(USER_AGENT, "GeodeCLI")
+		.bearer_auth(config.index_token.clone().unwrap())
+		.send()
+		.nice_unwrap("Unable to connect to Geode Index");
+
+	if response.status() != 200 {
+		warn!("Unable to fetch profile: {}", response.status());
+		return None;
+	}
+
+	let profile = response.json::<ApiResponse<DeveloperProfile>>();
+	if profile.is_err() {
+		return None;
+	}
+	Some(profile.unwrap().payload)
+}
+
+fn update_dev_status(config: &Config) {
+	let username = ask_value("Username", None, true);
+	let developer = get_developer_profile(&username, config);
+	if developer.is_none() {
+		warn!("Couldn't fetch developer");
+		return;
+	}
+	let developer = developer.unwrap();
+	println!("{}", developer);
+	let mut verified = developer.verified;
+	loop {
+		let status = ask_value("New status (verified/unverified)", None, true);
+		if status == "verified" {
+			if verified {
+				warn!("Developer is already verified!");
+			} else {
+				verified = true;
+				break;
+			}
+		} else if status == "unverified" {
+			if !verified {
+				warn!("Developer is already unverified!");
+			} else {
+				verified = false;
+				break;
+			}
+		}
+	}
+
+	let client = reqwest::blocking::Client::new();
+
+	let url = index::get_index_url(format!("/v1/developers/{}", username).to_string(), config);
+}
+
 fn validate_mod(version: &PendingModVersion, id: &str, config: &Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in!");
@@ -266,7 +340,7 @@ fn validate_mod(version: &PendingModVersion, id: &str, config: &Config) {
 		.put(url)
 		.bearer_auth(config.index_token.clone().unwrap())
 		.json(&json!({
-			"validated": true
+			"status": "accepted"
 		}))
 		.send()
 		.nice_unwrap("Failed to connect to the Geode Index");
@@ -279,6 +353,33 @@ fn validate_mod(version: &PendingModVersion, id: &str, config: &Config) {
 	}
 
 	info!("Mod validated");
+}
+
+fn reject_mod(version: &PendingModVersion, id: &str, config: &Config) {
+	let reason = ask_value("Reason", None, true);
+
+	let client = reqwest::blocking::Client::new();
+	let path = format!("v1/mods/{}/versions/{}", id, version.version);
+	let url = index::get_index_url(path, config);
+
+	let response = client
+		.put(url)
+		.bearer_auth(config.index_token.clone().unwrap())
+		.json(&json!({
+			"status": "rejected",
+			"info": reason
+		}))
+		.send()
+		.nice_unwrap("Failed to connect to the Geode Index");
+
+	if response.status() != 204 {
+		if let Ok(body) = response.json::<ApiResponse<String>>() {
+			warn!("{}", body.error);
+		}
+		fatal!("Bad response from Geode Index");
+	}
+
+	info!("Mod rejected");
 }
 
 pub fn get_random_message() -> String {
