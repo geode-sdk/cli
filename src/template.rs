@@ -115,6 +115,9 @@ fn create_template(
 	if mac_gd == "." {
 		mod_json["gd"].as_object_mut().unwrap().remove("mac");
 	}
+	if ios_gd == "." {
+		mod_json["gd"].as_object_mut().unwrap().remove("ios");
+	}
 
 	// Format neatly
 	let buf = Vec::new();
