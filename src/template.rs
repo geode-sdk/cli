@@ -21,6 +21,7 @@ fn create_template(
 	win_gd: String,
 	andr_gd: String,
 	mac_gd: String,
+	ios_gd: String,
 	strip: bool,
 	action: bool,
 ) {
@@ -96,7 +97,8 @@ fn create_template(
 		"gd":           {
 			"win": win_gd,
 			"android": andr_gd,
-			"mac": mac_gd
+			"mac": mac_gd,
+			"ios": ios_gd
 		},
 		"version":      version,
 		"id":           id,
@@ -106,9 +108,11 @@ fn create_template(
 	});
 	if win_gd == "." {
 		mod_json["gd"].as_object_mut().unwrap().remove("win");
-	} else if andr_gd == "." {
+	}
+	if andr_gd == "." {
 		mod_json["gd"].as_object_mut().unwrap().remove("android");
-	} else if mac_gd == "." {
+	}
+	if mac_gd == "." {
 		mod_json["mac"].as_object_mut().unwrap().remove("mac");
 	}
 
@@ -177,7 +181,15 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut mac_gd;
 	loop {
 		mac_gd = ask_value("GD Mac Version", Some("2.206"), true);
-		if mac_gd.starts_with("") || mac_gd == "*" || mac_gd == "." {
+		if mac_gd.starts_with("2.") || mac_gd == "*" || mac_gd == "." {
+			break;
+		}
+		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
+	}
+	let mut ios_gd;
+	loop {
+		ios_gd = ask_value("GD iOS Version", Some("2.206"), true);
+		if ios_gd.starts_with("2.") || mac_gd == "*" || mac_gd == "." {
 			break;
 		}
 		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
@@ -227,6 +239,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		win_gd,
 		andr_gd,
 		mac_gd,
+		ios_gd,
 		strip,
 		action,
 	);
