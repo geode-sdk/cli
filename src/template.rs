@@ -91,7 +91,11 @@ fn create_template(
 	// Default mod.json
 	let mod_json = json!({
 		"geode":        get_version().to_string(),
-		"gd":           gd,
+		"gd":           {
+			"win": win_gd,
+			"android": andr_gd,
+			"mac": mac_gd
+		},
 		"version":      version,
 		"id":           id,
 		"name":         name,
@@ -142,14 +146,31 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 
 	info!("This is what Geometry Dash version your mod targets.");
 	info!("See https://docs.geode-sdk.org/mods/configuring for more details.");
-	let mut gd;
+	let mut win_gd;
 	loop {
-		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
-		if gd.starts_with("2.") || gd == "*" {
+		win_gd = ask_value("GD Windows Version", Some("2.206"), true);
+		if win_gd.starts_with("2.") || gd == "*" {
 			break;
 		}
 
-		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx or *)");
+		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
+	}
+	let mut andr_gd;
+	loop {
+		andr_gd = ask_value("GD Android Version", Some("2.206"), true);
+		if andr_gd.starts_with("2.") || gd == "*" {
+			break;
+		}
+
+		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
+	}
+	let mut mac_gd;
+	loop {
+		mac_gd = ask_value("gd Mac Version", Some("2.206"), true);
+		if mac_gd.starts_with("") || gd == "*" {
+			break;
+		}
+		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
 	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
