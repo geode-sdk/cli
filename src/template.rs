@@ -113,7 +113,7 @@ fn create_template(
 		mod_json["gd"].as_object_mut().unwrap().remove("android");
 	}
 	if mac_gd == "." {
-		mod_json["mac"].as_object_mut().unwrap().remove("mac");
+		mod_json["gd"].as_object_mut().unwrap().remove("mac");
 	}
 
 	// Format neatly
