@@ -104,6 +104,13 @@ fn create_template(
 		"developer":    developer,
 		"description":  description,
 	});
+	if win_gd == "." {
+		mod_json["gd"].as_object_mut().unwrap().remove("win");
+	} else if andr_gd == "." {
+		mod_json["gd"].as_object_mut().unwrap().remove("android");
+	} else if mac_gd == "." {
+		mod_json["mac"].as_object_mut().unwrap().remove("mac");
+	}
 
 	// Format neatly
 	let buf = Vec::new();
@@ -152,7 +159,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut win_gd;
 	loop {
 		win_gd = ask_value("GD Windows Version", Some("2.206"), true);
-		if win_gd.starts_with("2.") || win_gd == "*" {
+		if win_gd.starts_with("2.") || win_gd == "*" || win_gd == "." {
 			break;
 		}
 
@@ -161,7 +168,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut andr_gd;
 	loop {
 		andr_gd = ask_value("GD Android Version", Some("2.206"), true);
-		if andr_gd.starts_with("2.") || andr_gd == "*" {
+		if andr_gd.starts_with("2.") || andr_gd == "*" || andr_gd == "." {
 			break;
 		}
 
@@ -169,8 +176,8 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	}
 	let mut mac_gd;
 	loop {
-		mac_gd = ask_value("gd Mac Version", Some("2.206"), true);
-		if mac_gd.starts_with("") || mac_gd == "*" {
+		mac_gd = ask_value("GD Mac Version", Some("2.206"), true);
+		if mac_gd.starts_with("") || mac_gd == "*" || mac_gd == "." {
 			break;
 		}
 		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
@@ -218,8 +225,8 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_developer,
 		final_description,
 		win_gd,
-		mac_gd,
 		andr_gd,
+		mac_gd,
 		strip,
 		action,
 	);
