@@ -18,7 +18,9 @@ fn create_template(
 	id: String,
 	developer: String,
 	description: String,
-	gd: String,
+	win_gd: String,
+	andr_gd: String,
+	mac_gd: String,
 	strip: bool,
 	action: bool,
 ) {
@@ -146,10 +148,11 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 
 	info!("This is what Geometry Dash version your mod targets.");
 	info!("See https://docs.geode-sdk.org/mods/configuring for more details.");
+	info!("If you don't want to specify a version for a specific platform, just place a dot.");
 	let mut win_gd;
 	loop {
 		win_gd = ask_value("GD Windows Version", Some("2.206"), true);
-		if win_gd.starts_with("2.") || gd == "*" {
+		if win_gd.starts_with("2.") || win_gd == "*" {
 			break;
 		}
 
@@ -158,7 +161,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut andr_gd;
 	loop {
 		andr_gd = ask_value("GD Android Version", Some("2.206"), true);
-		if andr_gd.starts_with("2.") || gd == "*" {
+		if andr_gd.starts_with("2.") || andr_gd == "*" {
 			break;
 		}
 
@@ -167,7 +170,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let mut mac_gd;
 	loop {
 		mac_gd = ask_value("gd Mac Version", Some("2.206"), true);
-		if mac_gd.starts_with("") || gd == "*" {
+		if mac_gd.starts_with("") || mac_gd == "*" {
 			break;
 		}
 		info!("GD version isn't valid, please choose a valid version (2.xxx or *)");
@@ -214,7 +217,9 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		mod_id,
 		final_developer,
 		final_description,
-		gd,
+		win_gd,
+		mac_gd,
+		andr_gd,
 		strip,
 		action,
 	);
