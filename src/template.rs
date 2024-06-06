@@ -91,7 +91,7 @@ fn create_template(
 	}
 
 	// Default mod.json
-	let mod_json = json!({
+	let mut mod_json = json!({
 		"geode":        get_version().to_string(),
 		"gd":           {
 			"win": win_gd,
