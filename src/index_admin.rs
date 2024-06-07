@@ -158,7 +158,7 @@ fn get_pending_mods(page: i32, config: &Config) -> PaginatedData<PendingMod> {
 	}
 
 	let client = reqwest::blocking::Client::new();
-	let path = format!("v1/mods?pending_validation=true&page={}&per_page=1", page);
+	let path = format!("v1/mods?status=pending&page={}&per_page=1", page);
 	let url = index::get_index_url(path, config);
 
 	let response = client
