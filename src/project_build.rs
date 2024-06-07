@@ -46,7 +46,7 @@ pub fn build_project(
 				fail!("Sorry! but this cannot cross-compile to windows yet.");
 				fatal!("See the docs for more info: https://docs.geode-sdk.org/getting-started/cpp-stuff#linux");
 			}
-			conf_args.extend(["-A", "Win32"].map(String::from));
+			conf_args.extend(["-A", "x64"].map(String::from));
 		}
 		"mac" => {
 			if cross_compiling {
