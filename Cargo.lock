@@ -821,7 +821,7 @@ dependencies = [
 
 [[package]]
 name = "geode"
-version = "2.13.1"
+version = "3.0.0-beta.1"
 dependencies = [
  "ansi_term",
  "cfg-if 1.0.0",
