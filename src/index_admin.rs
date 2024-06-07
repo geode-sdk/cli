@@ -272,10 +272,11 @@ fn list_pending_mods(config: &Config) {
 fn get_developer_profile(username: &str, config: &Config) -> Option<DeveloperProfile> {
 	let client = reqwest::blocking::Client::new();
 
-	let url = index::get_index_url(format!("/v1/developers/{}", username), config);
+	let url = index::get_index_url("/v1/developers".to_string(), config);
 
 	let response = client
 		.get(url)
+		.query(&[("query", username)])
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
 		.send()
@@ -286,11 +287,19 @@ fn get_developer_profile(username: &str, config: &Config) -> Option<DeveloperPro
 		return None;
 	}
 
-	let profile = response.json::<ApiResponse<DeveloperProfile>>();
-	if profile.is_err() {
-		return None;
-	}
-	Some(profile.unwrap().payload)
+	let profile: Option<DeveloperProfile> =
+		match response.json::<ApiResponse<PaginatedData<DeveloperProfile>>>() {
+			Err(_) => None,
+			Ok(p) => {
+				if p.payload.data.is_empty() {
+					None
+				} else {
+					p.payload.data.first().cloned()
+				}
+			}
+		};
+
+	profile
 }
 
 fn update_dev_status(config: &Config) {
