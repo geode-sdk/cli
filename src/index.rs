@@ -270,26 +270,35 @@ pub fn install_mod(
 	version: &VersionReq,
 	ignore_platform: bool,
 ) -> PathBuf {
-	let entry = get_entry(config, id, version)
-		.nice_unwrap(format!("Unable to find '{id}' version '{version}'"));
-
-	let curr_profile = config.get_current_profile();
-	let plat = curr_profile.platform_str();
-
-	if !entry.platforms.contains(plat) {
-		if ignore_platform {
-			warn!("Mod '{}' is not available on '{}'", id, plat);
+	let compare = {
+		let string = version.to_string();
+		if string == "*" {
+			None
 		} else {
-			fatal!("Mod '{}' is not available on '{}'", id, plat);
+			Some(string)
 		}
+	};
+	let found = get_mod_versions(id, 1, 1, config, !ignore_platform, compare)
+		.nice_unwrap("Couldn't fetch versions from index");
+
+	if found.data.is_empty() {
+		fatal!("Couldn't find dependency on index");
 	}
 
-	info!("Installing mod '{}' version '{}'", id, version);
+	let found_version = found.data.first().unwrap();
 
-	let bytes = reqwest::blocking::get(entry.r#mod.download)
-		.nice_unwrap("Unable to download mod")
-		.bytes()
-		.nice_unwrap("Unable to download mod");
+	info!(
+		"Installing mod '{}' version '{}'",
+		id, found_version.version
+	);
+
+	let bytes = reqwest::blocking::get(get_index_url(
+		format!("v1/mods/{}/versions/{}/download", id, found_version.version),
+		config,
+	))
+	.nice_unwrap("Unable to download mod")
+	.bytes()
+	.nice_unwrap("Unable to download mod");
 
 	let dest = config
 		.get_current_profile()
@@ -300,14 +309,14 @@ pub fn install_mod(
 	hasher.update(&bytes);
 	let hash = hex::encode(hasher.finalize());
 
-	if hash != entry.r#mod.hash {
+	if hash != found_version.version {
 		fatal!(
 			"Downloaded file doesn't match nice_unwraped hash\n\
 			    {hash}\n\
 			 vs {}\n\
 			Try again, and if the issue persists, report this on GitHub: \
 			https://github.com/geode-sdk/cli/issues/new",
-			entry.r#mod.hash
+			found_version.version
 		);
 	}
 
@@ -564,19 +573,30 @@ pub fn get_mod_versions(
 	page: u32,
 	per_page: u32,
 	config: &Config,
+	check_platform: bool,
 	compare: Option<String>,
 ) -> Result<PaginatedData<ServerModVersion>, String> {
 	let url = get_index_url(format!("v1/mods/{}/versions", id), config);
 
 	let client = reqwest::blocking::Client::new();
+	let page = page.to_string();
+	let per_page = per_page.to_string();
+	let compare = compare.unwrap_or_default();
+	let platform = config.get_current_profile().platform_str().to_string();
+
+	let mut query: Vec<(&str, &str)> = vec![
+		("page", &page),
+		("per_page", &per_page),
+		("compare", &compare),
+	];
+
+	if check_platform {
+		query.push(("platform", &platform));
+	}
 
 	let response = client
 		.get(url)
-		.query(&[
-			("page", page.to_string()),
-			("per_page", per_page.to_string()),
-			("compare", compare.unwrap_or_default()),
-		])
+		.query(&query)
 		.header(USER_AGENT, "GeodeCLI")
 		.send()
 		.nice_unwrap("Couldn't connec to the index");

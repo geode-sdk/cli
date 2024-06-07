@@ -156,7 +156,8 @@ impl Found {
 
 fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, String> {
 	info!("Fetching dependency from index");
-	let found = index::get_mod_versions(&dep.id, 1, 10, config, Some(dep.version.to_string()))?;
+	let found =
+		index::get_mod_versions(&dep.id, 1, 10, config, true, Some(dep.version.to_string()))?;
 
 	if found.data.is_empty() {
 		return Ok(Found::None);
@@ -436,7 +437,7 @@ pub fn check_dependencies(
 				_geode_info = inst_info;
 			}
 
-			(Found::Wrong(version), Found::Some(_, indx_info)) => {
+			(Found::Wrong(version), Found::Some(path, indx_info)) => {
 				if version > indx_info.version {
 					warn!(
 						"Dependency '{0}' found in installed mods, but as \
@@ -454,26 +455,26 @@ pub fn check_dependencies(
 					(update '{}' => '{}')",
 					dep.id, version, indx_info.version
 				);
-				path_to_dep_geode = install_mod(
-					config,
-					&indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
-					true,
-				);
+				let geode_path = config
+					.get_current_profile()
+					.mods_dir()
+					.join(format!("{}.geode", indx_info.id));
+				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+				path_to_dep_geode = geode_path;
 				_geode_info = indx_info;
 			}
 
-			(_, Found::Some(_, indx_info)) => {
+			(_, Found::Some(path, indx_info)) => {
 				info!(
 					"Dependency '{}' found on the index, installing (version '{}')",
 					dep.id, indx_info.version
 				);
-				path_to_dep_geode = install_mod(
-					config,
-					&indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
-					true,
-				);
+				let geode_path = config
+					.get_current_profile()
+					.mods_dir()
+					.join(format!("{}.geode", indx_info.id));
+				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+				path_to_dep_geode = geode_path;
 				_geode_info = indx_info;
 			}
 
