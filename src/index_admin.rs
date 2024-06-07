@@ -60,6 +60,7 @@ struct PendingModVersion {
 	geode: String,
 	early_load: bool,
 	api: bool,
+	mod_id: String,
 	gd: PendingModGD,
 	dependencies: Option<Vec<PendingModDepencency>>,
 	incompatibilities: Option<Vec<PendingModDepencency>>,
@@ -69,6 +70,7 @@ impl Display for PendingModVersion {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		writeln!(f, "{}", self.version)?;
 		writeln!(f, "  - Name: {}", self.name)?;
+		writeln!(f, "  - ID: {}", self.mod_id)?;
 		writeln!(
 			f,
 			"  - Description: {}",
@@ -207,6 +209,7 @@ fn list_pending_mods(config: &Config) {
 		println!("  - <INDEX>: Go to submission");
 		println!("  - v: Validate mod");
 		println!("  - r: Reject mod");
+		println!("  - i: Install mod");
 		println!("  - q: Quit");
 		println!("---------------------");
 
@@ -245,7 +248,21 @@ fn list_pending_mods(config: &Config) {
 				} else {
 					let version = ask_value("Version", None, true);
 					if let Some(version) = version_vec.iter().find(|x| x.version == version) {
-						validate_mod(version, &mods.data[0].id, config);
+						reject_mod(version, &mods.data[0].id, config);
+					} else {
+						warn!("Invalid version");
+					}
+				}
+			}
+			"i" => {
+				let version_vec: &Vec<PendingModVersion> = mods.data[0].versions.as_ref();
+
+				if version_vec.len() == 1 {
+					download_mod(&version_vec[0], &mods.data[0].id, config);
+				} else {
+					let version = ask_value("Version", None, true);
+					if let Some(version) = version_vec.iter().find(|x| x.version == version) {
+						download_mod(version, &mods.data[0].id, config);
 					} else {
 						warn!("Invalid version");
 					}
@@ -400,6 +417,34 @@ fn reject_mod(version: &PendingModVersion, id: &str, config: &Config) {
 	}
 
 	info!("Mod rejected");
+}
+
+fn download_mod(version: &PendingModVersion, id: &str, config: &Config) {
+	let client = reqwest::blocking::Client::new();
+	let path = format!("v1/mods/{}/versions/{}/download", id, version.version);
+	let url = index::get_index_url(path, config);
+
+	let response = client
+		.get(url)
+		.bearer_auth(config.index_token.clone().unwrap())
+		.send()
+		.nice_unwrap("Failed to connect to the Geode Index");
+
+	if response.status() != 200 {
+		if let Ok(body) = response.json::<ApiResponse<String>>() {
+			warn!("{}", body.error);
+		}
+		fatal!("Bad response from Geode Index");
+	}
+
+	let data = response.bytes().nice_unwrap("Failed to download mod");
+
+	let mods_dir = config.get_current_profile().mods_dir();
+	let mod_path = mods_dir.join(format!("{}.geode", version.mod_id));
+
+	std::fs::write(&mod_path, data).nice_unwrap("Failed to save mod");
+
+	info!("Mod downloaded");
 }
 
 pub fn get_random_message() -> String {
