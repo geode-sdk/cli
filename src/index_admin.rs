@@ -245,7 +245,7 @@ fn list_pending_mods(config: &Config) {
 				} else {
 					let version = ask_value("Version", None, true);
 					if let Some(version) = version_vec.iter().find(|x| x.version == version) {
-						validate_mod(version, &mods.data[0].id, config);
+						reject_mod(version, &mods.data[0].id, config);
 					} else {
 						warn!("Invalid version");
 					}
