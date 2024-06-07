@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
 	config::Config,
-	fatal,
+	fail, fatal,
 	index::{self, AdminAction},
 	index_dev::{self, DeveloperProfile},
 	info,
@@ -301,7 +301,6 @@ fn update_dev_status(config: &Config) {
 		return;
 	}
 	let developer = developer.unwrap();
-	println!("{}", developer);
 	let mut verified = developer.verified;
 	loop {
 		let status = ask_value("New status (verified/unverified)", None, true);
@@ -319,12 +318,25 @@ fn update_dev_status(config: &Config) {
 				verified = false;
 				break;
 			}
+		} else {
+			warn!("Invalid option");
 		}
 	}
 
 	let client = reqwest::blocking::Client::new();
 
 	let url = index::get_index_url(format!("/v1/developers/{}", username).to_string(), config);
+	let response = client
+		.post(url)
+		.json(&json!({ "verified": verified }))
+		.send()
+		.nice_unwrap("Failed to update developer");
+
+	if response.status() != 204 {
+		fail!("Failed to upadte developer");
+	}
+
+	info!("Developer updated successfully");
 }
 
 fn validate_mod(version: &PendingModVersion, id: &str, config: &Config) {
