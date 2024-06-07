@@ -112,7 +112,7 @@ pub fn run_profile(
 		));
 	let path = &profile.gd_path;
 
-	let mut cmd = if profile.platform_str().to_string() == "win".to_string() {
+	let mut cmd = if profile.platform_str() == "win" {
 		let mut out = Command::new(path);
 		out.args(launch_args);
 		out.current_dir(path.parent().unwrap());
@@ -211,7 +211,11 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 			}
 		}
 
-		Profile::Add { name, location, platform } => {
+		Profile::Add {
+			name,
+			location,
+			platform,
+		} => {
 			if config.get_profile(&Some(name.to_owned())).is_some() {
 				fail!("A profile named '{}' already exists", name);
 			} else if !is_valid_geode_dir(&location) {
@@ -226,20 +230,24 @@ pub fn subcommand(config: &mut Config, cmd: Profile) {
 						"android64" => "android64",
 						_ => "",
 					},
-					None => if cfg!(target_os = "windows") {
-						"win"
-					} else if cfg!(target_os = "macos") {
-						"mac"
-					} else {
-						""
-					},
+					None => {
+						if cfg!(target_os = "windows") {
+							"win"
+						} else if cfg!(target_os = "macos") {
+							"mac"
+						} else {
+							""
+						}
+					}
 				};
 				if profile.is_empty() {
 					fail!("Platform must be specified for this system");
 				}
-				config
-					.profiles
-					.push(RefCell::new(CfgProfile::new(name, location, profile.to_string())));
+				config.profiles.push(RefCell::new(CfgProfile::new(
+					name,
+					location,
+					profile.to_string(),
+				)));
 			}
 		}
 

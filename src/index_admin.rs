@@ -6,7 +6,7 @@ use crate::{
 	index::{self, AdminAction},
 	index_dev::{self, DeveloperProfile},
 	info,
-	logging::{self, ask_confirm, ask_value},
+	logging::{self, ask_value},
 	server::{ApiResponse, PaginatedData},
 	warn, NiceUnwrap,
 };
@@ -23,7 +23,6 @@ struct PendingMod {
 	versions: Vec<PendingModVersion>,
 	tags: Vec<String>,
 	about: Option<String>,
-	changelog: Option<String>,
 }
 
 impl Display for PendingMod {

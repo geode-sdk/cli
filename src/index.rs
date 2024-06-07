@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::file::{copy_dir_recursive, read_dir_recursive};
-use crate::server::ApiResponse;
+use crate::server::{ApiResponse, PaginatedData};
 use crate::util::logging::ask_value;
 use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
 use crate::{done, fatal, index_admin, index_auth, index_dev, info, warn, NiceUnwrap};
@@ -17,6 +17,14 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use zip::read::ZipFile;
 use zip::ZipArchive;
+
+#[derive(Deserialize)]
+pub struct ServerModVersion {
+	pub name: String,
+	pub version: String,
+	pub download_link: String,
+	pub hash: String,
+}
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -549,6 +557,42 @@ pub fn get_index_url(path: String, config: &Config) -> String {
 		config.index_url.trim_end_matches('/'),
 		path.trim_start_matches('/')
 	)
+}
+
+pub fn get_mod_versions(
+	id: &str,
+	page: u32,
+	per_page: u32,
+	config: &Config,
+	compare: Option<String>,
+) -> Result<PaginatedData<ServerModVersion>, String> {
+	let url = get_index_url(format!("v1/mods/{}/versions", id), config);
+
+	let client = reqwest::blocking::Client::new();
+
+	let response = client
+		.get(url)
+		.query(&[
+			("page", page.to_string()),
+			("per_page", per_page.to_string()),
+			("compare", compare.unwrap_or_default()),
+		])
+		.header(USER_AGENT, "GeodeCLI")
+		.send()
+		.nice_unwrap("Couldn't connec to the index");
+
+	if response.status() != 200 {
+		return Err("Failed to fetch mod versions".to_string());
+	}
+
+	let body = match response.json::<ApiResponse<PaginatedData<ServerModVersion>>>() {
+		Err(e) => {
+			return Err(format!("Failed to parse index response: {}", e));
+		}
+		Ok(b) => b,
+	};
+
+	Ok(body.payload)
 }
 
 pub fn subcommand(config: &mut Config, cmd: Index) {
