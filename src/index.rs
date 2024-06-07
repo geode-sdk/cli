@@ -591,7 +591,7 @@ pub fn get_mod_versions(
 	];
 
 	if check_platform {
-		query.push(("platform", &platform));
+		query.push(("platforms", &platform));
 	}
 
 	let response = client
