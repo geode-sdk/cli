@@ -1,8 +1,8 @@
 use crate::util::mod_file::DependencyImportance;
-use crate::{done, fail, fatal, info, warn, NiceUnwrap};
+use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
 	file::read_dir_recursive,
-	index::{index_mods_dir, install_mod, update_index},
+	index::{install_mod, update_index},
 	indexer,
 	package::get_working_dir,
 	template,
@@ -14,6 +14,7 @@ use crate::{
 use clap::Subcommand;
 use edit_distance::edit_distance;
 use semver::{Version, VersionReq};
+use std::env;
 use std::{
 	collections::HashMap,
 	fs,
@@ -151,6 +152,53 @@ impl Found {
 			*self = value;
 		}
 	}
+}
+
+fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, String> {
+	info!("Fetching dependency from index");
+	let found =
+		index::get_mod_versions(&dep.id, 1, 10, config, true, Some(dep.version.to_string()))?;
+
+	if found.data.is_empty() {
+		return Ok(Found::None);
+	}
+
+	let first = found.data.first().unwrap();
+	info!("Dependency found: {}, version {}", dep.id, first.version);
+	info!("Downloading dependency");
+
+	let client = reqwest::blocking::Client::new();
+
+	let result = client
+		.get(&first.download_link)
+		.send()
+		.map_err(|x| format!("Failed to download dependency: {}", x))?;
+
+	if result.status() != 200 {
+		return Err(format!(
+			"Failed to download dependency. Bad status code: {}",
+			result.status()
+		));
+	}
+
+	let bytes = result
+		.bytes()
+		.map_err(|x| format!("Failed to parse dependency binary: {}", x))?;
+
+	info!("Success");
+	info!("Writing dependency to temp file");
+
+	let mut path = env::temp_dir();
+	path.push(format!("{}.geode", dep.id));
+
+	if let Err(e) = std::fs::write(&path, bytes) {
+		return Err(format!("Failed to write dependency to temp file: {}", e));
+	}
+
+	let mod_info =
+		try_parse_mod_info(&path).map_err(|x| format!("Couldn't parse mod.json: {}", x))?;
+
+	Ok(Found::Some(path, mod_info))
 }
 
 fn find_dependency(
@@ -292,9 +340,13 @@ pub fn check_dependencies(
 		// otherwise try to find it on installed mods and then on index
 
 		// check index
-		let found_in_index = find_dependency(&dep, &index_mods_dir(config), true, true)
-			.nice_unwrap("Unable to read index");
-
+		let found_in_index = match find_index_dependency(&dep, config) {
+			Ok(f) => f,
+			Err(e) => {
+				warn!("Failed to fetch dependency {} from index: {}", &dep.id, e);
+				Found::None
+			}
+		};
 		// check installed mods
 		let found_in_installed =
 			find_dependency(&dep, &config.get_current_profile().mods_dir(), true, false)
@@ -385,7 +437,7 @@ pub fn check_dependencies(
 				_geode_info = inst_info;
 			}
 
-			(Found::Wrong(version), Found::Some(_, indx_info)) => {
+			(Found::Wrong(version), Found::Some(path, indx_info)) => {
 				if version > indx_info.version {
 					warn!(
 						"Dependency '{0}' found in installed mods, but as \
@@ -403,26 +455,26 @@ pub fn check_dependencies(
 					(update '{}' => '{}')",
 					dep.id, version, indx_info.version
 				);
-				path_to_dep_geode = install_mod(
-					config,
-					&indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
-					true,
-				);
+				let geode_path = config
+					.get_current_profile()
+					.mods_dir()
+					.join(format!("{}.geode", indx_info.id));
+				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+				path_to_dep_geode = geode_path;
 				_geode_info = indx_info;
 			}
 
-			(_, Found::Some(_, indx_info)) => {
+			(_, Found::Some(path, indx_info)) => {
 				info!(
 					"Dependency '{}' found on the index, installing (version '{}')",
 					dep.id, indx_info.version
 				);
-				path_to_dep_geode = install_mod(
-					config,
-					&indx_info.id,
-					&VersionReq::parse(&format!("={}", indx_info.version)).unwrap(),
-					true,
-				);
+				let geode_path = config
+					.get_current_profile()
+					.mods_dir()
+					.join(format!("{}.geode", indx_info.id));
+				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+				path_to_dep_geode = geode_path;
 				_geode_info = indx_info;
 			}
 

@@ -28,8 +28,15 @@ pub struct Config {
 	pub default_developer: Option<String>,
 	pub sdk_nightly: bool,
 	pub sdk_version: Option<String>,
+	pub index_token: Option<String>,
+	#[serde(default = "default_index_url")]
+	pub index_url: String,
 	#[serde(flatten)]
 	other: HashMap<String, Value>,
+}
+
+fn default_index_url() -> String {
+	"https://api.geode-sdk.org".to_string()
 }
 
 // old config.json structures for migration
@@ -97,6 +104,8 @@ impl OldConfig {
 			sdk_nightly: false,
 			sdk_version: None,
 			other: HashMap::new(),
+			index_token: None,
+			index_url: "https://api.geode-sdk.org".to_string(),
 		}
 	}
 }
@@ -243,6 +252,8 @@ impl Config {
 				sdk_nightly: false,
 				sdk_version: None,
 				other: HashMap::<String, Value>::new(),
+				index_token: None,
+				index_url: "https://api.geode-sdk.org".to_string(),
 			};
 		}
 
@@ -257,7 +268,9 @@ impl Config {
 				default_developer: None,
 				sdk_nightly: false,
 				sdk_version: None,
+				index_token: None,
 				other: HashMap::<String, Value>::new(),
+				index_url: "https://api.geode-sdk.org".to_string(),
 			}
 		} else {
 			// Parse config

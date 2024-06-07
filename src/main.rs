@@ -3,6 +3,9 @@ use std::path::PathBuf;
 
 mod file;
 mod index;
+mod index_admin;
+mod index_auth;
+mod index_dev;
 mod indexer;
 mod info;
 mod package;
@@ -10,6 +13,7 @@ mod profile;
 mod project;
 mod project_build;
 mod sdk;
+mod server;
 mod template;
 mod util;
 
