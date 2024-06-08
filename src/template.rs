@@ -20,15 +20,20 @@ fn create_template(
 	description: String,
 	strip: bool,
 	action: bool,
+	current_dir: bool,
 ) {
-	if project_location.exists() {
-		warn!("The provided location already exists.");
-		if !ask_confirm("Are you sure you want to proceed?", false) {
-			info!("Aborting");
-			return;
-		}
-	} else {
+	if current_dir {
 		fs::create_dir_all(&project_location).nice_unwrap("Unable to create project directory");
+	} else {
+		if project_location.exists() {
+			warn!("The provided location already exists.");
+			if !ask_confirm("Are you sure you want to proceed?", false) {
+				info!("Aborting");
+				return;
+			}
+		} else {
+			fs::create_dir_all(&project_location).nice_unwrap("Unable to create project directory");
+		}
 	}
 
 	// Clone repository
@@ -142,7 +147,7 @@ fn possible_name(path: &Option<PathBuf>) -> Option<String> {
 	})
 }
 
-pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
+pub fn build_template(config: &mut Config, location: Option<PathBuf>, current_dir: bool) {
 	info!("This utility will walk you through setting up a new mod.");
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
@@ -196,5 +201,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		final_description,
 		strip,
 		action,
+        current_dir,
 	);
 }

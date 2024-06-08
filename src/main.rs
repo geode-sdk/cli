@@ -30,11 +30,14 @@ struct Args {
 
 #[derive(Subcommand, Debug)]
 enum GeodeCommands {
-	/// Initialize a new Geode project
+	/// Create a new Geode project in the specified directory
 	New {
 		/// The target directory to create the project in
 		path: Option<PathBuf>,
 	},
+
+    /// Initialize a new Geode project in the current directory
+    Init,
 
 	/// Options for managing profiles (installations of Geode)
 	Profile {
@@ -127,7 +130,12 @@ fn main() {
 	let mut config = config::Config::new();
 
 	match args.command {
-		GeodeCommands::New { path } => template::build_template(&mut config, path),
+		GeodeCommands::New { path } => template::build_template(&mut config, path, false),
+        GeodeCommands::Init => {
+            let current_dir: Option<PathBuf> = Some(std::env::current_dir().expect("Failed to get current config"));
+
+            template::build_template(&mut config, current_dir, true);
+        },
 		GeodeCommands::Profile { commands } => profile::subcommand(&mut config, commands),
 		GeodeCommands::Config { commands } => info::subcommand(&mut config, commands),
 		GeodeCommands::Sdk { commands } => sdk::subcommand(&mut config, commands),
