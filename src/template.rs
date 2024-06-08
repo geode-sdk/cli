@@ -18,7 +18,6 @@ fn create_template(
 	id: String,
 	developer: String,
 	description: String,
-	gd: String,
 	strip: bool,
 	action: bool,
 ) {
@@ -88,30 +87,44 @@ fn create_template(
 		.nice_unwrap("Unable to write action");
 	}
 
-	// Default mod.json
-	let mod_json = json!({
-		"geode":        get_version().to_string(),
-		"gd":           gd,
-		"version":      version,
-		"id":           id,
-		"name":         name,
-		"developer":    developer,
-		"description":  description,
-	});
+	let mod_json_path = project_location.join("mod.json");
+	let mod_json_content;
 
-	// Format neatly
-	let buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-	mod_json.serialize(&mut ser).unwrap();
+	if mod_json_path.exists() {
+		let mod_json =
+			fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
+		let mod_json = mod_json
+			.replace("$GEODE_VERSION", &get_version().to_string())
+			.replace("$MOD_VERSION", &version)
+			.replace("$MOD_ID", &id)
+			.replace("$MOD_NAME", &name)
+			.replace("$MOD_DEVELOPER", &developer)
+			.replace("$MOD_DESCRIPTION", &description);
 
-	// Write formatted json
-	fs::write(
-		project_location.join("mod.json"),
-		String::from_utf8(ser.into_inner()).unwrap(),
-	)
-	.nice_unwrap("Unable to write to project");
+		mod_json_content = mod_json;
+	} else {
+		// Default mod.json
+		let mod_json = json!({
+			"geode":        get_version().to_string(),
+			"version":      version,
+			"id":           id,
+			"name":         name,
+			"developer":    developer,
+			"description":  description,
+		});
 
+		// Format neatly
+		let buf = Vec::new();
+		let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+		let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+		mod_json.serialize(&mut ser).unwrap();
+
+		// Write formatted json
+		mod_json_content = String::from_utf8(ser.into_inner()).unwrap()
+	}
+
+	fs::write(mod_json_path, mod_json_content)
+		.nice_unwrap("Unable to write mod.json, are permissions correct?");
 	done!("Succesfully initialized project! Happy modding :)");
 }
 
@@ -139,18 +152,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	let location = location.absolutize().unwrap();
 
 	let final_version = ask_value("Version", Some("v1.0.0"), true);
-
-	info!("This is what Geometry Dash version your mod targets.");
-	info!("See https://docs.geode-sdk.org/mods/configuring for more details.");
-	let mut gd;
-	loop {
-		gd = ask_value("Geometry Dash Version", Some("2.204"), true);
-		if gd.starts_with("2.") || gd == "*" {
-			break;
-		}
-
-		info!("Geometry Dash version isn't valid, please choose a valid version (2.xxx or *)");
-	}
 
 	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
 
@@ -193,7 +194,6 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 		mod_id,
 		final_developer,
 		final_description,
-		gd,
 		strip,
 		action,
 	);
