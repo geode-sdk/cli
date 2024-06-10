@@ -23,7 +23,7 @@ jobs:
           id: win
 
         - name: "macOS"
-          os: macos-latest
+          os: macos-12
           out_paths: './target/release/geode'
           static: 'export OPENSSL_STATIC=1'
           id: mac
