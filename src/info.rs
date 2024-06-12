@@ -193,9 +193,11 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					};
 				};
 
-				config
-					.profiles
-					.push(RefCell::new(Profile::new(name.trim().into(), path, platform.to_string())));
+				config.profiles.push(RefCell::new(Profile::new(
+					name.trim().into(),
+					path,
+					platform.to_string(),
+				)));
 				config.current_profile = Some(name.trim().into());
 				done!("Profile added");
 			}
