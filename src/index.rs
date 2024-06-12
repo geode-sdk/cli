@@ -58,7 +58,8 @@ pub enum Index {
 	/// Set the URL for the index (pass default to reset)
 	Url {
 		/// URL to set
-		url: String,
+		#[clap(long, short)]
+		url: Option<String>,
 	},
 
 	/// Secrets...
@@ -246,6 +247,10 @@ fn create_entry(out_path: &Path) {
 }
 
 fn submit(action: MyModAction, config: &mut Config) {
+	if action != MyModAction::Create || action != MyModAction::Update {
+		fatal!("Invalid action");
+	}
+
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
@@ -450,7 +455,13 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		}
 		Index::Login => index_auth::login(config),
 		Index::Invalidate => index_auth::invalidate(config),
-		Index::Url { url } => set_index_url(url, config),
+		Index::Url { url } => {
+			if let Some(u) = url {
+				set_index_url(u, config);
+			} else {
+				info!("Your current index URL is: {}", config.index_url);
+			}
+		}
 		Index::Mods { action } => match action {
 			MyModAction::Create => submit(action, config),
 			MyModAction::Update => submit(action, config),

@@ -326,6 +326,10 @@ fn update_dev_status(config: &Config) {
 		return;
 	}
 	let developer = developer.unwrap();
+
+	info!("Developer found: ");
+	println!("{}", developer);
+
 	let mut verified = developer.verified;
 	loop {
 		let status = ask_value("New status (verified/unverified)", None, true);
@@ -350,15 +354,27 @@ fn update_dev_status(config: &Config) {
 
 	let client = reqwest::blocking::Client::new();
 
-	let url = index::get_index_url(format!("/v1/developers/{}", username).to_string(), config);
+	let url = index::get_index_url(
+		format!("/v1/developers/{}", developer.id).to_string(),
+		config,
+	);
 	let response = client
-		.post(url)
+		.put(url)
+		.bearer_auth(config.index_token.as_ref().unwrap())
 		.json(&json!({ "verified": verified }))
 		.send()
 		.nice_unwrap("Failed to update developer");
 
-	if response.status() != 204 {
-		fail!("Failed to upadte developer");
+	if response.status() != 200 {
+		let json = response.json::<serde_json::Value>();
+		if let Ok(j) = json {
+			if j.is_object() && j.as_object().unwrap().contains_key("error") {
+				let err = j.as_object().unwrap().get("error").unwrap().to_string();
+				fatal!("Failed to update developer: {}", err);
+			}
+		} else {
+			fatal!("Failed to update developer. No error received from index.");
+		}
 	}
 
 	info!("Developer updated successfully");
