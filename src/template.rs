@@ -11,42 +11,49 @@ use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
-fn create_template(
-	project_location: PathBuf,
-	name: String,
-	version: String,
-	id: String,
-	developer: String,
-	description: String,
-	strip: bool,
-	action: bool,
-) {
-	if project_location.exists() {
+struct CreateTemplate {
+	pub project_location: PathBuf,
+	pub name: String,
+	pub version: String,
+	pub id: String,
+	pub developer: String,
+	pub description: String,
+	pub strip: bool,
+	pub action: bool,
+}
+
+fn create_template(template: CreateTemplate) {
+	if template.project_location.exists() {
 		warn!("The provided location already exists.");
 		if !ask_confirm("Are you sure you want to proceed?", false) {
 			info!("Aborting");
 			return;
 		}
 	} else {
-		fs::create_dir_all(&project_location).nice_unwrap("Unable to create project directory");
+		fs::create_dir_all(&template.project_location)
+			.nice_unwrap("Unable to create project directory");
 	}
 
 	// Clone repository
 	Repository::clone(
 		"https://github.com/geode-sdk/example-mod",
-		&project_location,
+		&template.project_location,
 	)
 	.nice_unwrap("Unable to clone repository");
 
-	if fs::remove_dir_all(project_location.join(".git")).is_err() {
+	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
 		warn!("Unable to remove .git directory");
 	}
 
 	// Replace "Template" with project name (no spaces)
-	let filtered_name: String = name.chars().filter(|c| !c.is_whitespace()).collect();
+	let filtered_name: String = template
+		.name
+		.chars()
+		.filter(|c| !c.is_whitespace())
+		.collect();
 
 	for file in &["README.md", "CMakeLists.txt"] {
-		let file = project_location.join(file);
+		let file = template.project_location.join(file);
 
 		let contents = fs::read_to_string(&file)
 			.unwrap()
@@ -55,9 +62,9 @@ fn create_template(
 	}
 
 	// Strip comments from template
-	if strip {
-		let cmake_path = project_location.join("CMakeLists.txt");
-		let cpp_path = project_location.join("src/main.cpp");
+	if template.strip {
+		let cmake_path = template.project_location.join("CMakeLists.txt");
+		let cpp_path = template.project_location.join("src/main.cpp");
 
 		let cmake_regex = Regex::new(r"\n#.*").unwrap();
 		let cpp_regex = Regex::new(r"(?m)^.*/\*[\s\S]*?\*/\r?\n?|^.*//.*\r?\n?").unwrap();
@@ -75,8 +82,10 @@ fn create_template(
 
 	// Add cross-platform action
 	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
-	if action {
-		let action_path = project_location.join(".github/workflows/multi-platform.yml");
+	if template.action {
+		let action_path = template
+			.project_location
+			.join(".github/workflows/multi-platform.yml");
 		fs::create_dir_all(action_path.parent().unwrap())
 			.nice_unwrap("Unable to create .github/workflows directory");
 		let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
@@ -87,7 +96,7 @@ fn create_template(
 		.nice_unwrap("Unable to write action");
 	}
 
-	let mod_json_path = project_location.join("mod.json");
+	let mod_json_path = template.project_location.join("mod.json");
 
 	let mod_json_content: String = {
 		if mod_json_path.exists() {
@@ -96,20 +105,20 @@ fn create_template(
 
 			mod_json
 				.replace("$GEODE_VERSION", &get_version().to_string())
-				.replace("$MOD_VERSION", &version)
-				.replace("$MOD_ID", &id)
-				.replace("$MOD_NAME", &name)
-				.replace("$MOD_DEVELOPER", &developer)
-				.replace("$MOD_DESCRIPTION", &description)
+				.replace("$MOD_VERSION", &template.version)
+				.replace("$MOD_ID", &template.id)
+				.replace("$MOD_NAME", &template.name)
+				.replace("$MOD_DEVELOPER", &template.developer)
+				.replace("$MOD_DESCRIPTION", &template.description)
 		} else {
 			// Default mod.json
 			let mod_json = json!({
 				"geode":        get_version().to_string(),
-				"version":      version,
-				"id":           id,
-				"name":         name,
-				"developer":    developer,
-				"description":  description,
+				"version":      template.version,
+				"id":           template.id,
+				"name":         template.name,
+				"developer":    template.developer,
+				"description":  template.description,
 			});
 
 			// Format neatly
@@ -186,15 +195,14 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	);
 
 	info!("Creating project {}", mod_id);
-
-	create_template(
-		final_location,
-		final_name,
-		final_version,
-		mod_id,
-		final_developer,
-		final_description,
+	create_template(CreateTemplate {
+		project_location: final_location,
+		name: final_name,
+		version: final_version,
+		id: mod_id,
+		developer: final_developer,
+		description: final_description,
 		strip,
 		action,
-	);
+	});
 }
