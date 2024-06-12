@@ -179,10 +179,6 @@ impl Profile {
 		}
 	}
 
-	pub fn index_dir(&self) -> PathBuf {
-		self.geode_dir().join("index")
-	}
-
 	pub fn mods_dir(&self) -> PathBuf {
 		self.geode_dir().join("mods")
 	}

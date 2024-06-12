@@ -58,7 +58,7 @@ fn hash_sheet(sheet: &SpriteSheet) -> String {
 	let mut hashes: Vec<String> = sheet
 		.files
 		.iter()
-		.map(|x| sha256::digest_file(x).unwrap())
+		.map(|x| sha256::try_digest(x).unwrap())
 		.collect();
 	hashes.sort();
 	sha256::digest(hashes.into_iter().collect::<String>())
@@ -70,7 +70,7 @@ fn hash_font(font: &BitmapFont) -> String {
 		font.size,
 		font.outline,
 		font.charset.clone().unwrap_or_default(),
-		sha256::digest_file(font.path.clone()).unwrap()
+		sha256::try_digest(font.path.clone()).unwrap()
 	))
 }
 

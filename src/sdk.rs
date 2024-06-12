@@ -297,7 +297,7 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 	}) {
 		// Setting the authentication callback is kinda jank, just call the git process lmao
 		Command::new("git")
-			.args(&["fetch", "origin", "main"])
+			.args(["fetch", "origin", "main"])
 			.current_dir(Config::sdk_path())
 			.spawn()
 			.nice_unwrap("Could not fetch latest update")
@@ -438,18 +438,22 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		info!("Installing nightly binaries");
 		release_tag = "nightly".into();
 		target_dir = Config::sdk_path().join("bin/nightly");
-	}
-	else if version.is_some() {
-		let ver = Version::parse(version.as_deref().unwrap().strip_prefix('v').unwrap_or(version.as_deref().unwrap()))
-			.nice_unwrap("Invalid version specified");
+	} else if version.is_some() {
+		let ver = Version::parse(
+			version
+				.as_deref()
+				.unwrap()
+				.strip_prefix('v')
+				.unwrap_or(version.as_deref().unwrap()),
+		)
+		.nice_unwrap("Invalid version specified");
 		info!("Installing binaries for {}", ver);
-		
+
 		release_tag = format!("v{}", ver);
 		let mut stripped_ver = ver.clone();
 		stripped_ver.pre = Prerelease::EMPTY;
 		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
-	} 
-	else {
+	} else {
 		let ver = get_version();
 		info!("Installing binaries for {}", ver);
 		release_tag = format!("v{}", ver);

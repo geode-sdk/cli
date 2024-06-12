@@ -2,8 +2,6 @@ use crate::util::mod_file::DependencyImportance;
 use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
 	file::read_dir_recursive,
-	index::{install_mod, update_index},
-	indexer,
 	package::get_working_dir,
 	template,
 	util::{
@@ -13,7 +11,7 @@ use crate::{
 };
 use clap::Subcommand;
 use edit_distance::edit_distance;
-use semver::{Version, VersionReq};
+use semver::Version;
 use std::env;
 use std::{
 	collections::HashMap,
@@ -47,31 +45,7 @@ pub enum Project {
 		/// other means (usually through building it as part of the same project)
 		#[clap(long, num_args(0..))]
 		externals: Vec<String>,
-
-		/// Disable updating the mods index before checking dependencies
-		#[clap(long)]
-		dont_update_index: bool,
 	},
-
-	/// Publish this project on the Geode mods index
-	Publish {
-		/// Path to the project's built .geode file. If you are using Geode
-		/// v1.0.0-beta.8 or newer, CLI should be able to figure this out
-		/// automatically, unless you are building multiple mods from the
-		/// same directory
-		#[clap(short, long)]
-		package: Option<PathBuf>,
-	},
-
-	/// Unpublish a project from the Geode mods index
-	Unpublish {
-		/// ID of the mod to unpublish. If not provided, current opened project
-		/// is used
-		id: Option<String>,
-	},
-
-	/// List all published mods
-	ListPublished,
 }
 
 fn find_build_directory(root: &Path) -> Option<PathBuf> {
@@ -203,7 +177,7 @@ fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, Str
 
 fn find_dependency(
 	dep: &Dependency,
-	dir: &PathBuf,
+	dir: &Path,
 	search_recursive: bool,
 	mods_v2: bool,
 ) -> Result<Found, std::io::Error> {
@@ -211,7 +185,7 @@ fn find_dependency(
 	// steps away from the searched one
 	let mut closest_score = 4usize;
 	let mut found = Found::None;
-	let mut dir = dir.clone();
+	let mut dir = dir.to_path_buf();
 
 	// this doesnt work with the fuzzy search misspelling check or whatever
 	// someone else can fix it i dont care kthx
@@ -255,7 +229,6 @@ pub fn check_dependencies(
 	input: PathBuf,
 	output: PathBuf,
 	externals: Vec<String>,
-	dont_update_index: bool,
 ) {
 	let mod_info = parse_mod_info(&input);
 
@@ -285,17 +258,6 @@ pub fn check_dependencies(
 		.collect::<HashMap<_, _>>();
 
 	let mut errors = false;
-
-	// update mods index if all of the mods aren't external
-	if !mod_info
-		.dependencies
-		.iter()
-		.all(|d| externals.contains_key(&d.id))
-		&& !dont_update_index
-	{
-		info!("Updating Geode mods index");
-		update_index(config);
-	}
 
 	let dep_dir = output.join("geode-deps");
 	fs::create_dir_all(&dep_dir).nice_unwrap("Unable to create dependency directory");
@@ -528,18 +490,6 @@ pub fn check_dependencies(
 	}
 }
 
-pub fn publish_project(_config: &Config, _dir: &Path, _package_path: Option<PathBuf>) {
-	warn!("geode project publish is currently deprecated.");
-	info!("Please follow the new instructions over at https://docs.geode-sdk.org/mods/publishing/");
-}
-
-pub fn unpublish_project(_id: Option<String>) {
-	warn!("geode project unpublish is currently deprecated.");
-	info!(
-		"Currently there is no way to unpublish your mods other than asking one of the staff, lol!"
-	);
-}
-
 pub fn subcommand(config: &mut Config, cmd: Project) {
 	match cmd {
 		Project::New { path } => template::build_template(config, path),
@@ -547,18 +497,11 @@ pub fn subcommand(config: &mut Config, cmd: Project) {
 		Project::Check {
 			install_dir,
 			externals,
-			dont_update_index,
 		} => check_dependencies(
 			config,
 			std::env::current_dir().unwrap(),
 			install_dir.unwrap_or("build".into()),
 			externals,
-			dont_update_index,
 		),
-		Project::Publish { package } => {
-			publish_project(config, &std::env::current_dir().unwrap(), package)
-		}
-		Project::Unpublish { id } => unpublish_project(id),
-		Project::ListPublished => indexer::list_mods(),
 	}
 }

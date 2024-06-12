@@ -88,40 +88,40 @@ fn create_template(
 	}
 
 	let mod_json_path = project_location.join("mod.json");
-	let mod_json_content;
 
-	if mod_json_path.exists() {
-		let mod_json =
-			fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
-		let mod_json = mod_json
-			.replace("$GEODE_VERSION", &get_version().to_string())
-			.replace("$MOD_VERSION", &version)
-			.replace("$MOD_ID", &id)
-			.replace("$MOD_NAME", &name)
-			.replace("$MOD_DEVELOPER", &developer)
-			.replace("$MOD_DESCRIPTION", &description);
+	let mod_json_content: String = {
+		if mod_json_path.exists() {
+			let mod_json =
+				fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
 
-		mod_json_content = mod_json;
-	} else {
-		// Default mod.json
-		let mod_json = json!({
-			"geode":        get_version().to_string(),
-			"version":      version,
-			"id":           id,
-			"name":         name,
-			"developer":    developer,
-			"description":  description,
-		});
+			mod_json
+				.replace("$GEODE_VERSION", &get_version().to_string())
+				.replace("$MOD_VERSION", &version)
+				.replace("$MOD_ID", &id)
+				.replace("$MOD_NAME", &name)
+				.replace("$MOD_DEVELOPER", &developer)
+				.replace("$MOD_DESCRIPTION", &description)
+		} else {
+			// Default mod.json
+			let mod_json = json!({
+				"geode":        get_version().to_string(),
+				"version":      version,
+				"id":           id,
+				"name":         name,
+				"developer":    developer,
+				"description":  description,
+			});
 
-		// Format neatly
-		let buf = Vec::new();
-		let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-		let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-		mod_json.serialize(&mut ser).unwrap();
+			// Format neatly
+			let buf = Vec::new();
+			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+			let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+			mod_json.serialize(&mut ser).unwrap();
 
-		// Write formatted json
-		mod_json_content = String::from_utf8(ser.into_inner()).unwrap()
-	}
+			// Write formatted json
+			String::from_utf8(ser.into_inner()).unwrap()
+		}
+	};
 
 	fs::write(mod_json_path, mod_json_content)
 		.nice_unwrap("Unable to write mod.json, are permissions correct?");

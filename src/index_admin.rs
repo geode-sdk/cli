@@ -133,7 +133,7 @@ impl Display for PendingModDepencency {
 	}
 }
 
-pub fn admin_dashboard(action: AdminAction, config: &mut Config) {
+pub fn subcommand(action: AdminAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in!");
 	}
@@ -150,7 +150,6 @@ pub fn admin_dashboard(action: AdminAction, config: &mut Config) {
 		AdminAction::DevStatus => {
 			update_dev_status(config);
 		}
-		_ => unimplemented!(),
 	}
 }
 
@@ -442,7 +441,7 @@ fn download_mod(version: &PendingModVersion, id: &str, config: &Config) {
 	let mods_dir = config.get_current_profile().mods_dir();
 	let mod_path = mods_dir.join(format!("{}.geode", version.mod_id));
 
-	std::fs::write(&mod_path, data).nice_unwrap("Failed to save mod");
+	std::fs::write(mod_path, data).nice_unwrap("Failed to save mod");
 
 	info!("Mod downloaded");
 }

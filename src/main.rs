@@ -6,7 +6,6 @@ mod index;
 mod index_admin;
 mod index_auth;
 mod index_dev;
-mod indexer;
 mod info;
 mod package;
 mod profile;

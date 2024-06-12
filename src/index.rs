@@ -1,22 +1,18 @@
 use crate::config::Config;
-use crate::file::{copy_dir_recursive, read_dir_recursive};
 use crate::server::{ApiResponse, PaginatedData};
 use crate::util::logging::ask_value;
-use crate::util::mod_file::{parse_mod_info, try_parse_mod_info};
+use crate::util::mod_file::parse_mod_info;
 use crate::{done, fatal, index_admin, index_auth, index_dev, info, warn, NiceUnwrap};
 use clap::Subcommand;
-use colored::Colorize;
-use reqwest::header::{AUTHORIZATION, USER_AGENT};
+use reqwest::header::USER_AGENT;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sha3::{Digest, Sha3_256};
-use std::collections::HashSet;
 use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use zip::read::ZipFile;
-use zip::ZipArchive;
 
 #[derive(Deserialize)]
 pub struct ServerModVersion {
@@ -44,11 +40,11 @@ pub enum Index {
 	/// Edit your developer profile
 	Profile,
 
-	/// Submit a mod (or a mod update) to the index
-	Submit { action: CreateModAction },
-
 	/// Interact with your own mods
-	Mods { action: MyModAction },
+	Mods {
+		#[clap(subcommand)]
+		action: MyModAction,
+	},
 
 	/// Install a mod from the index to the current profile
 	Install {
@@ -59,9 +55,6 @@ pub enum Index {
 		version: Option<VersionReq>,
 	},
 
-	/// Updates the index cache
-	Update,
-
 	/// Set the URL for the index (pass default to reset)
 	Url {
 		/// URL to set
@@ -69,19 +62,18 @@ pub enum Index {
 	},
 
 	/// Secrets...
-	Admin { action: AdminAction },
+	Admin {
+		#[clap(subcommand)]
+		commands: AdminAction,
+	},
 }
 
-#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
-pub enum CreateModAction {
+#[derive(Deserialize, Debug, Clone, Subcommand, PartialEq)]
+pub enum MyModAction {
 	/// Create a new mod
 	Create,
 	/// Update an existing mod
 	Update,
-}
-
-#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
-pub enum MyModAction {
 	/// List your published mods
 	Published,
 	/// List your pending mods
@@ -90,178 +82,12 @@ pub enum MyModAction {
 	Edit,
 }
 
-#[derive(Deserialize, Debug, Clone, clap::ValueEnum, PartialEq)]
+#[derive(Deserialize, Debug, Clone, Subcommand, PartialEq)]
 pub enum AdminAction {
 	/// List mods that are pending verification
 	ListPending,
-	/// Validate a mod that is pending verification
-	Validate,
-	/// Reject a mod that is pending verification
-	Reject,
 	/// Alter a developer's verified status
 	DevStatus,
-}
-
-#[allow(unused)]
-#[derive(Deserialize)]
-pub struct EntryMod {
-	download: String,
-	hash: String,
-}
-
-#[allow(unused)]
-#[derive(Deserialize)]
-pub struct Entry {
-	r#mod: EntryMod,
-	platforms: HashSet<String>,
-	#[serde(default)]
-	tags: Vec<String>,
-	#[serde(default)]
-	featured: bool,
-}
-
-pub fn update_index(config: &Config) {
-	let index_dir = config.get_current_profile().index_dir();
-
-	let target_index_dir = index_dir.join("geode-sdk_mods");
-	// note to loader devs: never change the format pretty please
-	let checksum = index_dir.join("geode-sdk_mods.checksum");
-	let current_sha = fs::read_to_string(&checksum).unwrap_or_default();
-
-	let client = reqwest::blocking::Client::new();
-
-	let response = client
-		.get("https://api.github.com/repos/geode-sdk/mods/commits/main")
-		.header("Accept", "application/vnd.github.sha")
-		.header("If-None-Match", format!("\"{}\"", current_sha))
-		.header(USER_AGENT, "GeodeCli")
-		.header(
-			AUTHORIZATION,
-			std::env::var("GITHUB_TOKEN").map_or("".into(), |token| format!("Bearer {token}")),
-		)
-		.send()
-		.nice_unwrap("Unable to fetch index version");
-
-	if response.status() == 304 {
-		done!("Index is up-to-date");
-		return;
-	}
-	assert!(
-		response.status() == 200,
-		"Version check received status code {}",
-		response.status()
-	);
-	let latest_sha = response
-		.text()
-		.nice_unwrap("Unable to decode index version");
-
-	let mut zip_data = Cursor::new(Vec::new());
-
-	client
-		.get("https://github.com/geode-sdk/mods/zipball/main")
-		.send()
-		.nice_unwrap("Unable to download index")
-		.copy_to(&mut zip_data)
-		.nice_unwrap("Unable to write to index");
-
-	let mut zip_archive = ZipArchive::new(zip_data).nice_unwrap("Unable to decode index zip");
-
-	let before_items = if target_index_dir.join("mods-v2").exists() {
-		let mut items = fs::read_dir(target_index_dir.join("mods-v2"))
-			.unwrap()
-			.map(|x| x.unwrap().path())
-			.collect::<Vec<_>>();
-		items.sort();
-
-		fs::remove_dir_all(&target_index_dir).nice_unwrap("Unable to remove old index version");
-		Some(items)
-	} else {
-		None
-	};
-
-	let extract_dir = std::env::temp_dir().join("geode-nuevo-index-zip");
-	if extract_dir.exists() {
-		fs::remove_dir_all(&extract_dir).nice_unwrap("Unable to prepare new index");
-	}
-	fs::create_dir(&extract_dir).unwrap();
-	zip_archive
-		.extract(&extract_dir)
-		.nice_unwrap("Unable to extract new index");
-
-	let new_root_dir = fs::read_dir(&extract_dir)
-		.unwrap()
-		.next()
-		.unwrap()
-		.unwrap()
-		.path();
-	copy_dir_recursive(&new_root_dir, &target_index_dir).nice_unwrap("Unable to copy new index");
-
-	// we don't care if temp dir removal fails
-	drop(fs::remove_dir_all(extract_dir));
-
-	let mut after_items = fs::read_dir(target_index_dir.join("mods-v2"))
-		.unwrap()
-		.map(|x| x.unwrap().path())
-		.collect::<Vec<_>>();
-	after_items.sort();
-
-	if let Some(before_items) = before_items {
-		if before_items != after_items {
-			info!("Changelog:");
-
-			for i in &before_items {
-				if !after_items.contains(i) {
-					println!(
-						"            {} {}",
-						"-".red(),
-						i.file_name().unwrap().to_str().unwrap()
-					);
-				}
-			}
-
-			for i in &after_items {
-				if !before_items.contains(i) {
-					println!(
-						"            {} {}",
-						"+".green(),
-						i.file_name().unwrap().to_str().unwrap()
-					);
-				}
-			}
-		}
-	}
-
-	fs::write(checksum, latest_sha).nice_unwrap("Unable to save version");
-	done!("Successfully updated index")
-}
-
-pub fn index_mods_dir(config: &Config) -> PathBuf {
-	config
-		.get_current_profile()
-		.index_dir()
-		.join("geode-sdk_mods")
-		.join("mods-v2")
-}
-
-pub fn get_entry(config: &Config, id: &String, version: &VersionReq) -> Option<Entry> {
-	let dir = index_mods_dir(config).join(id);
-
-	for path in read_dir_recursive(&dir).nice_unwrap("Unable to read index") {
-		let Ok(mod_info) = try_parse_mod_info(&path) else {
-			continue;
-		};
-		if &mod_info.id == id && version.matches(&mod_info.version) {
-			return Some(
-				serde_json::from_str(
-					&fs::read_to_string(path.join("entry.json"))
-						.nice_unwrap("Unable to read index entry"),
-				)
-				.nice_unwrap("Unable to parse index entry"),
-			);
-		}
-	}
-
-	None
 }
 
 pub fn install_mod(
@@ -419,7 +245,7 @@ fn create_entry(out_path: &Path) {
 	}
 }
 
-fn submit(action: CreateModAction, config: &mut Config) {
+fn submit(action: MyModAction, config: &mut Config) {
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
@@ -431,7 +257,7 @@ fn submit(action: CreateModAction, config: &mut Config) {
 		id: String,
 	}
 
-	if action == CreateModAction::Update {
+	if action == MyModAction::Update {
 		info!("Fetching mod id from .geode file");
 		let mut zip_data: Cursor<Vec<u8>> = Cursor::new(vec![]);
 
@@ -618,22 +444,21 @@ pub fn get_mod_versions(
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
 		Index::New { output } => create_entry(&output),
-		Index::Update => update_index(config),
 		Index::Install { id, version } => {
-			update_index(config);
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
 		Index::Login => index_auth::login(config),
 		Index::Invalidate => index_auth::invalidate(config),
 		Index::Url { url } => set_index_url(url, config),
-		Index::Submit { action } => submit(action, config),
 		Index::Mods { action } => match action {
+			MyModAction::Create => submit(action, config),
+			MyModAction::Update => submit(action, config),
 			MyModAction::Published => index_dev::print_own_mods(true, config),
 			MyModAction::Pending => index_dev::print_own_mods(false, config),
 			MyModAction::Edit => index_dev::edit_own_mods(config),
 		},
 		Index::Profile => index_dev::edit_profile(config),
-		Index::Admin { action } => index_admin::admin_dashboard(action, config),
+		Index::Admin { commands } => index_admin::subcommand(commands, config),
 	}
 }

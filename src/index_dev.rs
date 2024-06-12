@@ -120,16 +120,6 @@ pub fn print_own_mods(validated: bool, config: &mut Config) {
 
 	for (i, entry) in payload.iter().enumerate() {
 		print!("{}. {}", i + 1, entry);
-		// info!("{}. ID: {}", i + 1, &entry.id);
-		// info!("  Featured: {}", entry.featured);
-		// info!("  Download count: {}", entry.download_count);
-		// info!("  Versions:");
-		// for (i, version) in entry.versions.iter().enumerate() {
-		// 	info!("    {}. Name: {}", i + 1, version.name);
-		// 	info!("      Version: {}", version.version);
-		// 	info!("      Download count: {}", version.download_count);
-		// 	info!("      Validated: {}", version.validated);
-		// }
 	}
 }
 
