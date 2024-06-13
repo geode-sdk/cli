@@ -247,7 +247,7 @@ fn create_entry(out_path: &Path) {
 }
 
 fn submit(action: MyModAction, config: &mut Config) {
-	if action != MyModAction::Create || action != MyModAction::Update {
+	if action != MyModAction::Create && action != MyModAction::Update {
 		fatal!("Invalid action");
 	}
 
