@@ -131,11 +131,11 @@ fn get_own_mods(validated: bool, config: &mut Config) -> Vec<SimpleDevMod> {
 	let client = reqwest::blocking::Client::new();
 
 	let validated_str = match validated {
-		true => "true",
-		false => "false",
+		true => "accepted",
+		false => "pending",
 	};
 
-	let url = index::get_index_url(format!("/v1/me/mods?validated={}", validated_str), config);
+	let url = index::get_index_url(format!("/v1/me/mods?status={}", validated_str), config);
 
 	let response = client
 		.get(url)
