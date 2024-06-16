@@ -32,7 +32,7 @@ texture_packer = "0.25.0"
 walkdir = "2"
 zip = "0.6.6"
 semver = "1.0.14"
-reqwest = { version = "0.12.2", features = ["json", "blocking"] }
+reqwest = { version = "0.12.2", default-features = false, features = ["json", "blocking", "stream", "rustls-tls-native-roots"] }
 cfg-if = "1.0.0"
 regex = "1.6.0"
 sha3 = "0.10.6"
