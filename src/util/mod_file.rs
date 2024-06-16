@@ -90,6 +90,17 @@ where
 		.map_err(serde::de::Error::custom)
 }
 
+pub trait ToGeodeString {
+	fn to_geode_string(&self) -> String;
+}
+
+impl ToGeodeString for VersionReq {
+	fn to_geode_string(&self) -> String {
+		// geode uses = instead of ^ for exact version
+		self.to_string().replace("^", "=")
+	}
+}
+
 fn parse_fonts<'de, D>(deserializer: D) -> Result<HashMap<String, BitmapFont>, D::Error>
 where
 	D: Deserializer<'de>,

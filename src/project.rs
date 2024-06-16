@@ -1,3 +1,4 @@
+use crate::mod_file::ToGeodeString;
 use crate::util::mod_file::DependencyImportance;
 use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
@@ -130,8 +131,14 @@ impl Found {
 
 fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, String> {
 	info!("Fetching dependency from index");
-	let found =
-		index::get_mod_versions(&dep.id, 1, 10, config, true, Some(dep.version.to_string()))?;
+	let found = index::get_mod_versions(
+		&dep.id,
+		1,
+		10,
+		config,
+		true,
+		Some(dep.version.to_geode_string()),
+	)?;
 
 	if found.data.is_empty() {
 		return Ok(Found::None);

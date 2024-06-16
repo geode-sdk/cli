@@ -430,7 +430,7 @@ pub fn get_mod_versions(
 		.query(&query)
 		.header(USER_AGENT, "GeodeCLI")
 		.send()
-		.nice_unwrap("Couldn't connec to the index");
+		.nice_unwrap("Couldn't connect to the index");
 
 	if response.status() != 200 {
 		return Err("Failed to fetch mod versions".to_string());
