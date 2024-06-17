@@ -205,15 +205,29 @@ pub struct ModResources {
 #[derive(Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PlatformName {
+	#[serde(rename = "win")]
 	Windows,
 	MacOS,
+	#[serde(rename = "mac-intel")]
+	MacIntel,
+	#[serde(rename = "mac-arm")]
+	MacArm,
+	Android,
 	Android32,
 	Android64,
 }
 
 fn all_platforms() -> HashSet<PlatformName> {
 	use PlatformName as P;
-	HashSet::from([P::Windows, P::MacOS, P::Android32, P::Android64])
+	HashSet::from([
+		P::Windows,
+		P::MacOS,
+		P::MacIntel,
+		P::MacArm,
+		P::Android,
+		P::Android32,
+		P::Android64,
+	])
 }
 
 #[derive(Default, Deserialize, PartialEq)]
