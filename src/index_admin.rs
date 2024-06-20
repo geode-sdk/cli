@@ -1,15 +1,11 @@
 use std::fmt::Display;
 
-use crate::{
-	config::Config,
-	fail, fatal,
-	index::{self, AdminAction},
-	index_dev::{self, DeveloperProfile},
-	info,
-	logging::{self, ask_value},
-	server::{ApiResponse, PaginatedData},
-	warn, NiceUnwrap,
-};
+use crate::config::Config;
+use crate::index::{self, AdminAction};
+use crate::index_dev::{self, DeveloperProfile};
+use crate::logging::{self, ask_value};
+use crate::server::{ApiResponse, PaginatedData};
+use crate::{fatal, info, warn, NiceUnwrap};
 
 use rand::Rng;
 use reqwest::header::USER_AGENT;
