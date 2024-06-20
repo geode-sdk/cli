@@ -188,7 +188,7 @@ fn initialize_font_bundle(
 		.for_each(|x| packer.pack_ref(x.id, &x.img).unwrap());
 
 	// Create .png file
-	let exporter = ImageExporter::export(&packer).unwrap();
+	let exporter = ImageExporter::export(&packer, None).unwrap();
 	let mut f = fs::File::create(&bundle.png).nice_unwrap("Unable to write font .png file");
 	exporter.write_to(&mut f, image::ImageFormat::Png).unwrap();
 
