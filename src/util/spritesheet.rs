@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use image::{imageops, ImageFormat, RgbaImage};
+use image::{imageops, ImageFormat, RgbaImage, Rgba32FImage, Rgba, Pixel};
 use serde_json::json;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::texture::Texture;
@@ -75,12 +75,45 @@ pub fn read_to_image(path: &Path) -> RgbaImage {
 }
 
 pub fn downscale(img: &mut RgbaImage, factor: u32) {
-	*img = imageops::resize(
-		img,
-		img.width() / factor,
-		img.height() / factor,
+	if factor == 1 {
+		return;
+	}
+
+	// premultiply alpha before resampling to fix black halo around transparent edges
+	let mut tmp: Rgba32FImage = imageproc::map::map_colors(img, |x| {
+		let ch = x.channels();
+		let a = ch[3] as f32 / 255.0;
+		let r = ch[0] as f32 / 255.0 * a;
+		let g = ch[1] as f32 / 255.0 * a;
+		let b = ch[2] as f32 / 255.0 * a;
+		Rgba([r, g, b, a])
+	});
+
+	tmp = imageops::resize(
+		&tmp,
+		tmp.width() / factor,
+		tmp.height() / factor,
 		imageops::FilterType::Lanczos3,
 	);
+
+	*img = imageproc::map::map_colors(&tmp, |x| {
+		let ch = x.channels();
+		let a = ch[3];
+		let r: u8;
+		let g: u8;
+		let b: u8;
+		if a == 0.0 {
+			r = (ch[0] * 255.0).round().clamp(0.0, 255.0) as u8;
+			g = (ch[1] * 255.0).round().clamp(0.0, 255.0) as u8;
+			b = (ch[2] * 255.0).round().clamp(0.0, 255.0) as u8;
+		}
+		else {
+			r = (ch[0] / a * 255.0).round().clamp(0.0, 255.0) as u8;
+			g = (ch[1] / a * 255.0).round().clamp(0.0, 255.0) as u8;
+			b = (ch[2] / a * 255.0).round().clamp(0.0, 255.0) as u8;
+		}
+		Rgba([r, g, b, (a * 255.0).round().clamp(0.0, 255.0) as u8])
+	});
 }
 
 fn initialize_spritesheet_bundle(
