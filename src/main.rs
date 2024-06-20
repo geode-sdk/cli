@@ -1,6 +1,4 @@
-use clap::{Parser, Subcommand};
-use std::path::PathBuf;
-
+mod cli;
 mod file;
 mod index;
 mod index_admin;
@@ -17,102 +15,9 @@ mod template;
 mod util;
 
 use crate::profile::RunBackground;
+use clap::{CommandFactory, Parser};
+use cli::{Args, GeodeCommands};
 use util::*;
-
-/// Command-line interface for Geode
-#[derive(Parser, Debug)]
-#[clap(version)]
-struct Args {
-	#[clap(subcommand)]
-	command: GeodeCommands,
-}
-
-#[derive(Subcommand, Debug)]
-enum GeodeCommands {
-	/// Initialize a new Geode project
-	New {
-		/// The target directory to create the project in
-		path: Option<PathBuf>,
-	},
-
-	/// Options for managing profiles (installations of Geode)
-	Profile {
-		#[clap(subcommand)]
-		commands: crate::profile::Profile,
-	},
-
-	/// Options for configuring Geode CLI
-	Config {
-		#[clap(subcommand)]
-		commands: crate::info::Info,
-	},
-
-	/// Options for installing & managing the Geode SDK
-	Sdk {
-		#[clap(subcommand)]
-		commands: crate::sdk::Sdk,
-	},
-
-	/// Tools for working with the current mod project
-	Project {
-		#[clap(subcommand)]
-		commands: crate::project::Project,
-	},
-
-	/// Options for working with .geode packages
-	Package {
-		#[clap(subcommand)]
-		commands: crate::package::Package,
-	},
-
-	/// Tools for interacting with the Geode mod index
-	Index {
-		#[clap(subcommand)]
-		commands: crate::index::Index,
-	},
-
-	/// Run default instance of Geometry Dash
-	Run {
-		/// Run Geometry Dash in the background instead of the foreground
-		#[clap(long, conflicts_with = "stay")]
-		background: bool,
-
-		/// Do not exit CLI after Geometry Dash exits if running in foreground
-		#[clap(long, conflicts_with = "background")]
-		stay: bool,
-
-		/// Launch arguments for Geometry Dash
-		#[clap(last = true, allow_hyphen_values = true)]
-		launch_args: Vec<String>,
-	},
-
-	/// Builds the project at the current directory
-	Build {
-		/// Which platform to cross-compile to, if possible
-		#[clap(long, short)]
-		platform: Option<String>,
-
-		/// Whether to only configure cmake
-		#[clap(long, short, default_value_t = false)]
-		configure_only: bool,
-
-		/// Whether to only build project
-		#[clap(long, short, default_value_t = false)]
-		build_only: bool,
-
-		/// Android NDK path, uses ANDROID_NDK_ROOT env var otherwise
-		#[clap(long)]
-		ndk: Option<String>,
-
-		/// Sets the cmake build type, defaults to Debug or RelWithDebInfo depending on platform
-		#[clap(long)]
-		config: Option<String>,
-
-		/// Extra cmake arguments when configuring
-		#[clap(last = true, allow_hyphen_values = true)]
-		extra_conf_args: Vec<String>,
-	},
-}
 
 fn main() {
 	#[cfg(windows)]
@@ -163,6 +68,16 @@ fn main() {
 			config,
 			extra_conf_args,
 		),
+		GeodeCommands::Completions { shell } => {
+			let mut app = Args::command();
+			let bin_name = app.get_name().to_string();
+			clap_complete::generate(shell, &mut app, bin_name, &mut std::io::stdout());
+		}
+		GeodeCommands::GenerateManpage {} => {
+			let app = Args::command();
+			let man = clap_mangen::Man::new(app);
+			let _ = man.render(&mut std::io::stdout());
+		}
 	}
 
 	config.save();

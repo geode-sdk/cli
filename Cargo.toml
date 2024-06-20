@@ -12,6 +12,9 @@ build = "build.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
+clap_complete = "4.5"
+clap_mangen = "0.2.21"
+
 colored = "2"
 dirs = "5"
 fontdue = "0.9"

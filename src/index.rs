@@ -16,10 +16,10 @@ use zip::read::ZipFile;
 
 #[derive(Deserialize)]
 pub struct ServerModVersion {
-	pub name: String,
+	// pub name: String,
 	pub version: String,
 	pub download_link: String,
-	pub hash: String,
+	// pub hash: String,
 }
 
 #[derive(Subcommand, Debug)]
