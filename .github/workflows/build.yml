@@ -21,14 +21,14 @@ jobs:
           out_paths: './target/release/geode.exe'
           static: ''
           id: win
-          target: stable-x86_64-pc-windows-msvc
+          target: x86_64-pc-windows-msvc
 
         - name: "macOS"
           os: macos-12
           out_paths: './target/release/geode'
           static: 'export OPENSSL_STATIC=1'
           id: mac
-          target: stable-x86_64-apple-darwin
+          target: x86_64-apple-darwin
 
         - name: "linux"
           os: ubuntu-latest
@@ -36,7 +36,7 @@ jobs:
           # some stupid old ubuntu versions cant install libssl3
           static: 'export OPENSSL_STATIC=1'
           id: linux
-          target: stable-x86_64-unknown-linux-gnu
+          target: x86_64-unknown-linux-gnu
 
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
