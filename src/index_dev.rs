@@ -4,10 +4,13 @@ use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::config::Config;
-use crate::logging::{self, ask_value};
-use crate::server::ApiResponse;
-use crate::{done, fatal, index, info, warn, NiceUnwrap};
+use crate::{
+	config::Config,
+	done, fatal, index, info,
+	logging::{self, ask_value},
+	server::ApiResponse,
+	warn, NiceUnwrap,
+};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleDevMod {

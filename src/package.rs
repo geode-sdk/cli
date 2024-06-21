@@ -7,10 +7,12 @@ use zip::write::FileOptions;
 use zip::ZipWriter;
 
 use crate::config::Config;
+use crate::util::bmfont;
 use crate::util::cache::CacheBundle;
 use crate::util::mod_file::{parse_mod_info, ModFileInfo};
-use crate::util::{bmfont, spritesheet};
-use crate::{cache, done, fatal, info, project, warn, NiceUnwrap};
+use crate::util::spritesheet;
+use crate::{cache, project};
+use crate::{done, fatal, info, warn, NiceUnwrap};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]

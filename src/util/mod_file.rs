@@ -97,7 +97,7 @@ pub trait ToGeodeString {
 impl ToGeodeString for VersionReq {
 	fn to_geode_string(&self) -> String {
 		// geode uses = instead of ^ for exact version
-		self.to_string().replace('^', "=")
+		self.to_string().replace("^", "=")
 	}
 }
 
@@ -108,7 +108,7 @@ where
 	Ok(<HashMap<String, BitmapFont>>::deserialize(deserializer)?
 		.into_iter()
 		.map(|(name, mut font)| {
-			font.name.clone_from(&name);
+			font.name = name.clone();
 			font.path = std::env::current_dir().unwrap().join(font.path);
 			(name, font)
 		})

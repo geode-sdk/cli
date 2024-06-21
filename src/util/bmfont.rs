@@ -1,10 +1,12 @@
 use crate::cache::CacheBundle;
 use crate::mod_file::BitmapFont;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use texture_packer::exporter::ImageExporter;
 use texture_packer::texture::Texture;
-use texture_packer::{TexturePacker, TexturePackerConfig};
+use texture_packer::TexturePacker;
+use texture_packer::TexturePackerConfig;
 
 use crate::{done, info, NiceUnwrap};
 use image::{Rgba, RgbaImage};
@@ -186,7 +188,7 @@ fn initialize_font_bundle(
 		.for_each(|x| packer.pack_ref(x.id, &x.img).unwrap());
 
 	// Create .png file
-	let exporter = ImageExporter::export(&packer, None).unwrap();
+	let exporter = ImageExporter::export(&packer).unwrap();
 	let mut f = fs::File::create(&bundle.png).nice_unwrap("Unable to write font .png file");
 	exporter.write_to(&mut f, image::ImageFormat::Png).unwrap();
 

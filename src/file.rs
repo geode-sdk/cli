@@ -1,5 +1,6 @@
+use std::fs;
+use std::io;
 use std::path::PathBuf;
-use std::{fs, io};
 
 /// Return all files in directory and subdirectories
 pub fn read_dir_recursive(src: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {

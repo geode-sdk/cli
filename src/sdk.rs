@@ -9,9 +9,10 @@ use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::{Prerelease, Version};
 use serde::Deserialize;
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::{env, fs};
 
 #[cfg(target_os = "macos")]
 use crate::launchctl;
@@ -19,7 +20,8 @@ use crate::launchctl;
 #[cfg(windows)]
 use winreg::RegKey;
 
-use crate::{confirm, done, fail, fatal, info, warn, NiceUnwrap};
+use crate::confirm;
+use crate::{done, fail, fatal, info, warn, NiceUnwrap};
 
 #[derive(Deserialize)]
 struct GithubReleaseAsset {

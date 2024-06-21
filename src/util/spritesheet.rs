@@ -217,7 +217,7 @@ fn initialize_spritesheet_bundle(
 
 	info!("Exporting");
 
-	let exporter = ImageExporter::export(&texture_packer, None).unwrap();
+	let exporter = ImageExporter::export(&texture_packer).unwrap();
 	exporter
 		.write_to(&mut file, ImageFormat::Png)
 		.nice_unwrap("Unable to write to png file");

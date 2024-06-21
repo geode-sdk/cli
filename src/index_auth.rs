@@ -2,10 +2,10 @@ use cli_clipboard::ClipboardProvider;
 use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
 
-use crate::config::Config;
-use crate::logging::ask_value;
-use crate::server::ApiResponse;
-use crate::{done, fatal, index, info, warn, NiceUnwrap};
+use crate::{
+	config::Config, done, fatal, index, info, logging::ask_value, server::ApiResponse, warn,
+	NiceUnwrap,
+};
 
 #[derive(Debug, Deserialize)]
 struct LoginAttempt {

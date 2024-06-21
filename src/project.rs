@@ -1,17 +1,24 @@
-use crate::file::read_dir_recursive;
 use crate::mod_file::ToGeodeString;
-use crate::package::get_working_dir;
-use crate::util::config::Config;
-use crate::util::mod_file::{
-	parse_mod_info, try_parse_mod_info, Dependency, DependencyImportance, ModFileInfo,
+use crate::util::mod_file::DependencyImportance;
+use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
+use crate::{
+	file::read_dir_recursive,
+	package::get_working_dir,
+	template,
+	util::{
+		config::Config,
+		mod_file::{parse_mod_info, try_parse_mod_info, Dependency, ModFileInfo},
+	},
 };
-use crate::{done, fail, fatal, index, info, template, warn, NiceUnwrap};
 use clap::Subcommand;
 use edit_distance::edit_distance;
 use semver::Version;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::env;
+use std::{
+	collections::HashMap,
+	fs,
+	path::{Path, PathBuf},
+};
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]

@@ -10,44 +10,46 @@ authors = [
 edition = "2021"
 build = "build.rs"
 
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
 clap_mangen = "0.2.21"
 
 colored = "2"
-dirs = "5"
-fontdue = "0.9"
-git2 = "0.19"
-glob = "0.3"
-image = "0.25"
-imageproc = "0.25"
+dirs = "5.0.1"
+fontdue = "0.8.0"
+git2 = "0.18.0"
+glob = "0.3.0"
+image = "0.24.3"
+imageproc = "0.23.0"
 signed-distance-field = "0.6.3"
-path-absolutize = "3.1"
+path-absolutize = "3.0.11"
 plist = "1.6.1"
-rustyline = "14.0.0"
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1", features = ["preserve_order"] }
-sha256 = "1.5"
-texture_packer = "0.29.0"
+rustyline = "12.0.0"
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = { version = "1.0.115", features = ["preserve_order"] }
+sha256 = "1.0.3"
+texture_packer = "0.25.0"
 walkdir = "2"
 zip = "0.6.6"
-semver = "1.0"
-reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "stream", "rustls-tls-native-roots"] }
+semver = "1.0.14"
+reqwest = { version = "0.12.2", features = ["json", "blocking"] }
 cfg-if = "1.0.0"
-regex = "1.10"
-sha3 = "0.10"
+regex = "1.6.0"
+sha3 = "0.10.6"
 hex = "0.4.3"
 edit-distance = "2.1.0"
-which = "6"
-vec1 = { version = "1.12", features = ["serde"] }
+which = "4.3.0"
+vec1 = { version = "1.10.1", features = ["serde"] }
 crossterm_input = "0.5.0"
-open = "5.1"
+open = "5.0.2"
 cli-clipboard = "0.4.0"
 rand = "0.8.5"
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.52.0"
+winreg = "0.51.0"
 ansi_term = "0.12"
 
 [build-dependencies]
