@@ -141,9 +141,9 @@ fn zip_folder(path: &Path, output: &Path) {
 }
 
 pub fn get_working_dir(id: &String) -> PathBuf {
-	let working_dir = dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", id));
+	let working_dir = dirs::cache_dir().unwrap().join("geode_pkg").join(id);
 	fs::remove_dir_all(&working_dir).unwrap_or(());
-	fs::create_dir(&working_dir).unwrap_or(());
+	fs::create_dir_all(&working_dir).unwrap_or(());
 	working_dir
 }
 
