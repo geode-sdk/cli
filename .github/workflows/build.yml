@@ -91,19 +91,19 @@ jobs:
     - name: Zip Windows Artifacts
       uses: vimtor/action-zip@v1.2
       with:
-        files: artifacts/geode-cli-win/*
+        files: artifacts/geode-cli-win/geode.exe
         dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-win.zip
 
     - name: Zip macOS Artifacts
       uses: vimtor/action-zip@v1.2
       with:
-        files: artifacts/geode-cli-mac/*
+        files: artifacts/geode-cli-mac/geode
         dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-mac.zip
 
     - name: Zip Linux Artifacts
       uses: vimtor/action-zip@v1.2
       with:
-        files: artifacts/geode-cli-linux/*
+        files: artifacts/geode-cli-linux/geode
         dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux.zip
 
     - name: Update Development Release
