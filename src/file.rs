@@ -17,16 +17,16 @@ pub fn read_dir_recursive(src: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {
 	Ok(res)
 }
 
-// pub fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), io::Error> {
-// 	fs::create_dir_all(dest)?;
-// 	for item in fs::read_dir(src)? {
-// 		let item_path = item?.path();
-// 		let dest_path = dest.join(item_path.file_name().unwrap());
-// 		if item_path.is_dir() {
-// 			copy_dir_recursive(&item_path, &dest_path)?;
-// 		} else {
-// 			fs::copy(&item_path, &dest_path)?;
-// 		}
-// 	}
-// 	Ok(())
-// }
+pub fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), io::Error> {
+	fs::create_dir_all(dest)?;
+	for item in fs::read_dir(src)? {
+		let item_path = item?.path();
+		let dest_path = dest.join(item_path.file_name().unwrap());
+		if item_path.is_dir() {
+			copy_dir_recursive(&item_path, &dest_path)?;
+		} else {
+			fs::copy(&item_path, &dest_path)?;
+		}
+	}
+	Ok(())
+}
