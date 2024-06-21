@@ -5,6 +5,7 @@ use colored::Colorize;
 use git2::build::{CheckoutBuilder, RepoBuilder};
 use git2::{FetchOptions, RemoteCallbacks, Repository};
 use path_absolutize::Absolutize;
+use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::{Prerelease, Version};
 use serde::Deserialize;
@@ -31,6 +32,20 @@ struct GithubReleaseAsset {
 #[derive(Deserialize)]
 struct GithubReleaseResponse {
 	assets: Vec<GithubReleaseAsset>,
+}
+
+struct LinuxShellConfig {
+	profile: String,
+	profile_bak: String,
+	regex: Regex,
+	replace_with: String,
+}
+
+#[derive(PartialEq)]
+enum UserShell {
+	Bash,
+	Zsh,
+	Fish,
 }
 
 fn download_url(
@@ -182,10 +197,47 @@ fn set_sdk_env(path: &Path) -> bool {
 
 	#[cfg(any(target_os = "linux", target_os = "android"))]
 	{
-		warn!("set_sdk_env is not implemented on linux");
-		warn!("Please set the GEODE_SDK enviroment variable yourself to:");
-		warn!("{}", path.to_str().unwrap());
-		env_success = false;
+		let shell = match detect_user_shell() {
+			Some(s) => s,
+			None => {
+				warn!("Couldn't detect user shell. The CLI only supports bash, zsh and fish for setting the GEODE_SDK environment variable at the moment.");
+				return false;
+			}
+		};
+
+		let shell_data = match get_linux_shell_info(shell, path) {
+			Some(d) => d,
+			None => {
+				warn!("Couldn't fetch shell data.");
+				return false;
+			}
+		};
+
+		let mut contents = std::fs::read_to_string(&shell_data.profile).unwrap_or_default();
+		if !contents.is_empty() {
+			if let Err(e) = std::fs::copy(&shell_data.profile, shell_data.profile_bak) {
+				warn!("Failed to write profile backup: {}", e);
+				return false;
+			}
+		}
+
+		if shell_data.regex.find(&contents).is_none() {
+			contents.push_str(format!("\n{}", shell_data.replace_with).as_str());
+			if let Err(e) = std::fs::write(&shell_data.profile, contents) {
+				warn!("Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup", e, &shell_data.profile);
+				return false;
+			}
+		} else {
+			let r = shell_data
+				.regex
+				.replace(&contents, shell_data.replace_with.as_str());
+			if let Err(e) = std::fs::write(&shell_data.profile, r.as_bytes()) {
+				warn!("Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup", e, &shell_data.profile);
+				return false;
+			}
+		}
+
+		env_success = true;
 	}
 
 	#[cfg(target_os = "macos")]
@@ -194,6 +246,53 @@ fn set_sdk_env(path: &Path) -> bool {
 	}
 
 	env_success
+}
+
+fn detect_user_shell() -> Option<UserShell> {
+	let shell = match env::var("SHELL") {
+		Err(_) => {
+			return None;
+		}
+		Ok(s) => s,
+	};
+
+	if shell.ends_with("bash") {
+		return Some(UserShell::Bash);
+	}
+	if shell.ends_with("zsh") {
+		return Some(UserShell::Zsh);
+	}
+	if shell.ends_with("fish") {
+		return Some(UserShell::Fish);
+	}
+	None
+}
+
+fn get_linux_shell_info(shell: UserShell, path: &Path) -> Option<LinuxShellConfig> {
+	let home = match env::var("HOME") {
+		Err(_) => return None,
+		Ok(h) => h,
+	};
+	match shell {
+		UserShell::Bash => Some(LinuxShellConfig {
+			profile: format!("{}/.bash_profile", home),
+			profile_bak: format!("{}/.bash_profile.bak", home),
+			regex: Regex::new("export GEODE_SDK=.*").unwrap(),
+			replace_with: format!("export GEODE_SDK={}", path.to_str().unwrap()),
+		}),
+		UserShell::Zsh => Some(LinuxShellConfig {
+			profile: format!("{}/.zshenv", home),
+			profile_bak: format!("{}/.zshenv", home),
+			regex: Regex::new("export GEODE_SDK=.*").unwrap(),
+			replace_with: format!("export GEODE_SDK={}", path.to_str().unwrap()),
+		}),
+		UserShell::Fish => Some(LinuxShellConfig {
+			profile: format!("{}/.config/fish/conf.d/geode.fish", home),
+			profile_bak: format!("{}/.config/fish/conf.d/geode.fish.bak", home),
+			regex: Regex::new("set -gx GEODE_SDK.*").unwrap(),
+			replace_with: format!("set -gx GEODE_SDK {}", path.to_str().unwrap()),
+		}),
+	}
 }
 
 fn get_sdk_path() -> Option<PathBuf> {
