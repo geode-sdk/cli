@@ -34,7 +34,7 @@ jobs:
           # some stupid old ubuntu versions cant install libssl3
           static: 'export OPENSSL_STATIC=1'
           id: linux
-        
+
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -44,7 +44,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        
+
     - uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.config.name }}
@@ -53,15 +53,66 @@ jobs:
       run: |
         ${{ matrix.config.static }}
         cargo build --release
-    
+
     - name: Move to output folder
       shell: bash
       run: |
         mkdir ./out
         mv ${{ matrix.config.out_paths }} ./out
-        
+
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: geode-cli-${{ matrix.config.id }}
         path: ./out/
+
+  publish:
+    name: Publish Nightly
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Declare Version Variables
+      id: ref
+      run: |
+        echo "version=$(cat VERSION | xargs)" >> $GITHUB_OUTPUT
+        echo "hash=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
+
+    - name: Download Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ${{ github.workspace }}/artifacts
+
+    # TODO: change when this is fixed https://github.com/actions/download-artifact/issues/143
+
+    - name: Zip Windows Artifacts
+      uses: vimtor/action-zip@v1.2
+      with:
+        files: artifacts/geode-cli-win/*
+        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-win.zip
+
+    - name: Zip macOS Artifacts
+      uses: vimtor/action-zip@v1.2
+      with:
+        files: artifacts/geode-cli-mac/*
+        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-mac.zip
+
+    - name: Zip Linux Artifacts
+      uses: vimtor/action-zip@v1.2
+      with:
+        files: artifacts/geode-cli-linux/*
+        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux.zip
+
+    - name: Update Development Release
+      uses: andelf/nightly-release@main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: nightly
+        name: 'Development Release'
+        body: Geode CLI development release for commit ${{ github.sha }}.
+        files: |
+          ./artifacts/*.zip
