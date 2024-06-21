@@ -101,7 +101,7 @@ fn zip_folder(path: &Path, output: &Path) {
 
 	// Setup zip
 	let mut zip_file = ZipWriter::new(fs::File::create(output).unwrap());
-	let zip_options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+	let zip_options = FileOptions::<()>::default().compression_method(zip::CompressionMethod::Deflated);
 
 	// Iterate files in target path
 	for item in walkdir::WalkDir::new(path) {
@@ -139,9 +139,9 @@ fn zip_folder(path: &Path, output: &Path) {
 }
 
 pub fn get_working_dir(id: &String) -> PathBuf {
-	let working_dir = dirs::cache_dir().unwrap().join(format!("geode_pkg_{}", id));
+	let working_dir = dirs::cache_dir().unwrap().join("geode_pkg").join(id);
 	fs::remove_dir_all(&working_dir).unwrap_or(());
-	fs::create_dir(&working_dir).unwrap_or(());
+	fs::create_dir_all(&working_dir).unwrap_or(());
 	working_dir
 }
 
