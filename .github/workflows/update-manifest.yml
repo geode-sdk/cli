@@ -1,5 +1,4 @@
-# Update cli manifest in the geode-sdk/website repository
-# and in geode-sdk/homebrew-geode too
+# Update cli manifest in geode-sdk/homebrew-geode
 # TODO: update the winget one too :P
 name: Update CLI Manifests
 
@@ -13,20 +12,9 @@ on:
 
 jobs:
   trigger:
-    name: Trigger site build
+    name: Update homebrew repo
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/github-script@v6
-      with:
-        github-token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
-        script: |
-          await github.rest.actions.createWorkflowDispatch({
-            owner: 'geode-sdk',
-            repo: 'website',
-            workflow_id: 'build.yml',
-            ref: 'main'
-          })
-
     - name: Checkout homebrew tap
       uses: actions/checkout@v4
       with:
