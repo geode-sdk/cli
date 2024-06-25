@@ -174,6 +174,8 @@ impl Profile {
 	pub fn geode_dir(&self) -> PathBuf {
 		if self.platform == "win" {
 			self.gd_path.parent().unwrap().join("geode")
+		} else if self.platform == "android32" || self.platform == "android64" {
+			self.gd_path.join("game/geode")
 		} else {
 			self.gd_path.join("Contents/geode")
 		}
