@@ -20,11 +20,18 @@ struct LoginPoll {
 	uuid: String,
 }
 
-pub fn login(config: &mut Config) {
+pub fn login(config: &mut Config, token: Option<String>) {
+	if let Some(token) = token {
+		config.index_token = Some(token);
+		config.save();
+		done!("Successfully logged in with the provided token");
+		return;
+	}
+
 	if config.index_token.is_some() {
 		warn!("You are already logged in");
 		let token = config.index_token.clone().unwrap();
-		info!("{}", token);
+		info!("Your token is: {}", token);
 		return;
 	}
 
