@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::{
 	config::Config,
-	fail, fatal,
+	fatal,
 	index::{self, AdminAction},
 	index_dev::{self, DeveloperProfile},
 	info,

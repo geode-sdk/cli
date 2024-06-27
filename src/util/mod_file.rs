@@ -97,7 +97,7 @@ pub trait ToGeodeString {
 impl ToGeodeString for VersionReq {
 	fn to_geode_string(&self) -> String {
 		// geode uses = instead of ^ for exact version
-		self.to_string().replace("^", "=")
+		self.to_string().replace('^', "=")
 	}
 }
 

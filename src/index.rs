@@ -32,7 +32,11 @@ pub enum Index {
 	},
 
 	/// Login with your GitHub account
-	Login,
+	Login {
+		/// Existing access token to use
+		#[clap(long)]
+		token: Option<String>,
+	},
 
 	/// Invalidate all existing access tokens (logout)
 	Invalidate,
@@ -72,9 +76,15 @@ pub enum Index {
 #[derive(Deserialize, Debug, Clone, Subcommand, PartialEq)]
 pub enum MyModAction {
 	/// Create a new mod
-	Create,
+	Create {
+		/// Direct download link to the .geode file
+		download_link: Option<String>,
+	},
 	/// Update an existing mod
-	Update,
+	Update {
+		/// Direct download link to the .geode file
+		download_link: Option<String>,
+	},
 	/// List your published mods
 	Published,
 	/// List your pending mods
@@ -247,22 +257,29 @@ fn create_entry(out_path: &Path) {
 }
 
 fn submit(action: MyModAction, config: &mut Config) {
-	if action != MyModAction::Create && action != MyModAction::Update {
-		fatal!("Invalid action");
-	}
+	let mut is_update = false;
+	let download_link = match action {
+		MyModAction::Create { download_link } => download_link,
+		MyModAction::Update { download_link } => {
+			is_update = true;
+			download_link
+		}
+		_ => fatal!("Invalid action"),
+	};
 
 	if config.index_token.is_none() {
 		fatal!("You are not logged in");
 	}
 
-	let download_link = ask_value("Download URL for the .geode file", None, true);
+	let download_link =
+		download_link.unwrap_or_else(|| ask_value("Download URL for the .geode file", None, true));
 	let mut id: Option<String> = None;
 	#[derive(Deserialize)]
 	struct SimpleModJson {
 		id: String,
 	}
 
-	if action == MyModAction::Update {
+	if is_update {
 		info!("Fetching mod id from .geode file");
 		let mut zip_data: Cursor<Vec<u8>> = Cursor::new(vec![]);
 
@@ -453,7 +470,7 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
-		Index::Login => index_auth::login(config),
+		Index::Login { token } => index_auth::login(config, token),
 		Index::Invalidate => index_auth::invalidate(config),
 		Index::Url { url } => {
 			if let Some(u) = url {
@@ -463,8 +480,8 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 			}
 		}
 		Index::Mods { action } => match action {
-			MyModAction::Create => submit(action, config),
-			MyModAction::Update => submit(action, config),
+			MyModAction::Create { .. } => submit(action, config),
+			MyModAction::Update { .. } => submit(action, config),
 			MyModAction::Published => index_dev::print_own_mods(true, config),
 			MyModAction::Pending => index_dev::print_own_mods(false, config),
 			MyModAction::Edit => index_dev::edit_own_mods(config),
