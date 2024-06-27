@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "android"))]
 use cli_clipboard::ClipboardProvider;
 use reqwest::header::USER_AGENT;
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,22 @@ struct LoginAttempt {
 #[derive(Serialize)]
 struct LoginPoll {
 	uuid: String,
+}
+
+#[cfg(not(target_os = "android"))]
+pub fn copy_token(token: &str) {
+	if let Ok(mut ctx) = cli_clipboard::ClipboardContext::new() {
+		if ctx.set_contents(token.to_string()).is_ok() {
+			done!("Token has been copied to your clipboard");
+		}
+	}
+}
+
+#[cfg(target_os = "android")]
+pub fn copy_token(token: &str) {
+	if terminal_clipboard::set_string(token).is_ok() {
+		done!("Token has been copied to your clipboard");
+	}
 }
 
 pub fn login(config: &mut Config, token: Option<String>) {
@@ -57,11 +74,7 @@ pub fn login(config: &mut Config, token: Option<String>) {
 	info!("You will need to complete the login process in your web browser");
 	info!("Go to: {} and enter the login code", &login_data.uri);
 	info!("Your login code is: {}", &login_data.code);
-	if let Ok(mut ctx) = cli_clipboard::ClipboardContext::new() {
-		if ctx.set_contents(login_data.code.to_string()).is_ok() {
-			info!("The code has been copied to your clipboard");
-		}
-	}
+	copy_token(&login_data.code);
 	open::that(&login_data.uri).nice_unwrap("Unable to open browser");
 
 	loop {
