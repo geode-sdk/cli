@@ -22,7 +22,20 @@ pub fn build_project(
 			s @ ("android32" | "android64") => String::from(s),
 			s => fatal!("Unknown platform {s}"),
 		})
-		.unwrap_or_else(|| String::from("win"));
+		.unwrap_or_else(|| {
+			if cfg!(target_os = "windows") {
+				String::from("win")
+			} else if cfg!(target_os = "android") {
+				String::from("android64")
+			} else if cfg!(target_os = "linux") {
+				// maybe default to win whenever it can cross compile
+				String::from("android64")
+			} else if cfg!(target_os = "macos") {
+				String::from("mac")
+			} else {
+				fatal!("Unknown platform, please specify one with --platform");
+			}
+		});
 	let cross_compiling = if cfg!(target_os = "windows") {
 		platform != "win"
 	} else if cfg!(target_os = "linux") {
