@@ -86,8 +86,20 @@ where
 {
 	// semver doesn't accept "v" prefixes and the string will be validated at
 	// runtime by Geode anyway so let's just crudely remove all 'v's for now
-	VersionReq::parse(&<String>::deserialize(deserializer)?.replace('v', ""))
+	let str = <String>::deserialize(deserializer)?.replace('v', "");
+	// semver defaults to ^, geode defaults to >=
+	let actual_equal = str.starts_with('=');
+	VersionReq::parse(&str)
 		.map_err(serde::de::Error::custom)
+		.map(|mut v| {
+			// in practice there should only be one comparator.. oh well
+			for c in &mut v.comparators {
+				if c.op == semver::Op::Caret && !actual_equal {
+					c.op = semver::Op::GreaterEq;
+				}
+			}
+			v
+		})
 }
 
 pub trait ToGeodeString {
