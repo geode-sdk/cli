@@ -238,6 +238,11 @@ impl Config {
 		Self::try_sdk_path().nice_unwrap("Unable to get SDK path")
 	}
 
+	#[cfg(target_os = "linux")]
+	pub fn linux_cross_tools_path() -> PathBuf {
+		geode_root().join("linux-cross")
+	}
+
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");

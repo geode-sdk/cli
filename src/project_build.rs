@@ -55,11 +55,37 @@ pub fn build_project(
 	let mut conf_args: Vec<String> = Vec::new();
 	match platform.as_str() {
 		"win" => {
-			if cross_compiling {
-				fail!("Sorry! but this cannot cross-compile to windows yet.");
-				fatal!("See the docs for more info: https://docs.geode-sdk.org/getting-started/cpp-stuff#linux");
+			if cross_compiling && !cfg!(target_os = "linux") {
+				// macos -> win
+				fatal!("Sorry! but this platform cannot cross-compile to windows yet.");
 			}
-			conf_args.extend(["-A", "x64"].map(String::from));
+
+			if cross_compiling {
+				let root = crate::config::Config::linux_cross_tools_path();
+				let splat_path = root.join("splat");
+				let toolchain_path = root.join("clang-msvc-sdk");
+
+				if !extra_conf_args
+					.iter()
+					.any(|arg| arg.contains("-DCMAKE_TOOLCHAIN_FILE"))
+				{
+					conf_args.push(format!(
+						"-DCMAKE_TOOLCHAIN_FILE={}",
+						toolchain_path.join("clang-cl-msvc.cmake").to_string_lossy()
+					));
+				}
+
+				if !extra_conf_args
+					.iter()
+					.any(|arg| arg.contains("-DSPLAT_DIR"))
+				{
+					conf_args.push(format!("-DSPLAT_DIR={}", splat_path.to_string_lossy()));
+				}
+
+				conf_args.push("-DHOST_ARCH=x64".to_owned());
+			} else {
+				conf_args.extend(["-A", "x64"].map(String::from));
+			}
 		}
 		"mac" => {
 			if cross_compiling {
