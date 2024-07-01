@@ -238,9 +238,10 @@ impl Config {
 		Self::try_sdk_path().nice_unwrap("Unable to get SDK path")
 	}
 
-	#[cfg(target_os = "linux")]
-	pub fn linux_cross_tools_path() -> PathBuf {
-		geode_root().join("linux-cross")
+	/// Path to cross-compilation tools
+	#[cfg(not(windows))]
+	pub fn cross_tools_path() -> PathBuf {
+		geode_root().join("cross-tools")
 	}
 
 	pub fn new() -> Config {

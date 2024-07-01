@@ -105,7 +105,7 @@ pub enum Sdk {
 	Version,
 
 	/// Install cross-compilation tools
-	#[cfg(target_os = "linux")]
+	#[cfg(not(windows))]
 	InstallLinux {
 		/// Selected Windows SDK version
 		#[clap(long)]
@@ -716,7 +716,7 @@ pub fn get_version() -> Version {
 	.nice_unwrap("Invalid SDK version")
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(windows))]
 fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 	let resp = reqwest::blocking::Client::builder()
 		.user_agent(format!("geode-cli/{}", env!("CARGO_PKG_VERSION")))
@@ -774,7 +774,7 @@ fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 	Ok(())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(not(windows))]
 fn install_linux(
 	winsdk_version: Option<String>,
 	path: Option<PathBuf>,
@@ -782,7 +782,7 @@ fn install_linux(
 	force_download_xwin: bool,
 ) {
 	let arch = arch.unwrap_or_else(|| "x86_64".to_owned());
-	let path = path.unwrap_or_else(Config::linux_cross_tools_path);
+	let path = path.unwrap_or_else(Config::cross_tools_path);
 
 	std::fs::create_dir_all(&path).nice_unwrap("Unable to create directory");
 
@@ -916,7 +916,8 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::Update { branch } => update(config, branch),
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
 		Sdk::InstallBinaries { platform, version } => install_binaries(config, platform, version),
-		#[cfg(target_os = "linux")]
+
+		#[cfg(not(windows))]
 		Sdk::InstallLinux {
 			winsdk_version,
 			path,

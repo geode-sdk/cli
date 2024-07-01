@@ -55,13 +55,8 @@ pub fn build_project(
 	let mut conf_args: Vec<String> = Vec::new();
 	match platform.as_str() {
 		"win" => {
-			if cross_compiling && !cfg!(target_os = "linux") {
-				// macos -> win
-				fatal!("Sorry! but this platform cannot cross-compile to windows yet.");
-			}
-
 			if cross_compiling {
-				let root = crate::config::Config::linux_cross_tools_path();
+				let root = crate::config::Config::cross_tools_path();
 				let splat_path = root.join("splat");
 				let toolchain_path = root.join("clang-msvc-sdk");
 
