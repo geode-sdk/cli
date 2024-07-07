@@ -317,12 +317,12 @@ fn extract_from_cache(
 	working_dir: &Path,
 	cache_bundle: &mut CacheBundle,
 	shut_up: bool,
-) {
+) -> bool {
 	let path_name = path.to_str().unwrap();
 	if !shut_up {
 		info!("Extracting '{}' from cache", path_name);
 	}
-	cache_bundle.try_extract_cached_into(
+	return cache_bundle.try_extract_cached_into(
 		path_name,
 		&working_dir.join(path.file_name().unwrap().to_str().unwrap()),
 	);
@@ -344,21 +344,26 @@ pub fn get_font_bundles(
 	if let Some(cache_bundle) = cache {
 		// Cache found
 		if let Some(p) = cache_bundle.cache.fetch_font_bundles(font) {
-			if !shut_up {
-				info!("Using cached files");
-			}
 			let bundles = FontBundles::new(p.to_path_buf());
 
 			// Extract all files
-			extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.sd.fnt, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.hd.fnt, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up);
-			extract_from_cache(&bundles.uhd.fnt, working_dir, cache_bundle, shut_up);
+			let success = extract_from_cache(&bundles.sd.png, working_dir, cache_bundle, shut_up)
+				&& extract_from_cache(&bundles.sd.fnt, working_dir, cache_bundle, shut_up)
+				&& extract_from_cache(&bundles.hd.png, working_dir, cache_bundle, shut_up)
+				&& extract_from_cache(&bundles.hd.fnt, working_dir, cache_bundle, shut_up)
+				&& extract_from_cache(&bundles.uhd.png, working_dir, cache_bundle, shut_up)
+				&& extract_from_cache(&bundles.uhd.fnt, working_dir, cache_bundle, shut_up);
 
-			done!("Fetched {} from cache", font.name.bright_yellow());
-			return bundles;
+			if success {
+				if !shut_up {
+					info!("Using cached files");
+				}
+
+				done!("Fetched {} from cache", font.name.bright_yellow());
+				return bundles;
+			} else {
+				info!("Failed to extract cached files");
+			}
 		}
 	}
 
