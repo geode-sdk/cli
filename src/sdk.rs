@@ -120,6 +120,10 @@ pub enum Sdk {
 		/// Whether to overwrite the existing xwin executable
 		#[clap(long)]
 		update_xwin: bool,
+
+		/// Whether to overwrite the existing Windows SDK if it's already installed
+		#[clap(long)]
+		update_winsdk: bool,
 	},
 }
 
@@ -780,6 +784,7 @@ fn install_linux(
 	path: Option<PathBuf>,
 	arch: Option<String>,
 	force_download_xwin: bool,
+	force_update_winsdk: bool,
 ) {
 	let arch = arch.unwrap_or_else(|| "x86_64".to_owned());
 	let path = path.unwrap_or_else(Config::cross_tools_path);
@@ -797,26 +802,33 @@ fn install_linux(
 		download_xwin(&xwin_exe_path).nice_unwrap("Failed to download xwin");
 	}
 
-	info!("Installing Windows SDK to {splat_path:?}");
+	let get_winsdk = !splat_path.exists() || force_update_winsdk;
 
-	let mut cmd = std::process::Command::new(xwin_exe_path);
+	if get_winsdk {
+		info!("Installing Windows SDK to {splat_path:?}");
 
-	cmd.arg("--accept-license")
-		.args(["--arch", &arch])
-		.arg("splat")
-		.args([
-			"--output",
-			splat_path
-				.to_str()
-				.nice_unwrap("Failed to convert path to str"),
-		])
-		.arg("--include-debug-libs");
+		std::fs::remove_dir_all(&splat_path)
+			.nice_unwrap("Failed to delete existing splat directory");
 
-	if let Some(winsdk_version) = winsdk_version {
-		cmd.args(["--sdk-version", &winsdk_version]);
+		let mut cmd = std::process::Command::new(xwin_exe_path);
+
+		cmd.arg("--accept-license")
+			.args(["--arch", &arch])
+			.arg("splat")
+			.args([
+				"--output",
+				splat_path
+					.to_str()
+					.nice_unwrap("Failed to convert path to str"),
+			])
+			.arg("--include-debug-libs");
+
+		if let Some(winsdk_version) = winsdk_version {
+			cmd.args(["--sdk-version", &winsdk_version]);
+		}
+
+		cmd.output().nice_unwrap("Failed to install Windows SDK");
 	}
-
-	cmd.output().nice_unwrap("Failed to install Windows SDK");
 
 	if toolchain_path.exists() {
 		info!("Updating the CMake toolchain");
@@ -922,7 +934,8 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 			winsdk_version,
 			path,
 			arch,
-			update_xwin: download_xwin,
-		} => install_linux(winsdk_version, path, arch, download_xwin),
+			update_xwin,
+			update_winsdk,
+		} => install_linux(winsdk_version, path, arch, update_xwin, update_winsdk),
 	}
 }
