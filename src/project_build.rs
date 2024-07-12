@@ -28,8 +28,7 @@ pub fn build_project(
 			} else if cfg!(target_os = "android") {
 				String::from("android64")
 			} else if cfg!(target_os = "linux") {
-				// maybe default to win whenever it can cross compile
-				String::from("android64")
+				String::from("win")
 			} else if cfg!(target_os = "macos") {
 				String::from("mac")
 			} else {
