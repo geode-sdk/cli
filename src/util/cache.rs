@@ -24,7 +24,11 @@ impl CacheBundle {
 	pub fn try_extract_cached_into(&mut self, name: &str, output: &PathBuf) -> bool {
 		match &mut self.src {
 			CacheBundleSource::Archive(archive) => {
-				let Ok(mut cached_file) = archive.by_name(name) else {
+				// zip doesn't really know what a folder is, so it just sees
+				// backslashes as a different filename. so ofc it breaks on windows
+				// and we have to do this
+				let name = name.replace('\\', "/");
+				let Ok(mut cached_file) = archive.by_name(&name) else {
 					return false;
 				};
 
