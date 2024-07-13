@@ -241,7 +241,6 @@ impl Config {
 	}
 
 	/// Path to cross-compilation tools
-	#[cfg(not(windows))]
 	pub fn cross_tools_path() -> PathBuf {
 		geode_root().join("cross-tools")
 	}
