@@ -136,7 +136,7 @@ fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, Str
 		1,
 		10,
 		config,
-		true,
+		false,
 		Some(dep.version.to_geode_string()),
 	)?;
 
@@ -248,7 +248,7 @@ pub fn check_dependencies(
 	let externals = externals
 		.into_iter()
 		.map(|ext|
-			// If the external is provided as name:version get those, otherwise 
+			// If the external is provided as name:version get those, otherwise
 			// assume it's just the name
 			if ext.contains(':') {
 				let mut split = ext.split(':');
