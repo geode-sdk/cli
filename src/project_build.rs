@@ -65,7 +65,7 @@ pub fn build_project(
 				{
 					conf_args.push(format!(
 						"-DCMAKE_TOOLCHAIN_FILE={}",
-						toolchain_path.join("clang-cl-msvc.cmake").to_string_lossy()
+						toolchain_path.join("clang-msvc.cmake").to_string_lossy()
 					));
 				}
 
