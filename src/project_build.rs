@@ -28,8 +28,7 @@ pub fn build_project(
 			} else if cfg!(target_os = "android") {
 				String::from("android64")
 			} else if cfg!(target_os = "linux") {
-				// maybe default to win whenever it can cross compile
-				String::from("android64")
+				String::from("win")
 			} else if cfg!(target_os = "macos") {
 				String::from("mac")
 			} else {
@@ -56,10 +55,31 @@ pub fn build_project(
 	match platform.as_str() {
 		"win" => {
 			if cross_compiling {
-				fail!("Sorry! but this cannot cross-compile to windows yet.");
-				fatal!("See the docs for more info: https://docs.geode-sdk.org/getting-started/cpp-stuff#linux");
+				let root = crate::config::Config::cross_tools_path();
+				let splat_path = root.join("splat");
+				let toolchain_path = root.join("clang-msvc-sdk");
+
+				if !extra_conf_args
+					.iter()
+					.any(|arg| arg.contains("-DCMAKE_TOOLCHAIN_FILE"))
+				{
+					conf_args.push(format!(
+						"-DCMAKE_TOOLCHAIN_FILE={}",
+						toolchain_path.join("clang-msvc.cmake").to_string_lossy()
+					));
+				}
+
+				if !extra_conf_args
+					.iter()
+					.any(|arg| arg.contains("-DSPLAT_DIR"))
+				{
+					conf_args.push(format!("-DSPLAT_DIR={}", splat_path.to_string_lossy()));
+				}
+
+				conf_args.push("-DHOST_ARCH=x64".to_owned());
+			} else {
+				conf_args.extend(["-A", "x64"].map(String::from));
 			}
-			conf_args.extend(["-A", "x64"].map(String::from));
 		}
 		"mac" => {
 			if cross_compiling {

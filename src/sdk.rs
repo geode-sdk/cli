@@ -48,10 +48,7 @@ enum UserShell {
 	Fish,
 }
 
-fn download_url(
-	url: String,
-	file_name: &PathBuf,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+fn download_url(url: &str, file_name: &Path) -> Result<(), Box<dyn std::error::Error>> {
 	let res = reqwest::blocking::get(url)?;
 	let mut file = fs::File::create(file_name)?;
 	let mut content = std::io::Cursor::new(res.bytes()?);
@@ -106,6 +103,28 @@ pub enum Sdk {
 
 	/// Get SDK version
 	Version,
+
+	/// Install cross-compilation tools
+	#[cfg(not(windows))]
+	InstallLinux {
+		/// Selected Windows SDK version
+		#[clap(long)]
+		winsdk_version: Option<String>,
+
+		/// Path to install
+		path: Option<PathBuf>,
+
+		/// SDK architectures to install
+		arch: Option<String>,
+
+		/// Whether to overwrite the existing xwin executable
+		#[clap(long)]
+		update_xwin: bool,
+
+		/// Whether to overwrite the existing Windows SDK if it's already installed
+		#[clap(long)]
+		update_winsdk: bool,
+	},
 }
 
 fn uninstall() -> bool {
@@ -303,6 +322,26 @@ fn get_sdk_path() -> Option<PathBuf> {
 	}
 }
 
+fn clone_repo(url: &str, into: &Path) -> Result<Repository, git2::Error> {
+	let mut callbacks = RemoteCallbacks::new();
+	callbacks.sideband_progress(|x| {
+		print!(
+			"{} {}",
+			"| Info |".bright_cyan(),
+			std::str::from_utf8(x).unwrap()
+		);
+		true
+	});
+
+	let mut fetch = FetchOptions::new();
+	fetch.remote_callbacks(callbacks);
+
+	let mut builder = RepoBuilder::new();
+	builder.fetch_options(fetch);
+
+	builder.clone(url, into)
+}
+
 fn install(config: &mut Config, path: PathBuf, force: bool) {
 	let path = path.absolutize().nice_unwrap("Failed to get absolute path");
 	let parent = path.parent().unwrap();
@@ -332,24 +371,7 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 
 	info!("Downloading SDK");
 
-	let mut callbacks = RemoteCallbacks::new();
-	callbacks.sideband_progress(|x| {
-		print!(
-			"{} {}",
-			"| Info |".bright_cyan(),
-			std::str::from_utf8(x).unwrap()
-		);
-		true
-	});
-
-	let mut fetch = FetchOptions::new();
-	fetch.remote_callbacks(callbacks);
-
-	let mut builder = RepoBuilder::new();
-	builder.fetch_options(fetch);
-
-	let repo = builder
-		.clone("https://github.com/geode-sdk/geode", &path)
+	let repo = clone_repo("https://github.com/geode-sdk/geode", &path)
 		.nice_unwrap("Could not download SDK");
 
 	// set GEODE_SDK environment variable;
@@ -627,7 +649,7 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 	info!("Downloading");
 
 	let temp_zip = target_dir.join("temp.zip");
-	download_url(target_url.unwrap(), &temp_zip).nice_unwrap("Downloading binaries failed");
+	download_url(&target_url.unwrap(), &temp_zip).nice_unwrap("Downloading binaries failed");
 
 	let file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
 	let mut zip = zip::ZipArchive::new(file).nice_unwrap("Downloaded ZIP appears to be corrupted");
@@ -698,6 +720,155 @@ pub fn get_version() -> Version {
 	.nice_unwrap("Invalid SDK version")
 }
 
+#[cfg(not(windows))]
+fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
+	let resp = reqwest::blocking::Client::builder()
+		.user_agent(format!("geode-cli/{}", env!("CARGO_PKG_VERSION")))
+		.build()?
+		.get("https://api.github.com/repos/Jake-Shadle/xwin/releases/latest")
+		.send()?;
+
+	let value = &resp.json::<serde_json::Value>()?;
+
+	let value = value
+		.get("assets")
+		.nice_unwrap("JSON response doesn't contain 'assets'")
+		.as_array()
+		.nice_unwrap("Expected 'assets' to be an array")
+		.iter()
+		.find(|value| {
+			value.get("name").is_some_and(|v| {
+				v.as_str()
+					.is_some_and(|v| v.ends_with("x86_64-unknown-linux-musl.tar.gz"))
+			})
+		});
+
+	let archive_path = dest.parent().unwrap().join("temp-xwin.tar.gz");
+
+	let value = value.nice_unwrap("No assets on the latest xwin release");
+
+	let url = value
+		.get("browser_download_url")
+		.nice_unwrap("JSON object doesn't contain 'browser_download_url'")
+		.as_str()
+		.nice_unwrap("Expected 'browser_download_url' to be a string");
+
+	download_url(url, &archive_path)?;
+
+	let name = value
+		.get("name")
+		.unwrap()
+		.as_str()
+		.unwrap()
+		.strip_suffix(".tar.gz")
+		.unwrap();
+
+	// extract it
+	std::process::Command::new("tar")
+		.arg("-xzvf")
+		.arg(&archive_path)
+		.arg("--strip-components=1")
+		.args(["-C", dest.parent().unwrap().to_str().unwrap()])
+		.arg(format!("{name}/xwin"))
+		.output()
+		.nice_unwrap("Failed to extract the archive with 'tar'");
+
+	let _ = std::fs::remove_file(archive_path);
+
+	Ok(())
+}
+
+#[cfg(not(windows))]
+fn install_linux(
+	winsdk_version: Option<String>,
+	path: Option<PathBuf>,
+	arch: Option<String>,
+	force_download_xwin: bool,
+	force_update_winsdk: bool,
+) {
+	let arch = arch.unwrap_or_else(|| "x86_64".to_owned());
+	let path = path.unwrap_or_else(Config::cross_tools_path);
+
+	std::fs::create_dir_all(&path).nice_unwrap("Unable to create directory");
+
+	let xwin_exe_path = path.join("xwin");
+	let splat_path = path.join("splat");
+	let toolchain_path = path.join("clang-msvc-sdk");
+
+	let get_xwin = force_download_xwin || !xwin_exe_path.exists();
+
+	if get_xwin {
+		info!("Downloading latest xwin executable to {xwin_exe_path:?}");
+		download_xwin(&xwin_exe_path).nice_unwrap("Failed to download xwin");
+	}
+
+	let get_winsdk = !splat_path.exists() || force_update_winsdk;
+
+	if get_winsdk {
+		info!("Installing Windows SDK to {splat_path:?}");
+
+		std::fs::remove_dir_all(&splat_path)
+			.nice_unwrap("Failed to delete existing splat directory");
+
+		let mut cmd = std::process::Command::new(xwin_exe_path);
+
+		cmd.arg("--accept-license")
+			.args(["--arch", &arch])
+			.arg("splat")
+			.args([
+				"--output",
+				splat_path
+					.to_str()
+					.nice_unwrap("Failed to convert path to str"),
+			])
+			.arg("--include-debug-libs");
+
+		if let Some(winsdk_version) = winsdk_version {
+			cmd.args(["--sdk-version", &winsdk_version]);
+		}
+
+		cmd.output().nice_unwrap("Failed to install Windows SDK");
+	}
+
+	if toolchain_path.exists() {
+		info!("Updating the CMake toolchain");
+
+		// Initialize repository
+		let repo = Repository::open(&toolchain_path)
+			.nice_unwrap("Could not initialize toolchain repository");
+
+		// Fetch
+		let merge_analysis = fetch_repo_info(&repo);
+
+		if merge_analysis.is_up_to_date() {
+			switch_to_ref(&repo, "refs/heads/main");
+
+			info!("Toolchain is up to date.");
+		} else if merge_analysis.is_fast_forward() {
+			// Change head and checkout
+			switch_to_ref(&repo, "refs/heads/main");
+
+			done!("Successfully updated the toolchain.");
+		} else {
+			fail!("Cannot update the toolchain, it has local changes");
+			info!(
+				"Go into the repository at {:?} and manually run `git pull`",
+				toolchain_path
+			);
+		}
+	} else {
+		info!("Cloning the CMake toolchain");
+
+		clone_repo(
+			"https://github.com/geode-sdk/clang-msvc-sdk",
+			&toolchain_path,
+		)
+		.nice_unwrap("Could not download the CMake toolchain");
+	}
+
+	done!("Installation complete!");
+}
+
 pub fn subcommand(config: &mut Config, cmd: Sdk) {
 	match cmd {
 		Sdk::Install {
@@ -757,5 +928,14 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 		Sdk::Update { branch } => update(config, branch),
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
 		Sdk::InstallBinaries { platform, version } => install_binaries(config, platform, version),
+
+		#[cfg(not(windows))]
+		Sdk::InstallLinux {
+			winsdk_version,
+			path,
+			arch,
+			update_xwin,
+			update_winsdk,
+		} => install_linux(winsdk_version, path, arch, update_xwin, update_winsdk),
 	}
 }

@@ -61,8 +61,10 @@ pub struct OldConfig {
 fn profile_platform_default() -> String {
 	if cfg!(target_os = "windows") {
 		"win".to_owned()
-	} else if cfg!(target_os = "macos") {
-		"mac".to_owned()
+	} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+		"mac-intel".to_owned()
+	} else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+		"mac-arm".to_owned()
 	} else {
 		"win".to_owned()
 	}
@@ -238,6 +240,12 @@ impl Config {
 		Self::try_sdk_path().nice_unwrap("Unable to get SDK path")
 	}
 
+	/// Path to cross-compilation tools
+	#[cfg(not(windows))]
+	pub fn cross_tools_path() -> PathBuf {
+		geode_root().join("cross-tools")
+	}
+
 	pub fn new() -> Config {
 		if !geode_root().exists() {
 			warn!("It seems you don't have Geode installed. Some operations will not work");
@@ -287,6 +295,14 @@ impl Config {
 				}
 			}
 		};
+
+		// migrate old profiles from mac to mac-arm or mac-intel
+		output.profiles.iter_mut().for_each(|profile| {
+			let p = profile.get_mut();
+			if p.platform == "mac" {
+				p.platform = profile_platform_default();
+			}
+		});
 
 		output.save();
 
