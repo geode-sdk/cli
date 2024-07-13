@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "geode"
-version = "3.0.6"
+version = "3.0.7"
 dependencies = [
  "ansi_term",
  "cfg-if 1.0.0",
