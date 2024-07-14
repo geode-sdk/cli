@@ -1,6 +1,6 @@
 [package]
 name = "geode"
-version = "3.1.0"
+version = "3.1.1"
 authors = [
     "HJfod <dreadrollmusic@gmail.com>",
     "Camila314 <ilaca314@gmail.com>",
