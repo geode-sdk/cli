@@ -738,8 +738,16 @@ fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 		.iter()
 		.find(|value| {
 			value.get("name").is_some_and(|v| {
-				v.as_str()
-					.is_some_and(|v| v.ends_with("x86_64-unknown-linux-musl.tar.gz"))
+				v.as_str().is_some_and(|v| {
+					v.ends_with(
+						#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+						"aarch64-apple-darwin.tar.gz",
+						#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+						"x86_64-apple-darwin.tar.gz",
+						#[cfg(not(target_os = "macos"))]
+						"x86_64-unknown-linux-musl.tar.gz",
+					)
+				})
 			})
 		});
 
