@@ -807,8 +807,7 @@ fn install_linux(
 	if get_winsdk {
 		info!("Installing Windows SDK to {splat_path:?}");
 
-		std::fs::remove_dir_all(&splat_path)
-			.nice_unwrap("Failed to delete existing splat directory");
+		let _ = std::fs::remove_dir_all(&splat_path);
 
 		let mut cmd = std::process::Command::new(xwin_exe_path);
 
