@@ -1,3 +1,5 @@
+use crate::mod_file::PlatformName;
+
 /// Command-line interface for Geode
 #[derive(clap::Parser, Debug)]
 #[clap(version)]
@@ -75,7 +77,7 @@ pub enum GeodeCommands {
 	Build {
 		/// Which platform to cross-compile to, if possible
 		#[clap(long, short)]
-		platform: Option<String>,
+		platform: Option<PlatformName>,
 
 		/// Whether to only configure cmake
 		#[clap(long, short, default_value_t = false)]

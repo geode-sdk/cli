@@ -1,4 +1,4 @@
-use crate::mod_file::ToGeodeString;
+use crate::mod_file::{PlatformName, ToGeodeString};
 use crate::util::mod_file::DependencyImportance;
 use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
@@ -39,6 +39,11 @@ pub enum Project {
 		/// the specified installation directory. If not specified, "build"
 		/// is assumed
 		install_dir: Option<PathBuf>,
+
+		/// The platform checked used for platform-specific dependencies. If 
+		/// not specified, uses current host platform if possible
+		#[clap(long, short)]
+		platform: Option<PlatformName>,
 
 		/// Any external dependencies as a list in the form of `mod.id:version`.
 		/// An external dependency is one that the CLI will not verify exists in
@@ -235,6 +240,7 @@ pub fn check_dependencies(
 	config: &Config,
 	input: PathBuf,
 	output: PathBuf,
+	platform: Option<PlatformName>,
 	externals: Vec<String>,
 ) {
 	let mod_info = parse_mod_info(&input);
@@ -269,8 +275,16 @@ pub fn check_dependencies(
 	let dep_dir = output.join("geode-deps");
 	fs::create_dir_all(&dep_dir).nice_unwrap("Unable to create dependency directory");
 
+	let platform = platform
+		.unwrap_or_else(|| PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform"));
+
 	// check all dependencies
 	for dep in mod_info.dependencies {
+		// Skip dependencies not on this platform
+		if !dep.platforms.contains(&platform) {
+			continue;
+		}
+
 		// is this an external dependency?
 		if let Some(ext) = externals.get(&dep.id) {
 			// did we get a version?
@@ -503,11 +517,13 @@ pub fn subcommand(config: &mut Config, cmd: Project) {
 		Project::ClearCache => clear_cache(&std::env::current_dir().unwrap()),
 		Project::Check {
 			install_dir,
+			platform,
 			externals,
 		} => check_dependencies(
 			config,
 			std::env::current_dir().unwrap(),
 			install_dir.unwrap_or("build".into()),
+			platform,
 			externals,
 		),
 	}

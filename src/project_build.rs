@@ -1,9 +1,9 @@
 use std::{path::Path, process::Command};
 
-use crate::{fail, fatal, info, NiceUnwrap};
+use crate::{fail, fatal, info, mod_file::PlatformName, warn, NiceUnwrap};
 
 pub fn build_project(
-	platform: Option<String>,
+	platform: Option<PlatformName>,
 	configure_only: bool,
 	build_only: bool,
 	ndk_path: Option<String>,
@@ -14,33 +14,27 @@ pub fn build_project(
 		fatal!("Could not find CMakeLists.txt. Please run this within a Geode project!");
 	}
 
-	let platform = platform.map(|x| x.to_lowercase());
 	let platform = platform
-		.map(|x| match x.as_str() {
-			"win" | "windows" => String::from("win"),
-			"mac" | "macos" => String::from("mac"),
-			s @ ("android32" | "android64") => String::from(s),
-			s => fatal!("Unknown platform {s}"),
-		})
-		.unwrap_or_else(|| {
-			if cfg!(target_os = "windows") {
-				String::from("win")
-			} else if cfg!(target_os = "android") {
-				String::from("android64")
-			} else if cfg!(target_os = "linux") {
-				String::from("win")
-			} else if cfg!(target_os = "macos") {
-				String::from("mac")
-			} else {
-				fatal!("Unknown platform, please specify one with --platform");
-			}
-		});
+		.unwrap_or_else(|| PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform"));
+	
+	// Make architechture exact
+	let platform = match platform {
+		PlatformName::Android => {
+			warn!("Assuming 64-bit Android, use \"-p android32\" to build for 32-bit Android");
+			PlatformName::Android64
+		},
+		// If Mac cross-building ever becomes possible, make sure to upgrade Mac 
+		// to MacArm or MacIntel here (or hard error if there's no reasonable 
+		// default)
+		p => p,
+	};
+	
 	let cross_compiling = if cfg!(target_os = "windows") {
-		platform != "win"
+		platform != PlatformName::Windows
 	} else if cfg!(target_os = "linux") {
 		true
 	} else if cfg!(target_os = "macos") {
-		platform != "mac"
+		platform != PlatformName::MacOS
 	} else {
 		true
 	};
@@ -52,8 +46,8 @@ pub fn build_project(
 	};
 
 	let mut conf_args: Vec<String> = Vec::new();
-	match platform.as_str() {
-		"win" => {
+	match platform {
+		PlatformName::Windows => {
 			if cross_compiling {
 				let root = crate::config::Config::cross_tools_path();
 				let splat_path = root.join("splat");
@@ -81,13 +75,13 @@ pub fn build_project(
 				conf_args.extend(["-A", "x64"].map(String::from));
 			}
 		}
-		"mac" => {
+		PlatformName::MacOS | PlatformName::MacArm | PlatformName::MacIntel => {
 			if cross_compiling {
 				fatal!("Sorry! but we do not know of any way to cross-compile to MacOS.");
 			}
 			conf_args.push("-DCMAKE_OSX_DEPLOYMENT_TARGET=10.15".into())
 		}
-		"android32" | "android64" => {
+		PlatformName::Android32 | PlatformName::Android64 | PlatformName::Android => {
 			if !build_only {
 				let ndk_path = ndk_path.unwrap_or_else(||
 					std::env::var("ANDROID_NDK_ROOT").nice_unwrap(
@@ -103,9 +97,10 @@ pub fn build_project(
 					"-DCMAKE_TOOLCHAIN_FILE={}",
 					toolchain_path.to_string_lossy()
 				));
-				if platform == "android32" {
+				if platform == PlatformName::Android32 {
 					conf_args.push("-DANDROID_ABI=armeabi-v7a".into());
-				} else {
+				}
+				else {
 					conf_args.push("-DANDROID_ABI=arm64-v8a".into());
 				}
 				// TODO: let the user change this? idk
@@ -118,13 +113,13 @@ pub fn build_project(
 				conf_args.push("-DGEODE_DONT_INSTALL_MODS=1".into());
 			}
 		}
-		_ => unreachable!("invalid platform"),
 	}
 
 	let build_type = config_type.unwrap_or_else(|| {
-		if platform == "win" {
+		if platform == PlatformName::Windows {
 			"RelWithDebInfo".into()
-		} else {
+		}
+		else {
 			"Debug".into()
 		}
 	});

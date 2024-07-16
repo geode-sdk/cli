@@ -1,8 +1,10 @@
 use crate::spritesheet::SpriteSheet;
 use crate::NiceUnwrap;
+use clap::ValueEnum;
 use semver::{Version, VersionReq};
 use serde::{Deserialize, Deserializer};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -214,11 +216,13 @@ pub struct ModResources {
 	pub fonts: HashMap<String, BitmapFont>,
 }
 
-#[derive(Deserialize, Hash, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Hash, PartialEq, Eq, Clone, Copy, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum PlatformName {
 	#[serde(rename = "win")]
+	#[value(alias = "win")]
 	Windows,
+	#[value(alias = "mac")]
 	MacOS,
 	#[serde(rename = "mac-intel")]
 	MacIntel,
@@ -227,6 +231,41 @@ pub enum PlatformName {
 	Android,
 	Android32,
 	Android64,
+}
+
+impl PlatformName {
+	pub fn current() -> Option<PlatformName> {
+		if cfg!(target_os = "windows") {
+			Some(PlatformName::Windows)
+		}
+		else if cfg!(target_os = "android") {
+			Some(PlatformName::Android64)
+		}
+		else if cfg!(target_os = "linux") {
+			Some(PlatformName::Windows)
+		}
+		else if cfg!(target_os = "macos") {
+			Some(PlatformName::MacOS)
+		}
+		else {
+			None
+		}
+	}
+}
+
+impl Display for PlatformName {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		use PlatformName as P;
+		f.write_str(match self {
+			P::Windows => "win",
+			P::MacOS => "mac",
+			P::MacIntel => "mac-intel",
+			P::MacArm => "mac-arm",
+			P::Android => "android",
+			P::Android32 => "android32",
+			P::Android64 => "android64",
+		})
+	}
 }
 
 fn all_platforms() -> HashSet<PlatformName> {
