@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn, NiceUnwrap};
-use git2::Repository;
+use git2::build::RepoBuilder;
 use path_absolutize::Absolutize;
 use regex::Regex;
 
@@ -12,6 +12,7 @@ use std::fs;
 use std::path::PathBuf;
 
 struct CreateTemplate {
+	pub template: String,
 	pub project_location: PathBuf,
 	pub name: String,
 	pub version: String,
@@ -34,12 +35,29 @@ fn create_template(template: CreateTemplate) {
 			.nice_unwrap("Unable to create project directory");
 	}
 
+	let (used_template, branch) = if template.template.contains('#') {
+		template.template.split_once('#').unwrap()
+	} else if template.template.contains('/') {
+		(template.template.as_str(), "main")
+	} else if template.template.is_empty() {
+		("geode-sdk/example-mod", "main")
+	} else {
+		("geode-sdk/example-mod", match template.template.to_ascii_lowercase().as_str() {
+			"default" => "main",
+			"minimal" => "minimal",
+			"custom layer" => "custom-layer",
+			_ => {
+				warn!("Invalid template name, using default template");
+				"main"
+			}
+		})
+	};
+
 	// Clone repository
-	Repository::clone(
-		"https://github.com/geode-sdk/example-mod",
-		&template.project_location,
-	)
-	.nice_unwrap("Unable to clone repository");
+	RepoBuilder::new()
+		.branch(branch)
+		.clone(format!("https://github.com/{}", used_template).as_str(), &template.project_location)
+		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
 		warn!("Unable to remove .git directory");
@@ -155,6 +173,13 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	info!("This utility will walk you through setting up a new mod.");
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
+	info!("Enter a template name, or press enter to use the default template.");
+	info!("Default: Create a simple mod that adds a button to the main menu.");
+	info!("Minimal: Create a minimal mod with only the necessary files.");
+	info!("Custom Layer: Create a mod with a custom layer and more UI elements.");
+	info!("Alternatively, you could use your own template: 'user/repo', 'user/repo#branch'");
+	let template = ask_value("Template", Some(""), false);
+
 	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 
 	let location = location.unwrap_or_else(|| std::env::current_dir().unwrap().join(&final_name));
@@ -196,6 +221,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 
 	info!("Creating project {}", mod_id);
 	create_template(CreateTemplate {
+		template,
 		project_location: final_location,
 		name: final_name,
 		version: final_version,
