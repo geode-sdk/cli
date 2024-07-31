@@ -12,197 +12,197 @@ use std::fs;
 use std::path::PathBuf;
 
 struct CreateTemplate {
-	pub project_location: PathBuf,
-	pub name: String,
-	pub version: String,
-	pub id: String,
-	pub developer: String,
-	pub description: String,
-	pub strip: bool,
-	pub action: bool,
+    pub project_location: PathBuf,
+    pub name: String,
+    pub version: String,
+    pub id: String,
+    pub developer: String,
+    pub description: String,
+    pub strip: bool,
+    pub action: bool,
 }
 
 fn create_template(template: CreateTemplate) {
-	if template.project_location.exists() {
-		warn!("The provided location already exists.");
-		if !ask_confirm("Are you sure you want to proceed?", false) {
-			info!("Aborting");
-			return;
-		}
-	} else {
-		fs::create_dir_all(&template.project_location)
-			.nice_unwrap("Unable to create project directory");
-	}
+    if template.project_location.exists() {
+        warn!("The provided location already exists.");
+        if !ask_confirm("Are you sure you want to proceed?", false) {
+            info!("Aborting");
+            return;
+        }
+    } else {
+        fs::create_dir_all(&template.project_location)
+            .nice_unwrap("Unable to create project directory");
+    }
 
-	// Clone repository
-	Repository::clone(
-		"https://github.com/geode-sdk/example-mod",
-		&template.project_location,
-	)
-	.nice_unwrap("Unable to clone repository");
+    // Clone repository
+    Repository::clone(
+        "https://github.com/geode-sdk/example-mod",
+        &template.project_location,
+    )
+    .nice_unwrap("Unable to clone repository");
 
-	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
-		warn!("Unable to remove .git directory");
-	}
+    if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
+        warn!("Unable to remove .git directory");
+    }
 
-	// Replace "Template" with project name (no spaces)
-	let filtered_name: String = template
-		.name
-		.chars()
-		.filter(|c| !c.is_whitespace())
-		.collect();
+    // Replace "Template" with project name (no spaces)
+    let filtered_name: String = template
+        .name
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
 
-	for file in &["README.md", "CMakeLists.txt"] {
-		let file = template.project_location.join(file);
+    for file in &["README.md", "CMakeLists.txt"] {
+        let file = template.project_location.join(file);
 
-		let contents = fs::read_to_string(&file)
-			.unwrap()
-			.replace("Template", &filtered_name);
-		fs::write(file, contents).unwrap();
-	}
+        let contents = fs::read_to_string(&file)
+            .unwrap()
+            .replace("Template", &filtered_name);
+        fs::write(file, contents).unwrap();
+    }
 
-	// Strip comments from template
-	if template.strip {
-		let cmake_path = template.project_location.join("CMakeLists.txt");
-		let cpp_path = template.project_location.join("src/main.cpp");
+    // Strip comments from template
+    if template.strip {
+        let cmake_path = template.project_location.join("CMakeLists.txt");
+        let cpp_path = template.project_location.join("src/main.cpp");
 
-		let cmake_regex = Regex::new(r"\n#.*").unwrap();
-		let cpp_regex = Regex::new(r"(?m)^.*/\*[\s\S]*?\*/\r?\n?|^.*//.*\r?\n?").unwrap();
+        let cmake_regex = Regex::new(r"\n#.*").unwrap();
+        let cpp_regex = Regex::new(r"(?m)^.*/\*[\s\S]*?\*/\r?\n?|^.*//.*\r?\n?").unwrap();
 
-		let cmake_text = fs::read_to_string(&cmake_path)
-			.nice_unwrap("Unable to read template file CMakeLists.txt");
-		let cpp_text =
-			fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
+        let cmake_text = fs::read_to_string(&cmake_path)
+            .nice_unwrap("Unable to read template file CMakeLists.txt");
+        let cpp_text =
+            fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
 
-		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, ""))
-			.nice_unwrap("Unable to access template file CMakeLists.txt");
-		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, ""))
-			.nice_unwrap("Unable to access template file main.cpp");
-	}
+        fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, ""))
+            .nice_unwrap("Unable to access template file CMakeLists.txt");
+        fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, ""))
+            .nice_unwrap("Unable to access template file main.cpp");
+    }
 
-	// Add cross-platform action
-	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
-	if template.action {
-		let action_path = template
-			.project_location
-			.join(".github/workflows/multi-platform.yml");
-		fs::create_dir_all(action_path.parent().unwrap())
-			.nice_unwrap("Unable to create .github/workflows directory");
-		let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
-		fs::write(
-			action_path,
-			action.text().nice_unwrap("Unable to write action"),
-		)
-		.nice_unwrap("Unable to write action");
-	}
+    // Add cross-platform action
+    // Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
+    if template.action {
+        let action_path = template
+            .project_location
+            .join(".github/workflows/multi-platform.yml");
+        fs::create_dir_all(action_path.parent().unwrap())
+            .nice_unwrap("Unable to create .github/workflows directory");
+        let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
+        fs::write(
+            action_path,
+            action.text().nice_unwrap("Unable to write action"),
+        )
+        .nice_unwrap("Unable to write action");
+    }
 
-	let mod_json_path = template.project_location.join("mod.json");
+    let mod_json_path = template.project_location.join("mod.json");
 
-	let mod_json_content: String = {
-		if mod_json_path.exists() {
-			let mod_json =
-				fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
+    let mod_json_content: String = {
+        if mod_json_path.exists() {
+            let mod_json =
+                fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
 
-			mod_json
-				.replace("$GEODE_VERSION", &get_version().to_string())
-				.replace("$MOD_VERSION", &template.version)
-				.replace("$MOD_ID", &template.id)
-				.replace("$MOD_NAME", &template.name)
-				.replace("$MOD_DEVELOPER", &template.developer)
-				.replace("$MOD_DESCRIPTION", &template.description)
-		} else {
-			// Default mod.json
-			let mod_json = json!({
-				"geode":        get_version().to_string(),
-				"version":      template.version,
-				"id":           template.id,
-				"name":         template.name,
-				"developer":    template.developer,
-				"description":  template.description,
-			});
+            mod_json
+                .replace("$GEODE_VERSION", &get_version().to_string())
+                .replace("$MOD_VERSION", &template.version)
+                .replace("$MOD_ID", &template.id)
+                .replace("$MOD_NAME", &template.name)
+                .replace("$MOD_DEVELOPER", &template.developer)
+                .replace("$MOD_DESCRIPTION", &template.description)
+        } else {
+            // Default mod.json
+            let mod_json = json!({
+                "geode":        get_version().to_string(),
+                "version":      template.version,
+                "id":           template.id,
+                "name":         template.name,
+                "developer":    template.developer,
+                "description":  template.description,
+            });
 
-			// Format neatly
-			let buf = Vec::new();
-			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-			mod_json.serialize(&mut ser).unwrap();
+            // Format neatly
+            let buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+            let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+            mod_json.serialize(&mut ser).unwrap();
 
-			// Write formatted json
-			String::from_utf8(ser.into_inner()).unwrap()
-		}
-	};
+            // Write formatted json
+            String::from_utf8(ser.into_inner()).unwrap()
+        }
+    };
 
-	fs::write(mod_json_path, mod_json_content)
-		.nice_unwrap("Unable to write mod.json, are permissions correct?");
-	done!("Succesfully initialized project! Happy modding :)");
+    fs::write(mod_json_path, mod_json_content)
+        .nice_unwrap("Unable to write mod.json, are permissions correct?");
+    done!("Succesfully initialized project! Happy modding :)");
 }
 
 fn possible_name(path: &Option<PathBuf>) -> Option<String> {
-	let path = path.as_ref()?;
-	Some(if path.is_absolute() {
-		path.file_name()?.to_string_lossy().to_string()
-	} else {
-		std::env::current_dir()
-			.ok()?
-			.join(path)
-			.file_name()?
-			.to_string_lossy()
-			.to_string()
-	})
+    let path = path.as_ref()?;
+    Some(if path.is_absolute() {
+        path.file_name()?.to_string_lossy().to_string()
+    } else {
+        std::env::current_dir()
+            .ok()?
+            .join(path)
+            .file_name()?
+            .to_string_lossy()
+            .to_string()
+    })
 }
 
 pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
-	info!("This utility will walk you through setting up a new mod.");
-	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
+    info!("This utility will walk you through setting up a new mod.");
+    info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
-	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
+    let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 
-	let location = location.unwrap_or_else(|| std::env::current_dir().unwrap().join(&final_name));
-	let location = location.absolutize().unwrap();
+    let location = location.unwrap_or_else(|| std::env::current_dir().unwrap().join(&final_name));
+    let location = location.absolutize().unwrap();
 
-	let final_version = ask_value("Version", Some("v1.0.0"), true);
+    let final_version = ask_value("Version", Some("v1.0.0"), true);
 
-	let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
+    let final_developer = ask_value("Developer", config.default_developer.as_deref(), true);
 
-	if config.default_developer.is_none() {
-		info!(
-			"Using '{}' as the default developer for all future projects. \
+    if config.default_developer.is_none() {
+        info!(
+            "Using '{}' as the default developer for all future projects. \
 			If this is undesirable, you can set a default developer using \
 			`geode config set default-developer <name>`",
-			&final_developer
-		);
-		config.default_developer = Some(final_developer.clone());
-	}
+            &final_developer
+        );
+        config.default_developer = Some(final_developer.clone());
+    }
 
-	let final_description = ask_value("Description", None, false);
-	let final_location = PathBuf::from(ask_value(
-		"Location",
-		Some(&location.to_string_lossy()),
-		true,
-	));
+    let final_description = ask_value("Description", None, false);
+    let final_location = PathBuf::from(ask_value(
+        "Location",
+        Some(&location.to_string_lossy()),
+        true,
+    ));
 
-	let mod_id = format!(
-		"{}.{}",
-		final_developer.to_lowercase().replace(' ', "_"),
-		final_name.to_lowercase().replace(' ', "_")
-	);
+    let mod_id = format!(
+        "{}.{}",
+        final_developer.to_lowercase().replace(' ', "_"),
+        final_name.to_lowercase().replace(' ', "_")
+    );
 
-	let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
+    let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
 
-	let strip = ask_confirm(
-		"Do you want to remove comments from the default template?",
-		false,
-	);
+    let strip = ask_confirm(
+        "Do you want to remove comments from the default template?",
+        false,
+    );
 
-	info!("Creating project {}", mod_id);
-	create_template(CreateTemplate {
-		project_location: final_location,
-		name: final_name,
-		version: final_version,
-		id: mod_id,
-		developer: final_developer,
-		description: final_description,
-		strip,
-		action,
-	});
+    info!("Creating project {}", mod_id);
+    create_template(CreateTemplate {
+        project_location: final_location,
+        name: final_name,
+        version: final_version,
+        id: mod_id,
+        developer: final_developer,
+        description: final_description,
+        strip,
+        action,
+    });
 }

@@ -52,65 +52,65 @@ macro_rules! confirm {
 }
 
 pub fn clear_terminal() {
-	print!("{esc}c", esc = 27 as char);
+    print!("{esc}c", esc = 27 as char);
 }
 
 pub fn ask_value(prompt: &str, default: Option<&str>, required: bool) -> String {
-	let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
-	let mut line_reader = Editor::<(), rustyline::history::DefaultHistory>::new().unwrap();
-	loop {
-		let line = line_reader
-			.readline_with_initial(&text, (default.unwrap_or(""), ""))
-			.expect("Error reading line");
-		line_reader
-			.add_history_entry(&line)
-			.expect("Error reading line");
+    let text = format!("{}{}: ", prompt, if required { "" } else { " (optional)" });
+    let mut line_reader = Editor::<(), rustyline::history::DefaultHistory>::new().unwrap();
+    loop {
+        let line = line_reader
+            .readline_with_initial(&text, (default.unwrap_or(""), ""))
+            .expect("Error reading line");
+        line_reader
+            .add_history_entry(&line)
+            .expect("Error reading line");
 
-		if line.is_empty() {
-			if required {
-				fail!("Please enter a value");
-			} else {
-				return default.unwrap_or("").to_string();
-			}
-		} else {
-			return line.trim().to_string();
-		}
-	}
+        if line.is_empty() {
+            if required {
+                fail!("Please enter a value");
+            } else {
+                return default.unwrap_or("").to_string();
+            }
+        } else {
+            return line.trim().to_string();
+        }
+    }
 }
 
 pub fn ask_confirm(text: &str, default: bool) -> bool {
-	use colored::Colorize;
-	// print question
-	print!(
-		"{}{} {} ",
-		"| Okay | ".bright_purple(),
-		text,
-		if default { "(Y/n)" } else { "(y/N)" }
-	);
-	std::io::stdout().flush().unwrap();
-	let mut yes = String::new();
-	match std::io::stdin().read_line(&mut yes) {
-		Ok(_) => match yes.trim().to_lowercase().as_str() {
-			"yes" | "ye" | "y" => true,
-			"no" | "n" => false,
-			_ => default,
-		},
-		Err(_) => default,
-	}
+    use colored::Colorize;
+    // print question
+    print!(
+        "{}{} {} ",
+        "| Okay | ".bright_purple(),
+        text,
+        if default { "(Y/n)" } else { "(y/N)" }
+    );
+    std::io::stdout().flush().unwrap();
+    let mut yes = String::new();
+    match std::io::stdin().read_line(&mut yes) {
+        Ok(_) => match yes.trim().to_lowercase().as_str() {
+            "yes" | "ye" | "y" => true,
+            "no" | "n" => false,
+            _ => default,
+        },
+        Err(_) => default,
+    }
 }
 
 pub trait NiceUnwrap<T> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T;
+    fn nice_unwrap<S: Display>(self, text: S) -> T;
 }
 
 impl<T, E: Display> NiceUnwrap<T> for Result<T, E> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T {
-		self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
-	}
+    fn nice_unwrap<S: Display>(self, text: S) -> T {
+        self.unwrap_or_else(|e| fatal!("{}: {}", text, e))
+    }
 }
 
 impl<T> NiceUnwrap<T> for Option<T> {
-	fn nice_unwrap<S: Display>(self, text: S) -> T {
-		self.unwrap_or_else(|| fatal!("{}", text))
-	}
+    fn nice_unwrap<S: Display>(self, text: S) -> T {
+        self.unwrap_or_else(|| fatal!("{}", text))
+    }
 }
