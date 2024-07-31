@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn, NiceUnwrap};
-use git2::Repository;
+use git2::build::RepoBuilder;
 use path_absolutize::Absolutize;
 use regex::Regex;
 
@@ -22,7 +22,11 @@ struct CreateTemplate {
     pub action: bool,
 }
 
-fn create_template(template: CreateTemplate) {
+fn clone_repo(url: &str, path: &PathBuf, branch_name: &str) {
+    RepoBuilder::new().branch(branch_name).clone(url, path).expect("Failed to clone repository");
+}
+
+fn create_template(template: CreateTemplate, api: Option<bool>) {
     if template.project_location.exists() {
         warn!("The provided location already exists.");
         if !ask_confirm("Are you sure you want to proceed?", false) {
@@ -35,11 +39,22 @@ fn create_template(template: CreateTemplate) {
     }
 
     // Clone repository
-    Repository::clone(
-        "https://github.com/geode-sdk/example-mod",
-        &template.project_location,
-    )
-    .nice_unwrap("Unable to clone repository");
+    match api {
+        Some(_) => {
+            clone_repo(
+                "https://github.com/thebearodactyl/example-mod",
+                &template.project_location,
+                "example-api-mod",
+            );
+        }
+        None => {
+            clone_repo(
+                "https://github.com/geode-sdk/example-mod",
+                &template.project_location,
+                "main",
+            );
+        }
+    }
 
     if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
         warn!("Unable to remove .git directory");
@@ -151,7 +166,7 @@ fn possible_name(path: &Option<PathBuf>) -> Option<String> {
     })
 }
 
-pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
+pub fn build_template(config: &mut Config, location: Option<PathBuf>, api: Option<bool>) {
     info!("This utility will walk you through setting up a new mod.");
     info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
@@ -195,14 +210,17 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
     );
 
     info!("Creating project {}", mod_id);
-    create_template(CreateTemplate {
-        project_location: final_location,
-        name: final_name,
-        version: final_version,
-        id: mod_id,
-        developer: final_developer,
-        description: final_description,
-        strip,
-        action,
-    });
+    create_template(
+        CreateTemplate {
+            project_location: final_location,
+            name: final_name,
+            version: final_version,
+            id: mod_id,
+            developer: final_developer,
+            description: final_description,
+            strip,
+            action,
+        },
+        api,
+    );
 }

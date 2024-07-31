@@ -14,6 +14,10 @@ pub enum GeodeCommands {
     New {
         /// The target directory to create the project in
         path: Option<std::path::PathBuf>,
+
+        /// Whether to make an API project for use by other mods
+        #[arg(short = 'a', long, num_args = 0, action = clap::ArgAction::SetFalse)]
+        api: Option<bool>,
     },
 
     /// Generate shell completions and print it to stdout

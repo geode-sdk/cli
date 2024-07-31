@@ -27,6 +27,9 @@ pub enum Project {
     New {
         /// The target directory to create the project in
         path: Option<PathBuf>,
+
+        /// Whether to make an API project for use by other mods
+        api: Option<bool>,
     },
 
     /// Clear this project's cached resource files
@@ -514,7 +517,7 @@ pub fn check_dependencies(
 
 pub fn subcommand(config: &mut Config, cmd: Project) {
     match cmd {
-        Project::New { path } => template::build_template(config, path),
+        Project::New { path, api } => template::build_template(config, path, api),
         Project::ClearCache => clear_cache(&std::env::current_dir().unwrap()),
         Project::Check {
             install_dir,
