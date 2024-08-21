@@ -778,7 +778,7 @@ fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 		.arg("--strip-components=1")
 		.args(["-C", dest.parent().unwrap().to_str().unwrap()])
 		.arg(format!("{name}/xwin"))
-		.output()
+		.status()
 		.nice_unwrap("Failed to extract the archive with 'tar'");
 
 	let _ = std::fs::remove_file(archive_path);
@@ -819,22 +819,28 @@ fn install_linux(
 
 		let mut cmd = std::process::Command::new(xwin_exe_path);
 
-		cmd.arg("--accept-license")
-			.args(["--arch", &arch])
-			.arg("splat")
-			.args([
-				"--output",
-				splat_path
-					.to_str()
-					.nice_unwrap("Failed to convert path to str"),
-			])
-			.arg("--include-debug-libs");
-
+		cmd.arg("--accept-license");
+		cmd.args(["--arch", &arch]);
+		
+		// this argument must come before `splat`
 		if let Some(winsdk_version) = winsdk_version {
 			cmd.args(["--sdk-version", &winsdk_version]);
 		}
 
-		cmd.output().nice_unwrap("Failed to install Windows SDK");
+		cmd.arg("splat");
+		cmd.args([
+				"--output",
+				splat_path
+					.to_str()
+					.nice_unwrap("Failed to convert path to str"),
+			]);
+		cmd.arg("--include-debug-libs");
+
+		let status = cmd.status().nice_unwrap("Failed to execute xwin");
+		
+		if !status.success() {
+			fatal!("xwin failed with code {}", status.code().unwrap_or_default());
+		}
 	}
 
 	if toolchain_path.exists() {
