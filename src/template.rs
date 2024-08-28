@@ -35,8 +35,8 @@ fn create_template(template: CreateTemplate) {
 			.nice_unwrap("Unable to create project directory");
 	}
 
-	let (used_template, branch) = if template.template.contains('#') {
-		template.template.split_once('#').unwrap()
+	let (used_template, branch) = if template.template.contains('@') {
+		template.template.split_once('@').unwrap()
 	} else if template.template.contains('/') {
 		(template.template.as_str(), "main")
 	} else if template.template.is_empty() {
@@ -177,7 +177,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	info!("Default: Create a simple mod that adds a button to the main menu.");
 	info!("Minimal: Create a minimal mod with only the necessary files.");
 	info!("Custom Layer: Create a mod with a custom layer and more UI elements.");
-	info!("Alternatively, you could use your own template: 'user/repo', 'user/repo#branch'");
+	info!("Alternatively, you could use your own template: 'user/repo', 'user/repo@branch'");
 	let template = ask_value("Template", Some(""), false);
 
 	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
