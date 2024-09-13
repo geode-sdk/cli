@@ -10,6 +10,7 @@ use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::{Prerelease, Version};
 use serde::Deserialize;
 use std::env;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -813,6 +814,8 @@ fn install_linux(
 	let get_winsdk = !splat_path.exists() || force_update_winsdk;
 
 	if get_winsdk {
+		let cache_path = splat_path.parent().unwrap().join(".xwin-cache");
+
 		info!("Installing Windows SDK to {splat_path:?}");
 
 		let _ = std::fs::remove_dir_all(&splat_path);
@@ -821,26 +824,29 @@ fn install_linux(
 
 		cmd.arg("--accept-license");
 		cmd.args(["--arch", &arch]);
-		
-		// this argument must come before `splat`
+
+		// these arguments must come before `splat`
+
 		if let Some(winsdk_version) = winsdk_version {
 			cmd.args(["--sdk-version", &winsdk_version]);
 		}
 
+		cmd.args([OsStr::new("--cache-dir"), cache_path.as_os_str()]);
+
 		cmd.arg("splat");
-		cmd.args([
-				"--output",
-				splat_path
-					.to_str()
-					.nice_unwrap("Failed to convert path to str"),
-			]);
+		cmd.args([OsStr::new("--output"), splat_path.as_os_str()]);
 		cmd.arg("--include-debug-libs");
 
 		let status = cmd.status().nice_unwrap("Failed to execute xwin");
-		
+
 		if !status.success() {
-			fatal!("xwin failed with code {}", status.code().unwrap_or_default());
+			fatal!(
+				"xwin failed with code {}",
+				status.code().unwrap_or_default()
+			);
 		}
+
+		let _ = std::fs::remove_dir_all(cache_path);
 	}
 
 	if toolchain_path.exists() {
