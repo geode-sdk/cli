@@ -42,10 +42,6 @@ pub enum Package {
 		/// Whether to install the generated package after creation
 		#[clap(short, long)]
 		install: bool,
-
-		/// Whether to include the PDB file in the package if it exists
-		#[clap(short, long)]
-		pdb: bool,
 	},
 
 	/// Merge multiple packages
@@ -263,7 +259,6 @@ fn create_package(
 	binaries: Vec<PathBuf>,
 	raw_output: Option<PathBuf>,
 	do_install: bool,
-	pdb: bool,
 ) {
 	// Parse mod.json
 	let mod_file_info = parse_mod_info(root_path);
@@ -342,10 +337,10 @@ fn create_package(
 			continue;
 		};
 		if name.to_string_lossy() == mod_file_info.id
-			&& (matches!(
+			&& matches!(
 				ext.to_string_lossy().as_ref(),
 				"ios.dylib" | "dylib" | "dll" | "lib" | "so" | "android32.so" | "android64.so"
-			) || (pdb && ext.to_string_lossy() == "pdb")) {
+			) {
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
 			std::fs::copy(path, working_dir.join(&binary))
 				.nice_unwrap(&format!("Unable to copy binary '{}'", binary));
@@ -475,8 +470,7 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			binary: binaries,
 			output,
 			install,
-			pdb,
-		} => create_package(config, &root_path, binaries, output, install, pdb),
+		} => create_package(config, &root_path, binaries, output, install),
 
 		Package::Merge { packages } => {
 			if packages.len() < 2 {
