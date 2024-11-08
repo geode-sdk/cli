@@ -475,7 +475,7 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			binary: binaries,
 			output,
 			install,
-			pdb
+			pdb,
 		} => create_package(config, &root_path, binaries, output, install, pdb),
 
 		Package::Merge { packages } => {
