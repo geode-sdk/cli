@@ -179,12 +179,41 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	info!("This utility will walk you through setting up a new mod.");
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
-	info!("Enter a template name, or press enter to use the default template.");
-	info!("Default: Create a simple mod that adds a button to the main menu.");
-	info!("Minimal: Create a minimal mod with only the necessary files.");
-	info!("Custom Layer: Create a mod with a custom layer and more UI elements.");
-	info!("Alternatively, you could use your own template: 'user/repo', 'user/repo@branch'");
-	let template = ask_value("Template", Some(""), false);
+	info!("Choose a template for the mod to be created:");
+
+	let template_options = [
+		(
+			"Default - Simple mod that adds a button to the main menu.",
+			"",
+		),
+		(
+			"Minimal - Minimal mod with only the bare minimum to compile.",
+			"minimal",
+		),
+		("Other..", ""),
+	];
+
+	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
+		.items(
+			template_options
+				.iter()
+				.map(|(name, _)| name)
+				.collect::<Vec<_>>()
+				.as_slice(),
+		)
+		.default(0)
+		.interact_opt()
+		.nice_unwrap("Unable to get template")
+		.unwrap_or(0);
+
+	let template = if template_index == template_options.len() - 1 {
+		println!();
+		info!("Here you can use any github repository");
+		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
+		ask_value("Template", Some(""), false)
+	} else {
+		template_options[template_index].1.to_string()
+	};
 
 	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 

@@ -47,6 +47,7 @@ crossterm_input = "0.5.0"
 open = "5.1.4"
 rand = "0.8.5"
 tempfile = "3"
+dialoguer = "0.11.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 terminal-clipboard = "0.4.1"
