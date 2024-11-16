@@ -79,9 +79,10 @@ fn create_template(template: CreateTemplate) {
 	for file in &["README.md", "CMakeLists.txt"] {
 		let file = template.project_location.join(file);
 
-		let contents = fs::read_to_string(&file)
-			.unwrap()
-			.replace("Template", &filtered_name);
+		let Ok(contents) = fs::read_to_string(&file) else {
+			continue;
+		};
+		let contents = contents.replace("Template", &filtered_name);
 		fs::write(file, contents).unwrap();
 	}
 
