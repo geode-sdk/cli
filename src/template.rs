@@ -42,21 +42,27 @@ fn create_template(template: CreateTemplate) {
 	} else if template.template.is_empty() {
 		("geode-sdk/example-mod", "main")
 	} else {
-		("geode-sdk/example-mod", match template.template.to_ascii_lowercase().as_str() {
-			"default" => "main",
-			"minimal" => "minimal",
-			"custom layer" => "custom-layer",
-			_ => {
-				warn!("Invalid template name, using default template");
-				"main"
-			}
-		})
+		(
+			"geode-sdk/example-mod",
+			match template.template.to_ascii_lowercase().as_str() {
+				"default" => "main",
+				"minimal" => "minimal",
+				"custom layer" => "custom-layer",
+				_ => {
+					warn!("Invalid template name, using default template");
+					"main"
+				}
+			},
+		)
 	};
 
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
-		.clone(format!("https://github.com/{}", used_template).as_str(), &template.project_location)
+		.clone(
+			format!("https://github.com/{}", used_template).as_str(),
+			&template.project_location,
+		)
 		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {

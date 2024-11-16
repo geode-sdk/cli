@@ -237,17 +237,13 @@ impl PlatformName {
 	pub fn current() -> Option<PlatformName> {
 		if cfg!(target_os = "windows") {
 			Some(PlatformName::Windows)
-		}
-		else if cfg!(target_os = "android") {
+		} else if cfg!(target_os = "android") {
 			Some(PlatformName::Android64)
-		}
-		else if cfg!(target_os = "linux") {
+		} else if cfg!(target_os = "linux") {
 			Some(PlatformName::Windows)
-		}
-		else if cfg!(target_os = "macos") {
+		} else if cfg!(target_os = "macos") {
 			Some(PlatformName::MacOS)
-		}
-		else {
+		} else {
 			None
 		}
 	}
