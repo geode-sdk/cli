@@ -281,7 +281,6 @@ fn create_package(
 	// Move mod.json
 	fs::copy(root_path.join("mod.json"), working_dir.join("mod.json")).unwrap();
 
-	dbg!(&output, &working_dir);
 	// Setup cache from the previously built .geode archive
 	let mut cache_bundle = cache::get_cache_bundle(&output);
 	let mut new_cache = cache::ResourceCache::new();
