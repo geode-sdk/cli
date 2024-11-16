@@ -75,7 +75,10 @@ pub fn login(config: &mut Config, token: Option<String>) {
 	info!("Go to: {} and enter the login code", &login_data.uri);
 	info!("Your login code is: {}", &login_data.code);
 	copy_token(&login_data.code);
-	open::that(&login_data.uri).nice_unwrap("Unable to open browser");
+	if let Err(msg) = open::that(&login_data.uri) {
+		warn!("Unable to open browser: {}", msg);
+		warn!("Go to the URL manually: {}", &login_data.uri);
+	}
 
 	loop {
 		info!("Checking login status");
