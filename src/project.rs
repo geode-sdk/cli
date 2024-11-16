@@ -3,7 +3,6 @@ use crate::util::mod_file::DependencyImportance;
 use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
 	file::read_dir_recursive,
-	package::get_working_dir,
 	template,
 	util::{
 		config::Config,
@@ -40,7 +39,7 @@ pub enum Project {
 		/// is assumed
 		install_dir: Option<PathBuf>,
 
-		/// The platform checked used for platform-specific dependencies. If 
+		/// The platform checked used for platform-specific dependencies. If
 		/// not specified, uses current host platform if possible
 		#[clap(long, short)]
 		platform: Option<PlatformName>,
@@ -70,8 +69,13 @@ fn clear_cache(dir: &Path) {
 	let mod_info = parse_mod_info(dir);
 
 	// Remove cache directory
-	let workdir = get_working_dir(&mod_info.id);
-	fs::remove_dir_all(workdir).nice_unwrap("Unable to remove cache directory");
+	let workdir = dirs::cache_dir()
+		.unwrap()
+		.join("geode_pkg")
+		.join(&mod_info.id);
+	if fs::remove_dir_all(workdir).is_err() {
+		warn!("Unable to remove cache directory");
+	}
 
 	// Remove cached .geode package
 	let dir = find_build_directory(dir);
@@ -275,8 +279,9 @@ pub fn check_dependencies(
 	let dep_dir = output.join("geode-deps");
 	fs::create_dir_all(&dep_dir).nice_unwrap("Unable to create dependency directory");
 
-	let platform = platform
-		.unwrap_or_else(|| PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform"));
+	let platform = platform.unwrap_or_else(|| {
+		PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform")
+	});
 
 	// check all dependencies
 	for dep in mod_info.dependencies {

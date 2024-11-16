@@ -141,14 +141,6 @@ fn zip_folder(path: &Path, output: &Path) {
 	);
 }
 
-pub fn get_working_dir(id: &String) -> PathBuf {
-	let working_dir = dirs::cache_dir().unwrap().join("geode_pkg").join(id);
-	// why would u do that :(
-	// fs::remove_dir_all(&working_dir).unwrap_or(());
-	fs::create_dir_all(&working_dir).unwrap_or(());
-	working_dir
-}
-
 fn create_resources(
 	#[allow(unused)] config: &mut Config,
 	mod_info: &ModFileInfo,
@@ -263,6 +255,7 @@ fn create_package(
 	// Parse mod.json
 	let mod_file_info = parse_mod_info(root_path);
 
+	// path to the final .geode file
 	let mut output = raw_output.unwrap_or(root_path.join(format!("{}.geode", mod_file_info.id)));
 
 	// If it's a directory, add file path to it
@@ -282,12 +275,14 @@ fn create_package(
 	}
 
 	// Setup working directory
-	let working_dir = get_working_dir(&mod_file_info.id);
+	let temp_working_dir = tempfile::tempdir().nice_unwrap("Could not create temporary directory");
+	let working_dir = temp_working_dir.path();
 
 	// Move mod.json
 	fs::copy(root_path.join("mod.json"), working_dir.join("mod.json")).unwrap();
 
-	// Setup cache
+	dbg!(&output, &working_dir);
+	// Setup cache from the previously built .geode archive
 	let mut cache_bundle = cache::get_cache_bundle(&output);
 	let mut new_cache = cache::ResourceCache::new();
 
