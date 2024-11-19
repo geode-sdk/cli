@@ -35,28 +35,34 @@ fn create_template(template: CreateTemplate) {
 			.nice_unwrap("Unable to create project directory");
 	}
 
-	let (used_template, branch) = if template.template.contains('#') {
-		template.template.split_once('#').unwrap()
+	let (used_template, branch) = if template.template.contains('@') {
+		template.template.split_once('@').unwrap()
 	} else if template.template.contains('/') {
 		(template.template.as_str(), "main")
 	} else if template.template.is_empty() {
 		("geode-sdk/example-mod", "main")
 	} else {
-		("geode-sdk/example-mod", match template.template.to_ascii_lowercase().as_str() {
-			"default" => "main",
-			"minimal" => "minimal",
-			"custom layer" => "custom-layer",
-			_ => {
-				warn!("Invalid template name, using default template");
-				"main"
-			}
-		})
+		(
+			"geode-sdk/example-mod",
+			match template.template.to_ascii_lowercase().as_str() {
+				"default" => "main",
+				"minimal" => "minimal",
+				"custom layer" => "custom-layer",
+				_ => {
+					warn!("Invalid template name, using default template");
+					"main"
+				}
+			},
+		)
 	};
 
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
-		.clone(format!("https://github.com/{}", used_template).as_str(), &template.project_location)
+		.clone(
+			format!("https://github.com/{}", used_template).as_str(),
+			&template.project_location,
+		)
 		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
@@ -73,9 +79,10 @@ fn create_template(template: CreateTemplate) {
 	for file in &["README.md", "CMakeLists.txt"] {
 		let file = template.project_location.join(file);
 
-		let contents = fs::read_to_string(&file)
-			.unwrap()
-			.replace("Template", &filtered_name);
+		let Ok(contents) = fs::read_to_string(&file) else {
+			continue;
+		};
+		let contents = contents.replace("Template", &filtered_name);
 		fs::write(file, contents).unwrap();
 	}
 
@@ -173,12 +180,41 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 	info!("This utility will walk you through setting up a new mod.");
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
-	info!("Enter a template name, or press enter to use the default template.");
-	info!("Default: Create a simple mod that adds a button to the main menu.");
-	info!("Minimal: Create a minimal mod with only the necessary files.");
-	info!("Custom Layer: Create a mod with a custom layer and more UI elements.");
-	info!("Alternatively, you could use your own template: 'user/repo', 'user/repo#branch'");
-	let template = ask_value("Template", Some(""), false);
+	info!("Choose a template for the mod to be created:");
+
+	let template_options = [
+		(
+			"Default - Simple mod that adds a button to the main menu.",
+			"",
+		),
+		(
+			"Minimal - Minimal mod with only the bare minimum to compile.",
+			"minimal",
+		),
+		("Other..", ""),
+	];
+
+	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
+		.items(
+			template_options
+				.iter()
+				.map(|(name, _)| name)
+				.collect::<Vec<_>>()
+				.as_slice(),
+		)
+		.default(0)
+		.interact_opt()
+		.nice_unwrap("Unable to get template")
+		.unwrap_or(0);
+
+	let template = if template_index == template_options.len() - 1 {
+		println!();
+		info!("Here you can use any github repository");
+		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
+		ask_value("Template", Some(""), false)
+	} else {
+		template_options[template_index].1.to_string()
+	};
 
 	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 

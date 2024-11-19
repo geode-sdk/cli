@@ -42,6 +42,7 @@ impl CacheBundle {
 				std::fs::write(output, buf).is_ok()
 			}
 
+			// should only be used for caching loader resources
 			CacheBundleSource::Directory(dir) => {
 				if dir.join(name) != *output {
 					std::fs::copy(dir.join(name), output).is_ok()

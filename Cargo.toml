@@ -1,6 +1,6 @@
 [package]
 name = "geode"
-version = "3.2.1"
+version = "3.2.2"
 authors = [
     "HJfod <dreadrollmusic@gmail.com>",
     "Camila314 <ilaca314@gmail.com>",
@@ -46,6 +46,8 @@ vec1 = { version = "1.12.1", features = ["serde"] }
 crossterm_input = "0.5.0"
 open = "5.1.4"
 rand = "0.8.5"
+tempfile = "3"
+dialoguer = "0.11.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 terminal-clipboard = "0.4.1"

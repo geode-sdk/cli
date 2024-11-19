@@ -81,8 +81,16 @@ impl Display for PendingModVersion {
 		writeln!(f, "  - API: {}", self.api)?;
 		writeln!(f, "  - GD:")?;
 		writeln!(f, "    - Win: {}", self.gd.win.as_deref().unwrap_or("None"))?;
-		writeln!(f, "    - Mac Intel: {}", self.gd.mac_intel.as_deref().unwrap_or("None"))?;
-		writeln!(f, "    - Mac ARM: {}", self.gd.mac_arm.as_deref().unwrap_or("None"))?;
+		writeln!(
+			f,
+			"    - Mac Intel: {}",
+			self.gd.mac_intel.as_deref().unwrap_or("None")
+		)?;
+		writeln!(
+			f,
+			"    - Mac ARM: {}",
+			self.gd.mac_arm.as_deref().unwrap_or("None")
+		)?;
 		writeln!(
 			f,
 			"    - Android 32: {}",

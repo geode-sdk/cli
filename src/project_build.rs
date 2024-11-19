@@ -14,21 +14,22 @@ pub fn build_project(
 		fatal!("Could not find CMakeLists.txt. Please run this within a Geode project!");
 	}
 
-	let platform = platform
-		.unwrap_or_else(|| PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform"));
-	
+	let platform = platform.unwrap_or_else(|| {
+		PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform")
+	});
+
 	// Make architechture exact
 	let platform = match platform {
 		PlatformName::Android => {
 			warn!("Assuming 64-bit Android, use \"-p android32\" to build for 32-bit Android");
 			PlatformName::Android64
-		},
-		// If Mac cross-building ever becomes possible, make sure to upgrade Mac 
-		// to MacArm or MacIntel here (or hard error if there's no reasonable 
+		}
+		// If Mac cross-building ever becomes possible, make sure to upgrade Mac
+		// to MacArm or MacIntel here (or hard error if there's no reasonable
 		// default)
 		p => p,
 	};
-	
+
 	let cross_compiling = if cfg!(target_os = "windows") {
 		platform != PlatformName::Windows
 	} else if cfg!(target_os = "linux") {
@@ -99,8 +100,7 @@ pub fn build_project(
 				));
 				if platform == PlatformName::Android32 {
 					conf_args.push("-DANDROID_ABI=armeabi-v7a".into());
-				}
-				else {
+				} else {
 					conf_args.push("-DANDROID_ABI=arm64-v8a".into());
 				}
 				// TODO: let the user change this? idk
@@ -118,8 +118,7 @@ pub fn build_project(
 	let build_type = config_type.unwrap_or_else(|| {
 		if platform == PlatformName::Windows {
 			"RelWithDebInfo".into()
-		}
-		else {
+		} else {
 			"Debug".into()
 		}
 	});
