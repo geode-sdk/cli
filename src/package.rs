@@ -353,6 +353,7 @@ fn create_package(
 			".android32.so",
 			".android64.so",
 			".so",
+			".pdb",
 		]
 		.iter()
 		.find(|x| binary_name.ends_with(**x))
