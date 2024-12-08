@@ -25,12 +25,6 @@ pub struct ServerModVersion {
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
 pub enum Index {
-	/// Create a new entry to be used in the index
-	New {
-		/// Output folder of entry
-		output: PathBuf,
-	},
-
 	/// Login with your GitHub account
 	Login {
 		/// Existing access token to use
@@ -160,100 +154,6 @@ pub fn install_mod(
 	fs::write(&dest, bytes).nice_unwrap("Unable to install .geode file");
 
 	dest
-}
-
-fn create_index_json(path: &Path) {
-	let url = ask_value("URL", None, true);
-
-	let response = reqwest::blocking::get(&url).nice_unwrap("Unable to access .geode file at URL");
-
-	let file_name = reqwest::Url::parse(&url)
-		.unwrap()
-		.path_segments()
-		.and_then(|segments| segments.last())
-		.and_then(|name| {
-			if name.is_empty() {
-				None
-			} else {
-				Some(name.to_string())
-			}
-		})
-		.unwrap_or_else(|| ask_value("Filename", None, true));
-
-	let file_contents = response
-		.bytes()
-		.nice_unwrap("Unable to access .geode file at URL");
-
-	let mut hasher = Sha3_256::new();
-	hasher.update(&file_contents);
-	let hash = hasher.finalize();
-
-	let platform_str = ask_value("Supported platforms (comma separated)", None, true);
-	let platforms = platform_str.split(',').collect::<Vec<_>>();
-
-	let category_str = ask_value("Categories (comma separated)", None, true);
-	let categories = category_str.split(',').collect::<Vec<_>>();
-
-	let index_json = json!({
-		"download": {
-			"url": url,
-			"name": file_name,
-			"hash": hex::encode(hash),
-			"platforms": platforms
-		},
-		"categories": categories
-	});
-
-	// Format neatly
-	let buf = Vec::new();
-	let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-	let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-	index_json.serialize(&mut ser).unwrap();
-
-	// Write formatted json
-	std::fs::write(
-		path.join("index.json"),
-		String::from_utf8(ser.into_inner()).unwrap(),
-	)
-	.nice_unwrap("Unable to write to project");
-}
-
-fn create_entry(out_path: &Path) {
-	assert!(out_path.exists(), "Path does not exist");
-	assert!(out_path.is_dir(), "Path is not a directory");
-
-	let root_path = PathBuf::from(ask_value("Project root directory", Some("."), true));
-
-	let mod_json_path = root_path.join("mod.json");
-	let about_path = root_path.join("about.md");
-	let logo_path = root_path.join("logo.png");
-
-	assert!(mod_json_path.exists(), "Unable to find project mod.json");
-
-	// Get mod id
-	let mod_info = parse_mod_info(&mod_json_path);
-
-	let entry_path = out_path.join(mod_info.id);
-	if entry_path.exists() {
-		warn!("Directory not empty");
-	} else {
-		fs::create_dir(&entry_path).nice_unwrap("Unable to create folder");
-	}
-
-	create_index_json(&entry_path);
-	fs::copy(&mod_json_path, entry_path.join("mod.json")).nice_unwrap("Unable to copy mod.json");
-
-	if about_path.exists() {
-		fs::copy(&about_path, entry_path.join("about.md")).nice_unwrap("Unable to copy about.md");
-	} else {
-		warn!("No about.md found, skipping");
-	}
-
-	if logo_path.exists() {
-		fs::copy(&logo_path, entry_path.join("logo.png")).nice_unwrap("Unable to copy logo.png");
-	} else {
-		warn!("No logo.png found, skipping");
-	}
 }
 
 fn submit(action: MyModAction, config: &mut Config) {
@@ -463,7 +363,6 @@ pub fn get_mod_versions(
 
 pub fn subcommand(config: &mut Config, cmd: Index) {
 	match cmd {
-		Index::New { output } => create_entry(&output),
 		Index::Install { id, version } => {
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
