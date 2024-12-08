@@ -87,7 +87,9 @@ pub fn install(config: &Config, pkg_path: &Path) {
 	let mod_path = config.get_current_profile().mods_dir();
 
 	if !mod_path.exists() {
-		fs::create_dir_all(&mod_path).nice_unwrap("Could not setup mod installation");
+		warn!("Path {mod_path:?} does not exist, creating it");
+		warn!("(Is your profile set up correctly?)");
+		fs::create_dir_all(&mod_path).nice_unwrap("Failed to create path");
 	}
 	fs::copy(pkg_path, mod_path.join(pkg_path.file_name().unwrap()))
 		.nice_unwrap("Could not install mod");
