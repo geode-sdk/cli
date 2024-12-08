@@ -429,14 +429,12 @@ pub fn get_mod_versions(
 	let client = reqwest::blocking::Client::new();
 	let page = page.to_string();
 	let per_page = per_page.to_string();
-	let compare = compare.unwrap_or_default();
 	let platform = config.get_current_profile().platform_str().to_string();
 
-	let mut query: Vec<(&str, &str)> = vec![
-		("page", &page),
-		("per_page", &per_page),
-		("compare", &compare),
-	];
+	let mut query: Vec<(&str, &str)> = vec![("page", &page), ("per_page", &per_page)];
+	if let Some(c) = &compare {
+		query.push(("compare", c.as_str()));
+	}
 
 	if check_platform {
 		query.push(("platforms", &platform));
