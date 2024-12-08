@@ -28,22 +28,19 @@ fn main() {
 
 	let args = Args::parse();
 
-	let mut config = config::Config::new();
-
 	match args.command {
-		GeodeCommands::New { path } => template::build_template(&mut config, path),
-		GeodeCommands::Profile { commands } => profile::subcommand(&mut config, commands),
-		GeodeCommands::Config { commands } => info::subcommand(&mut config, commands),
-		GeodeCommands::Sdk { commands } => sdk::subcommand(&mut config, commands),
-		GeodeCommands::Package { commands } => package::subcommand(&mut config, commands),
-		GeodeCommands::Project { commands } => project::subcommand(&mut config, commands),
-		GeodeCommands::Index { commands } => index::subcommand(&mut config, commands),
+		GeodeCommands::New { path } => template::build_template(path),
+		GeodeCommands::Profile { commands } => profile::subcommand(commands),
+		GeodeCommands::Config { commands } => info::subcommand(commands),
+		GeodeCommands::Sdk { commands } => sdk::subcommand(commands),
+		GeodeCommands::Package { commands } => package::subcommand(commands),
+		GeodeCommands::Project { commands } => project::subcommand(commands),
+		GeodeCommands::Index { commands } => index::subcommand(commands),
 		GeodeCommands::Run {
 			background,
 			stay,
 			launch_args,
 		} => profile::run_profile(
-			&config,
 			None,
 			match (background, stay) {
 				(false, false) => RunBackground::Foreground,
@@ -79,6 +76,4 @@ fn main() {
 			let _ = man.render(&mut std::io::stdout());
 		}
 	}
-
-	config.save();
 }

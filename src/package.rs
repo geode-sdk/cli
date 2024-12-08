@@ -83,7 +83,7 @@ pub enum Package {
 	},
 }
 
-pub fn install(config: &mut Config, pkg_path: &Path) {
+pub fn install(config: &Config, pkg_path: &Path) {
 	let mod_path = config.get_current_profile().mods_dir();
 
 	if !mod_path.exists() {
@@ -142,7 +142,6 @@ fn zip_folder(path: &Path, output: &Path) {
 }
 
 fn create_resources(
-	#[allow(unused)] config: &mut Config,
 	mod_info: &ModFileInfo,
 	#[allow(unused_mut)] mut cache_bundle: &mut Option<CacheBundle>,
 	cache: &mut cache::ResourceCache,
@@ -217,12 +216,7 @@ fn create_resources(
 	}
 }
 
-fn create_package_resources_only(
-	config: &mut Config,
-	root_path: &Path,
-	output_dir: &PathBuf,
-	shut_up: bool,
-) {
+fn create_package_resources_only(root_path: &Path, output_dir: &PathBuf, shut_up: bool) {
 	// Parse mod.json
 	let mod_info = parse_mod_info(root_path);
 
@@ -231,7 +225,6 @@ fn create_package_resources_only(
 	let mut new_cache = cache::ResourceCache::new();
 
 	create_resources(
-		config,
 		&mod_info,
 		&mut cache_bundle,
 		&mut new_cache,
@@ -246,7 +239,6 @@ fn create_package_resources_only(
 }
 
 fn create_package(
-	config: &mut Config,
 	root_path: &Path,
 	binaries: Vec<PathBuf>,
 	raw_output: Option<PathBuf>,
@@ -287,7 +279,6 @@ fn create_package(
 
 	// Create resources
 	create_resources(
-		config,
 		&mod_file_info,
 		&mut cache_bundle,
 		&mut new_cache,
@@ -377,7 +368,8 @@ fn create_package(
 	zip_folder(&working_dir, &output);
 
 	if do_install {
-		install(config, &output);
+		let config = Config::new().assert_is_setup();
+		install(&config, &output);
 	}
 }
 
@@ -455,16 +447,19 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 	);
 }
 
-pub fn subcommand(config: &mut Config, cmd: Package) {
+pub fn subcommand(cmd: Package) {
 	match cmd {
-		Package::Install { path } => install(config, &path),
+		Package::Install { path } => {
+			let config = Config::new().assert_is_setup();
+			install(&config, &path);
+		}
 
 		Package::New {
 			root_path,
 			binary: binaries,
 			output,
 			install,
-		} => create_package(config, &root_path, binaries, output, install),
+		} => create_package(&root_path, binaries, output, install),
 
 		Package::Merge { packages } => {
 			if packages.len() < 2 {
@@ -478,12 +473,12 @@ pub fn subcommand(config: &mut Config, cmd: Package) {
 			input,
 			output,
 			externals,
-		} => project::check_dependencies(config, input, output, None, externals),
+		} => project::check_dependencies(input, output, None, externals),
 
 		Package::Resources {
 			root_path,
 			output,
 			shut_up,
-		} => create_package_resources_only(config, &root_path, &output, shut_up),
+		} => create_package_resources_only(&root_path, &output, shut_up),
 	}
 }

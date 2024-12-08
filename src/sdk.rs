@@ -888,13 +888,15 @@ fn install_linux(
 	done!("Installation complete!");
 }
 
-pub fn subcommand(config: &mut Config, cmd: Sdk) {
+pub fn subcommand(cmd: Sdk) {
 	match cmd {
 		Sdk::Install {
 			reinstall,
 			force,
 			path,
 		} => {
+			let mut config = Config::new().assert_is_setup();
+
 			if reinstall && !uninstall() && !force {
 				return;
 			}
@@ -938,15 +940,24 @@ pub fn subcommand(config: &mut Config, cmd: Sdk) {
 				}
 			};
 
-			install(config, actual_path, force);
+			install(&mut config, actual_path, force);
+			config.save();
 		}
 		Sdk::Uninstall => {
 			uninstall();
 		}
 		Sdk::SetPath { path, r#move } => set_sdk_path(path, r#move),
-		Sdk::Update { branch } => update(config, branch),
+		Sdk::Update { branch } => {
+			let mut config = Config::new().assert_is_setup();
+			update(&mut config, branch);
+			config.save();
+		}
 		Sdk::Version => info!("Geode SDK version: {}", get_version()),
-		Sdk::InstallBinaries { platform, version } => install_binaries(config, platform, version),
+		Sdk::InstallBinaries { platform, version } => {
+			let mut config = Config::new().assert_is_setup();
+			install_binaries(&mut config, platform, version);
+			config.save();
+		}
 
 		#[cfg(not(windows))]
 		Sdk::InstallLinux {

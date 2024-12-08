@@ -361,7 +361,9 @@ pub fn get_mod_versions(
 	Ok(body.payload)
 }
 
-pub fn subcommand(config: &mut Config, cmd: Index) {
+pub fn subcommand(cmd: Index) {
+	let mut _config = Config::new().assert_is_setup();
+	let config = &mut _config;
 	match cmd {
 		Index::Install { id, version } => {
 			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
@@ -386,4 +388,5 @@ pub fn subcommand(config: &mut Config, cmd: Index) {
 		Index::Profile => index_dev::edit_profile(config),
 		Index::Admin { commands } => index_admin::subcommand(commands, config),
 	}
+	config.save();
 }

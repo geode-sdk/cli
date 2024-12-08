@@ -241,12 +241,13 @@ fn find_dependency(
 }
 
 pub fn check_dependencies(
-	config: &Config,
 	input: PathBuf,
 	output: PathBuf,
 	platform: Option<PlatformName>,
 	externals: Vec<String>,
 ) {
+	let config = Config::new();
+
 	let mod_info = parse_mod_info(&input);
 
 	// If no dependencies, skippy wippy
@@ -328,7 +329,7 @@ pub fn check_dependencies(
 		// otherwise try to find it on installed mods and then on index
 
 		// check index
-		let found_in_index = match find_index_dependency(&dep, config) {
+		let found_in_index = match find_index_dependency(&dep, &config) {
 			Ok(f) => f,
 			Err(e) => {
 				warn!("Failed to fetch dependency {} from index: {}", &dep.id, e);
@@ -516,16 +517,15 @@ pub fn check_dependencies(
 	}
 }
 
-pub fn subcommand(config: &mut Config, cmd: Project) {
+pub fn subcommand(cmd: Project) {
 	match cmd {
-		Project::New { path } => template::build_template(config, path),
+		Project::New { path } => template::build_template(path),
 		Project::ClearCache => clear_cache(&std::env::current_dir().unwrap()),
 		Project::Check {
 			install_dir,
 			platform,
 			externals,
 		} => check_dependencies(
-			config,
 			std::env::current_dir().unwrap(),
 			install_dir.unwrap_or("build".into()),
 			platform,

@@ -176,7 +176,9 @@ fn possible_name(path: &Option<PathBuf>) -> Option<String> {
 	})
 }
 
-pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
+pub fn build_template(location: Option<PathBuf>) {
+	let mut config = Config::new().assert_is_setup();
+
 	info!("This utility will walk you through setting up a new mod.");
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
@@ -233,6 +235,7 @@ pub fn build_template(config: &mut Config, location: Option<PathBuf>) {
 			&final_developer
 		);
 		config.default_developer = Some(final_developer.clone());
+		config.save();
 	}
 
 	let final_description = ask_value("Description", None, false);

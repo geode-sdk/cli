@@ -1,6 +1,7 @@
-use crate::config::Config;
+use crate::config::{self, Config};
+use crate::logging::ask_value;
 use crate::util::config::Profile;
-use crate::{done, fail, info, NiceUnwrap};
+use crate::{done, fail, info, warn, NiceUnwrap};
 use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
@@ -53,9 +54,11 @@ fn get_bool(value: &str) -> Option<bool> {
 	}
 }
 
-pub fn subcommand(config: &mut Config, cmd: Info) {
+pub fn subcommand(cmd: Info) {
 	match cmd {
 		Info::Set { field, value } => {
+			let mut config = Config::new().assert_is_setup();
+
 			let done_str = format!("Set {} to {}", field, &value);
 
 			if field == "default-developer" {
@@ -72,9 +75,12 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 			}
 
 			done!("{}", done_str);
+			config.save();
 		}
 
 		Info::Get { field, raw } => {
+			let config = Config::new().assert_is_setup();
+
 			let sdk_path;
 
 			let out = if field == "default-developer" {
@@ -109,6 +115,8 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 		}
 
 		Info::Setup {} => {
+			let mut config = Config::new();
+
 			if config.profiles.is_empty() {
 				let default = config::profile_platform_default();
 				let platform = ask_value(
@@ -185,6 +193,7 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 				Config::try_sdk_path().map_or(false, |path| path.join("bin/nightly").exists());
 
 			done!("Config setup finished");
+			config.save();
 		}
 	}
 }

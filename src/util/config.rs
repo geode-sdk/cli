@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::{done, fail, info, warn, NiceUnwrap};
+use crate::{done, fail, fatal, info, warn, NiceUnwrap};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -58,7 +58,7 @@ pub struct OldConfig {
 	pub default_developer: Option<String>,
 }
 
-fn profile_platform_default() -> String {
+pub fn profile_platform_default() -> String {
 	if cfg!(target_os = "windows") {
 		"win".to_owned()
 	} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
@@ -67,48 +67,6 @@ fn profile_platform_default() -> String {
 		"mac-arm".to_owned()
 	} else {
 		"win".to_owned()
-	}
-}
-
-// TODO: remove this in 3.0
-impl OldConfig {
-	pub fn migrate(&self) -> Config {
-		let profiles = self
-			.installations
-			.as_ref()
-			.map(|insts| {
-				insts
-					.iter()
-					.map(|inst| {
-						RefCell::from(Profile {
-							name: inst
-								.executable
-								.strip_suffix(".exe")
-								.unwrap_or(&inst.executable)
-								.into(),
-							gd_path: inst.path.clone(),
-							platform: String::from("win"),
-							other: HashMap::new(),
-						})
-					})
-					.collect::<Vec<_>>()
-			})
-			.unwrap_or_default();
-		Config {
-			current_profile: profiles
-				.get(
-					self.working_installation
-						.unwrap_or(self.default_installation),
-				)
-				.map(|i| i.borrow().name.clone()),
-			profiles,
-			default_developer: self.default_developer.to_owned(),
-			sdk_nightly: false,
-			sdk_version: None,
-			other: HashMap::new(),
-			index_token: None,
-			index_url: "https://api.geode-sdk.org".to_string(),
-		}
 	}
 }
 
@@ -245,53 +203,43 @@ impl Config {
 		geode_root().join("cross-tools")
 	}
 
+	pub fn assert_is_setup(self) -> Config {
+		if self.profiles.is_empty() {
+			fatal!("No Geode profiles found! Setup one by using `geode config setup`");
+		}
+		self
+	}
+
+	fn default_fallback() -> Config {
+		Config {
+			current_profile: None,
+			profiles: Vec::new(),
+			default_developer: None,
+			sdk_nightly: false,
+			sdk_version: None,
+			other: HashMap::<String, Value>::new(),
+			index_token: None,
+			index_url: "https://api.geode-sdk.org".to_string(),
+		}
+	}
+
 	pub fn new() -> Config {
 		if !geode_root().exists() {
-			warn!("It seems you don't have Geode installed. Some operations will not work");
-			warn!("You can setup Geode using `geode config setup`");
-
-			return Config {
-				current_profile: None,
-				profiles: Vec::new(),
-				default_developer: None,
-				sdk_nightly: false,
-				sdk_version: None,
-				other: HashMap::<String, Value>::new(),
-				index_token: None,
-				index_url: "https://api.geode-sdk.org".to_string(),
-			};
+			return Config::default_fallback();
 		}
 
 		let config_json = geode_root().join("config.json");
 
 		let mut output: Config = if !config_json.exists() {
-			info!("Setup Geode using `geode config setup`");
 			// Create new config
-			Config {
-				current_profile: None,
-				profiles: Vec::new(),
-				default_developer: None,
-				sdk_nightly: false,
-				sdk_version: None,
-				index_token: None,
-				other: HashMap::<String, Value>::new(),
-				index_url: "https://api.geode-sdk.org".to_string(),
-			}
+			return Config::default_fallback();
 		} else {
 			// Parse config
 			let config_json_str =
 				&std::fs::read_to_string(&config_json).nice_unwrap("Unable to read config.json");
 			match serde_json::from_str(config_json_str) {
 				Ok(json) => json,
-				Err(e) => {
-					// Try migrating old config
-					// TODO: remove this in 3.0
-					let json = serde_json::from_str::<OldConfig>(config_json_str)
-						.ok()
-						.nice_unwrap(format!("Unable to parse config.json: {}", e));
-					info!("Migrating old config.json");
-					json.migrate()
-				}
+				Err(_) => Config::default_fallback(),
 			}
 		};
 
@@ -305,10 +253,7 @@ impl Config {
 
 		output.save();
 
-		if output.profiles.is_empty() {
-			warn!("No Geode profiles found! Some operations will be unavailable.");
-			warn!("Setup Geode using `geode config setup`");
-		} else if output.get_profile(&output.current_profile).is_none() {
+		if !output.profiles.is_empty() && output.get_profile(&output.current_profile).is_none() {
 			output.current_profile = Some(output.profiles[0].borrow().name.clone());
 		}
 
