@@ -110,49 +110,31 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 
 		Info::Setup {} => {
 			if config.profiles.is_empty() {
-				info!("Please enter the platform you are using (win, mac, android32, android64), empty for host platform:");
-
-				let platform = loop {
-					let mut buf = String::new();
-					match std::io::stdin().lock().read_line(&mut buf) {
-						Ok(_) => {}
-						Err(e) => {
-							fail!("Unable to read input: {}", e);
-							continue;
-						}
-					};
-
-					let platform = buf.trim().to_lowercase();
-					if platform.is_empty() {
-						break std::env::consts::OS;
-					} else if platform == "win" {
-						break "win";
-					} else if platform == "mac" {
-						break "mac";
-					} else if platform == "android32" {
-						break "android32";
-					} else if platform == "android64" {
-						break "android64";
-					} else {
-						fail!("Invalid platform");
-					}
-				};
-
-				info!("Please enter the path to the Geometry Dash app:");
+				let default = config::profile_platform_default();
+				let platform = ask_value(
+					"What platform you are using? (win, mac, android32, android64)",
+					Some(default.as_str()),
+					true,
+				);
+				let mut platform = platform.trim().to_lowercase();
+				if platform == "mac" {
+					platform = default;
+				}
+				if !["win", "mac-intel", "mac-arm", "android32", "android64"]
+					.contains(&platform.as_str())
+				{
+					fail!("Invalid platform");
+				}
 
 				let path = loop {
-					let mut buf = String::new();
-					match std::io::stdin().lock().read_line(&mut buf) {
-						Ok(_) => {}
-						Err(e) => {
-							fail!("Unable to read input: {}", e);
-							continue;
-						}
-					};
+					let buf = ask_value("Path to the Geometry Dash app/executable", None, true);
+					let buf = buf
+						.trim_matches(|c| c == '"' || c == ' ')
+						.replace("\\ ", " ");
 
 					// Verify path is valid
-					let path = PathBuf::from(buf.trim());
 
+					let path = PathBuf::from(buf.trim());
 					if !path.exists() {
 						fail!("The path must exist");
 						continue;
@@ -162,12 +144,11 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					if platform == "win" {
 						if path.is_dir() {
 							fail!(
-								"The path must point to the Geometry Dash exe,\
-								not the folder it's in"
+								"The path must point to the Geometry Dash exe, not the folder it's in"
 							);
 							continue;
 						} else if path.extension().and_then(|p| p.to_str()).unwrap_or("") != "exe" {
-							fail!("The path must point to a .exe file");
+							fail!("The path must point to the Geometry Dash .exe file");
 							continue;
 						}
 					} else if platform == "mac" {
@@ -180,8 +161,6 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 							fail!("The path must point to the Geometry Dash app, not a Steam shortcut");
 							continue;
 						}
-					} else {
-						break path;
 					}
 
 					break path;
@@ -189,22 +168,17 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					// to make sure GD 2.113 is in the folder
 				};
 
-				info!("Please enter a name for the profile:");
-				let name = loop {
-					let mut buf = String::new();
-					match std::io::stdin().lock().read_line(&mut buf) {
-						Ok(_) => break buf,
-						Err(e) => fail!("Unable to read input: {}", e),
-					};
-				};
+				let name = ask_value("Profile name", None, true);
 
 				config.profiles.push(RefCell::new(Profile::new(
 					name.trim().into(),
 					path,
-					platform.to_string(),
+					platform,
 				)));
 				config.current_profile = Some(name.trim().into());
 				done!("Profile added");
+			} else {
+				warn!("Profiles already exist, skipping profile setup");
 			}
 
 			config.sdk_nightly =
