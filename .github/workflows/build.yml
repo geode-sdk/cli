@@ -32,7 +32,11 @@ jobs:
           id: mac
           os: macos-latest
           executable: 'geode'
-          prebuild: 'export OPENSSL_STATIC=1'
+          prebuild: |
+            brew fetch --force --bottle-tag=ventura openssl@3
+            brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
+            export OPENSSL_STATIC=1
+            export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
           target: x86_64-apple-darwin
 
         - name: "Linux"
@@ -57,14 +61,6 @@ jobs:
     - uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.config.id }}
-
-    - name: Get x86_64 openssl
-      if: ${{ matrix.config.id == 'mac' }}
-      shell: bash
-      run: |
-        brew fetch --force --bottle-tag=ventura openssl@3
-        brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
-        export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
 
     - name: Build
       run: |
