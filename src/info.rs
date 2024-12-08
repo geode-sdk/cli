@@ -153,6 +153,11 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					// Verify path is valid
 					let path = PathBuf::from(buf.trim());
 
+					if !path.exists() {
+						fail!("The path must exist");
+						continue;
+					}
+
 					#[allow(clippy::collapsible_else_if)]
 					if platform == "win" {
 						if path.is_dir() {
