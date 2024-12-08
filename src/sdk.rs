@@ -10,6 +10,8 @@ use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::{Prerelease, Version};
 use serde::Deserialize;
 use std::env;
+#[allow(unused)]
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
