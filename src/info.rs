@@ -153,10 +153,6 @@ pub fn subcommand(config: &mut Config, cmd: Info) {
 					// Verify path is valid
 					let path = PathBuf::from(buf.trim());
 
-					// Potentially vulnerable to a TOC/TOU bug if the user
-					// changes the path without updating their config,
-					// but there's no reasonable way around that
-					// TODO: Check the path exists in other parts of the CLI as well
 					if !path.exists() {
 						fail!("The path must exist");
 						continue;
