@@ -2,6 +2,11 @@ name: Build Binaries
 
 on:
   workflow_dispatch:
+    inputs:
+      debug:
+        description: enable tmate debug
+        default: false
+        type: boolean
   push:
     paths:
     - "src/**"
@@ -27,7 +32,11 @@ jobs:
           id: mac
           os: macos-latest
           executable: 'geode'
-          prebuild: 'export OPENSSL_STATIC=1'
+          prebuild: |
+            brew fetch --force --bottle-tag=ventura openssl@3
+            brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
+            export OPENSSL_STATIC=1
+            export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
           target: x86_64-apple-darwin
 
         - name: "Linux"
@@ -69,6 +78,12 @@ jobs:
       with:
         name: geode-cli-${{ matrix.config.id }}
         path: ./out/
+
+    - name: Setup tmate session
+      if: ${{ failure() && inputs.debug && matrix.config.id == 'mac' }}
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
 
   publish:
     name: Publish
