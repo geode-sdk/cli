@@ -17,6 +17,7 @@ pub fn read_dir_recursive(src: &PathBuf) -> Result<Vec<PathBuf>, io::Error> {
 	Ok(res)
 }
 
+#[allow(unused)]
 pub fn copy_dir_recursive(src: &PathBuf, dest: &PathBuf) -> Result<(), io::Error> {
 	fs::create_dir_all(dest)?;
 	for item in fs::read_dir(src)? {

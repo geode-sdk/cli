@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use crate::{done, fail, fatal, info, warn, NiceUnwrap};
+use crate::{done, fail, fatal, warn, NiceUnwrap};
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
@@ -272,7 +272,7 @@ impl Config {
 	pub fn rename_profile(&mut self, old: &str, new: String) {
 		let profile = self
 			.get_profile(&Some(String::from(old)))
-			.nice_unwrap(&format!("Profile named '{}' does not exist", old));
+			.nice_unwrap(format!("Profile named '{}' does not exist", old));
 
 		if self.get_profile(&Some(new.to_owned())).is_some() {
 			fail!("The name '{}' is already taken!", new);

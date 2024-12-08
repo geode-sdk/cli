@@ -191,7 +191,7 @@ fn create_resources(
 			spritesheet::downscale(&mut sprite, 2);
 			sprite.save(output_dir.join(base.to_string() + ".png"))
 		})()
-		.nice_unwrap(&format!(
+		.nice_unwrap(format!(
 			"Unable to copy sprite at {}",
 			sprite_path.display()
 		));
@@ -203,7 +203,7 @@ fn create_resources(
 	// Move other resources
 	for file in &mod_info.resources.files {
 		std::fs::copy(file, output_dir.join(file.file_name().unwrap()))
-			.nice_unwrap(&format!("Unable to copy file at '{}'", file.display()));
+			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
 	}
 
 	if !&mod_info.resources.libraries.is_empty() {
@@ -212,7 +212,7 @@ fn create_resources(
 	// Move other resources
 	for file in &mod_info.resources.libraries {
 		std::fs::copy(file, working_dir.join(file.file_name().unwrap()))
-			.nice_unwrap(&format!("Unable to copy file at '{}'", file.display()));
+			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
 	}
 }
 
@@ -282,7 +282,7 @@ fn create_package(
 		&mod_file_info,
 		&mut cache_bundle,
 		&mut new_cache,
-		&working_dir,
+		working_dir,
 		&working_dir.join("resources").join(&mod_file_info.id),
 		false,
 	);
@@ -292,7 +292,7 @@ fn create_package(
 		let path = root_path.join(file);
 		if path.exists() {
 			std::fs::copy(path, working_dir.join(file))
-				.nice_unwrap(&format!("Could not copy {file}"));
+				.nice_unwrap(format!("Could not copy {file}"));
 		}
 	}
 
@@ -301,7 +301,7 @@ fn create_package(
 		for header in &api.include {
 			let out = working_dir.join(header);
 			out.parent().map(fs::create_dir_all);
-			fs::copy(root_path.join(header), &out).nice_unwrap(&format!(
+			fs::copy(root_path.join(header), &out).nice_unwrap(format!(
 				"Unable to copy header {} to {}",
 				header.display(),
 				out.display()
@@ -328,7 +328,7 @@ fn create_package(
 			) {
 			let binary = name.to_string_lossy().to_string() + "." + ext.to_string_lossy().as_ref();
 			std::fs::copy(path, working_dir.join(&binary))
-				.nice_unwrap(&format!("Unable to copy binary '{}'", binary));
+				.nice_unwrap(format!("Unable to copy binary '{}'", binary));
 			binaries_added = true;
 		}
 	}
@@ -353,7 +353,7 @@ fn create_package(
 		}
 
 		std::fs::copy(binary, working_dir.join(binary_name))
-			.nice_unwrap(&format!("Unable to copy binary at '{}'", binary.display()));
+			.nice_unwrap(format!("Unable to copy binary at '{}'", binary.display()));
 		binaries_added = true;
 	}
 
@@ -363,9 +363,9 @@ fn create_package(
 		info!("Help: Add a binary with `--binary <bin_path>`");
 	}
 
-	new_cache.save(&working_dir);
+	new_cache.save(working_dir);
 
-	zip_folder(&working_dir, &output);
+	zip_folder(working_dir, &output);
 
 	if do_install {
 		let config = Config::new().assert_is_setup();

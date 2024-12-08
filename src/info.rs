@@ -1,11 +1,10 @@
 use crate::config::{self, Config};
 use crate::logging::ask_value;
 use crate::util::config::Profile;
-use crate::{done, fail, info, warn, NiceUnwrap};
+use crate::{done, fail, warn, NiceUnwrap};
 use clap::Subcommand;
 use colored::Colorize;
 use std::cell::RefCell;
-use std::io::BufRead;
 
 /**
  * geode info

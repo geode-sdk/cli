@@ -1,24 +1,24 @@
 use crate::config::Config;
 use crate::server::{ApiResponse, PaginatedData};
 use crate::util::logging::ask_value;
-use crate::util::mod_file::parse_mod_info;
-use crate::{done, fatal, index_admin, index_auth, index_dev, info, warn, NiceUnwrap};
+use crate::{done, fatal, index_admin, index_auth, index_dev, info, NiceUnwrap};
 use clap::Subcommand;
 use reqwest::header::USER_AGENT;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sha3::{Digest, Sha3_256};
 use std::fs;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use zip::read::ZipFile;
 
 #[derive(Deserialize)]
 pub struct ServerModVersion {
+	#[allow(unused)]
 	pub name: String,
 	pub version: String,
 	pub download_link: String,
+	#[allow(unused)]
 	pub hash: String,
 }
 

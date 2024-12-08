@@ -2,7 +2,6 @@ use crate::config::{Config, Profile as CfgProfile};
 use crate::{done, fail, info, warn, NiceUnwrap};
 use clap::{Subcommand, ValueEnum};
 use colored::Colorize;
-use rustyline::config;
 use std::cell::RefCell;
 use std::process::Command;
 

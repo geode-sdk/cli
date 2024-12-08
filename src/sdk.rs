@@ -10,7 +10,6 @@ use reqwest::header::{AUTHORIZATION, USER_AGENT};
 use semver::{Prerelease, Version};
 use serde::Deserialize;
 use std::env;
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -35,6 +34,7 @@ struct GithubReleaseResponse {
 	assets: Vec<GithubReleaseAsset>,
 }
 
+#[allow(unused)]
 struct LinuxShellConfig {
 	profile: String,
 	profile_bak: String,
@@ -268,6 +268,7 @@ fn set_sdk_env(path: &Path) -> bool {
 	env_success
 }
 
+#[allow(unused)]
 fn detect_user_shell() -> Option<UserShell> {
 	let shell = match env::var("SHELL") {
 		Err(_) => {
@@ -288,6 +289,7 @@ fn detect_user_shell() -> Option<UserShell> {
 	None
 }
 
+#[allow(unused)]
 fn get_linux_shell_info(shell: UserShell, path: &Path) -> Option<LinuxShellConfig> {
 	let home = match env::var("HOME") {
 		Err(_) => return None,

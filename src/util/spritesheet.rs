@@ -67,7 +67,7 @@ impl SheetBundles {
 }
 
 pub fn read_to_image(path: &Path) -> RgbaImage {
-	image::io::Reader::open(path)
+	image::ImageReader::open(path)
 		.nice_unwrap(format!("Error reading sprite '{}'", path.display()))
 		.decode()
 		.nice_unwrap(format!("Error decoding sprite '{}'", path.display()))
