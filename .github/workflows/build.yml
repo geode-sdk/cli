@@ -58,6 +58,14 @@ jobs:
       with:
         key: ${{ matrix.config.id }}
 
+    - name: Get x86_64 openssl
+      if: ${{ matrix.config.id == 'mac' }}
+      shell: bash
+      run: |
+        brew fetch --force --bottle-tag=ventura openssl@3
+        brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
+        export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
+
     - name: Build
       run: |
         ${{ matrix.config.prebuild }}
@@ -76,7 +84,7 @@ jobs:
         path: ./out/
 
     - name: Setup tmate session
-      if: ${{ !cancelled() && inputs.debug && matrix.config.id == 'mac' }}
+      if: ${{ failure() && inputs.debug && matrix.config.id == 'mac' }}
       uses: mxschmitt/action-tmate@v3
       with:
         limit-access-to-actor: true
