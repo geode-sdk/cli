@@ -2,6 +2,11 @@ name: Build Binaries
 
 on:
   workflow_dispatch:
+    inputs:
+      debug:
+        description: enable tmate debug
+        default: false
+        type: boolean
   push:
     paths:
     - "src/**"
@@ -69,6 +74,12 @@ jobs:
       with:
         name: geode-cli-${{ matrix.config.id }}
         path: ./out/
+
+    - name: Setup tmate session
+      if: ${{ !cancelled() && inputs.debug && matrix.config.id == 'mac' }}
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
 
   publish:
     name: Publish
