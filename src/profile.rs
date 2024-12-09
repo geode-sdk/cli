@@ -219,7 +219,7 @@ pub fn subcommand(cmd: Profile) {
 			location,
 			platform,
 		} => {
-			let mut config = Config::new().assert_is_setup();
+			let mut config = Config::new();
 
 			if config.get_profile(&Some(name.to_owned())).is_some() {
 				fail!("A profile named '{}' already exists", name);
