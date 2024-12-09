@@ -41,7 +41,11 @@ jobs:
 
         - name: "Linux"
           id: linux
-          os: ubuntu-latest
+          os: ubuntu-22.04
+          # ubuntu-latest is currently a mix of 22.04 and 24.04
+          # so we are not able to use that until January 17, 2025 at least
+          # if we want compatibility with said version on GH actions
+          # see also https://github.com/actions/runner-images/issues/10636
           executable: 'geode'
           # some stupid old ubuntu versions cant install libssl3
           prebuild: 'export OPENSSL_STATIC=1'
