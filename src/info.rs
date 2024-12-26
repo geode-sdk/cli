@@ -39,7 +39,14 @@ pub enum Info {
 	Setup {},
 }
 
-const CONFIGURABLES: [&str; 3] = ["default-developer", "sdk-path", "sdk-nightly"];
+const CONFIGURABLES: [&str; 6] = [
+	"default-developer",
+	"sdk-path",
+	"sdk-nightly",
+	"current-profile",
+	"index-token",
+	"index-url",
+];
 
 fn get_bool(value: &str) -> Option<bool> {
 	let lower = value.to_ascii_lowercase();
@@ -68,6 +75,11 @@ pub fn subcommand(cmd: Info) {
 			} else if field == "sdk-path" {
 				fail!("Set the SDK Path using `geode sdk set-path <PATH>`");
 				return;
+			} else if field == "index-token" {
+				config.index_token = Some(value);
+			} else if field == "index-url" {
+				fail!("Set the Index URL using `geode index set-url <URL>`");
+				return;
 			} else {
 				fail!("Unknown field {}", field);
 				return;
@@ -93,6 +105,12 @@ pub fn subcommand(cmd: Info) {
 				} else {
 					"false"
 				}
+			} else if field == "current-profile" {
+				config.current_profile.as_deref().unwrap_or("")
+			} else if field == "index-token" {
+				config.index_token.as_deref().unwrap_or("")
+			} else if field == "index-url" {
+				config.index_url.as_ref()
 			} else if raw {
 				std::process::exit(1);
 			} else {
