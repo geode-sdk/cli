@@ -362,11 +362,17 @@ pub fn get_mod_versions(
 }
 
 pub fn subcommand(cmd: Index) {
-	let mut _config = Config::new().assert_is_setup();
+	let mut _config = Config::new();
 	let config = &mut _config;
 	match cmd {
 		Index::Install { id, version } => {
-			install_mod(config, &id, &version.unwrap_or(VersionReq::STAR), false);
+			let mut config = Config::new().assert_is_setup();
+			install_mod(
+				&mut config,
+				&id,
+				&version.unwrap_or(VersionReq::STAR),
+				false,
+			);
 			done!("Mod installed");
 		}
 		Index::Login { token } => index_auth::login(config, token),
