@@ -1,4 +1,4 @@
-name: Setup Geode CLI
+name: Setup hGeode CLI
 description: Sets up Geode CLI
 
 inputs:
