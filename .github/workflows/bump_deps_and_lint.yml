@@ -23,7 +23,7 @@ jobs:
         run: cargo update --verbose
 
       - name: Apply fixes
-        run: cargo fix --verbose
+        run: cargo fix --allow-dirty --verbose
 
       - name: Lint and format
         run: |
