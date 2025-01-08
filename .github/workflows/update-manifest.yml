@@ -1,21 +1,20 @@
-# Update cli manifest in geode-sdk/homebrew-geode
-# TODO: update the winget one too :P
+# TODO: Update the WinGet one too :P
+
 name: Update CLI Manifests
 
 on:
-  # trigger when a new release is released
+  workflow_dispatch:
   release:
     types:
       - released
-  
-  workflow_dispatch: 
 
 jobs:
   trigger:
     name: Update homebrew repo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     steps:
-    - name: Checkout homebrew tap
+    - name: Checkout homebrew repository
       uses: actions/checkout@v4
       with:
         repository: geode-sdk/homebrew-geode
@@ -23,7 +22,7 @@ jobs:
         token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
 
     - name: Fetch release info
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       id: fetch-mac-release
       with:
         result-encoding: string
@@ -39,7 +38,7 @@ jobs:
             }
           }
 
-    - name: Update mac homebrew repo
+    - name: Update macOS homebrew repo
       shell: bash
       run: |
         URL="${{ steps.fetch-mac-release.outputs.result }}"
