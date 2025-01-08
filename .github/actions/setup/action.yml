@@ -10,32 +10,32 @@ inputs:
 runs:
   using: "composite"
   steps:
-  - name: Detect platform
-    id: platform
-    shell: bash
-    run: |
-      if [ "$RUNNER_OS" = "Linux" ]; then
-        echo "host=linux" >> $GITHUB_OUTPUT
-      elif [ "$RUNNER_OS" = "Windows" ]; then
-        echo "host=win" >> $GITHUB_OUTPUT
-      elif [ "$RUNNER_OS" = "macOS" ]; then
-        echo "host=mac" >> $GITHUB_OUTPUT
-      fi
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          echo "host=linux" >> $GITHUB_OUTPUT
+        elif [ "$RUNNER_OS" = "Windows" ]; then
+          echo "host=win" >> $GITHUB_OUTPUT
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          echo "host=mac" >> $GITHUB_OUTPUT
+        fi
 
-  - name: Download
-    uses: robinraju/release-downloader@v1.10
-    with:
-      repository: geode-sdk/cli
-      latest: ${{ inputs.version == 'latest' }}
-      tag: ${{ inputs.version != 'latest' && inputs.version || '' }}
-      fileName: '*-${{ steps.platform.outputs.host }}.zip'
-      tarBall: false
-      zipBall: false
-      out-file-path: "my-epic-geode-cli"
+    - name: Download Geode CLI
+      uses: robinraju/release-downloader@v1
+      with:
+        repository: 'geode-sdk/cli'
+        latest: ${{ inputs.version == 'latest' }}
+        tag: ${{ inputs.version != 'latest' && inputs.version || '' }}
+        fileName: '*-${{ steps.platform.outputs.host }}.zip'
+        tarBall: false
+        zipBall: false
+        out-file-path: 'my-epic-geode-cli'
 
-  - name: Setup
-    shell: bash
-    run: |
-      7z x "my-epic-geode-cli/*-${{ steps.platform.outputs.host }}.zip" -omy-epic-geode-cli
-      chmod +x my-epic-geode-cli/geode
-      echo "$GITHUB_WORKSPACE/my-epic-geode-cli" >> $GITHUB_PATH
+    - name: Setup Geode CLI
+      shell: bash
+      run: |
+        7z x "my-epic-geode-cli/*-${{ steps.platform.outputs.host }}.zip" -omy-epic-geode-cli
+        chmod +x my-epic-geode-cli/geode
+        echo "$GITHUB_WORKSPACE/my-epic-geode-cli" >> $GITHUB_PATH
