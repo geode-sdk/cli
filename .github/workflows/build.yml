@@ -103,6 +103,7 @@ jobs:
         id: download-artifact
         uses: dawidd6/action-download-artifact@v7
         with:
+          name: geode-cli-*
           path: ${{ github.workspace }}/artifacts
 
       - name: Rename files
