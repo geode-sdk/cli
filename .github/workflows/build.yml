@@ -105,6 +105,13 @@ jobs:
         with:
           path: ${{ github.workspace }}/artifacts
 
+      - name: Rename files
+        run: |
+          cd ${{ github.workspace }}/artifacts
+          mv geode-cli-win.zip geode-cli-${{ steps.info.outputs.hash }}-win.zip
+          mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.hash }}-mac.zip
+          mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.hash }}-linux.zip
+
       - name: Update development release
         uses: andelf/nightly-release@main
         env:
