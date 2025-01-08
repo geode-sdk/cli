@@ -5,16 +5,16 @@ on:
 
 jobs:
   draft:
-    name: Draft Release
-    runs-on: ubuntu-latest
+    name: Draft release
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Define variables
         id: info
         run: |
           VERSION=v$(cat Cargo.toml | sed -nr 's/version = \"(.+)\"/\1/p' | head -1)
-          # gets the latest action run from the main branch
           BRANCH=main
           API_URL="https://api.github.com/repos/geode-sdk/cli/actions/workflows/build.yml/runs?per_page=1&branch=$BRANCH&event=push&status=success"
           RUN_ID=$(curl $API_URL | jq .workflow_runs[0].id)
@@ -22,41 +22,13 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
-      # - uses: actions/download-artifact@v4
-      #   with:
-      #     run-id: ${{ steps.info.outputs.run_id }}
-      #     path: ${{ github.workspace }}/artifacts
-      #     github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      # not using download-artifacts until this is possible:
-      # https://github.com/actions/download-artifact/issues/143
       - name: Download artifacts
-        uses: actions/github-script@v6
+        id: download-artifact
+        uses: dawidd6/action-download-artifact@v7
         with:
-          script: |
-            const fs = require('node:fs/promises');
+          run_id: ${{ steps.info.outputs.run_id }}
+          path: ${{ github.workspace }}/artifacts
 
-            const path = `${process.env.GITHUB_WORKSPACE}/artifacts`;
-            await fs.mkdir(path, { recursive: true });
-
-            const allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: ${{ steps.info.outputs.run_id }},
-            });
-            console.log(`Found ${allArtifacts.data.artifacts.length} artifacts!`);
-            for (const artifact of allArtifacts.data.artifacts) {
-              console.log(`Downloading ${artifact.name}`);
-              const download = await github.rest.actions.downloadArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-                archive_format: 'zip',
-              });
-              
-              await fs.writeFile(`${path}/${artifact.name}.zip`, Buffer.from(download.data));
-            }
-        
       - name: Rename files
         run: |
           cd ${{ github.workspace }}/artifacts
@@ -64,8 +36,8 @@ jobs:
           mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.version }}-mac.zip
           mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.version }}-linux.zip
 
-      - name: Create Draft Release
-        uses: softprops/action-gh-release@v1
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
