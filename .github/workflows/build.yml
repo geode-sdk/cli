@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       debug:
-        description: enable tmate debug
+        description: Enable tmate debug
         default: false
         type: boolean
   push:
