@@ -32,9 +32,9 @@ jobs:
       - name: Rename files
         run: |
           cd ${{ github.workspace }}/artifacts
-          mv geode-cli-win.zip geode-cli-${{ steps.info.outputs.version }}-win.zip
-          mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.version }}-mac.zip
-          mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.version }}-linux.zip
+          mv geode-cli-win.zip geode-cli-${{ steps.info.ref.version }}-win.zip
+          mv geode-cli-mac.zip geode-cli-${{ steps.info.ref.version }}-mac.zip
+          mv geode-cli-linux.zip geode-cli-${{ steps.info.ref.version }}-linux.zip
 
       - name: Create draft release
         uses: softprops/action-gh-release@v2
