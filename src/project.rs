@@ -26,6 +26,9 @@ pub enum Project {
 	New {
 		/// The target directory to create the project in
 		path: Option<PathBuf>,
+
+		/// Whether to make an API project for use by other mods
+		api: Option<bool>,
 	},
 
 	/// Clear this project's cached resource files
