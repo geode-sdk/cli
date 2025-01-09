@@ -29,7 +29,7 @@ fn main() {
 	let args = Args::parse();
 
 	match args.command {
-		GeodeCommands::New { path } => template::build_template(path),
+		GeodeCommands::New { path, api } => template::build_template(path, api),
 		GeodeCommands::Profile { commands } => profile::subcommand(commands),
 		GeodeCommands::Config { commands } => info::subcommand(commands),
 		GeodeCommands::Sdk { commands } => sdk::subcommand(commands),
