@@ -522,7 +522,7 @@ pub fn check_dependencies(
 
 pub fn subcommand(cmd: Project) {
 	match cmd {
-		Project::New { path } => template::build_template(path),
+		Project::New { path, api } => template::build_template(path, api),
 		Project::ClearCache => clear_cache(&std::env::current_dir().unwrap()),
 		Project::Check {
 			install_dir,
