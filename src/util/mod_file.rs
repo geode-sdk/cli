@@ -2,7 +2,7 @@ use crate::spritesheet::SpriteSheet;
 use crate::NiceUnwrap;
 use clap::ValueEnum;
 use semver::{Version, VersionReq};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de::Error};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::fs;
@@ -122,7 +122,7 @@ where
 	Ok(<HashMap<String, BitmapFont>>::deserialize(deserializer)?
 		.into_iter()
 		.map(|(name, mut font)| {
-			font.name = name.clone();
+			font.name.clone_from(&name);
 			font.path = std::env::current_dir().unwrap().join(font.path);
 			(name, font)
 		})
@@ -286,16 +286,102 @@ pub enum DependencyImportance {
 	Suggested,
 }
 
-#[derive(Default, Deserialize, PartialEq)]
+#[derive(Deserialize, PartialEq)]
 pub struct Dependency {
+	#[serde(skip)]
 	pub id: String,
 	#[serde(deserialize_with = "parse_comparable_version")]
 	pub version: VersionReq,
 	#[serde(default)]
 	pub importance: DependencyImportance,
-	pub required: Option<bool>,
 	#[serde(default = "all_platforms")]
 	pub platforms: HashSet<PlatformName>,
+}
+
+#[derive(Deserialize, PartialEq)]
+pub struct LegacyDependency {
+	pub id: String,
+	#[serde(deserialize_with = "parse_comparable_version")]
+	pub version: VersionReq,
+	#[serde(default)]
+	pub importance: DependencyImportance,
+	#[serde(default = "all_platforms")]
+	pub platforms: HashSet<PlatformName>,
+}
+
+#[derive(PartialEq)]
+pub struct Dependencies(HashMap<String, Dependency>);
+
+impl Dependencies {
+	pub fn is_empty(&self) -> bool {
+		self.0.is_empty()
+	}
+}
+
+impl<'a> IntoIterator for &'a Dependencies {
+	type IntoIter = std::collections::hash_map::Values<'a, String, Dependency>;
+	type Item = &'a Dependency;
+	fn into_iter(self) -> Self::IntoIter {
+		self.0.values()
+	}
+}
+
+// No it can't clippy Dependency doesn't impl Default
+#[allow(clippy::derivable_impls)]
+impl Default for Dependencies {
+	fn default() -> Self {
+		Self(HashMap::new())
+	}
+}
+
+fn parse_dependencies<'de, D>(deserializer: D) -> Result<Dependencies, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	// This is all to avoid union types having terrible errors 
+	// (they just log "failed to parse any variant of X")
+
+	// This is needed because deserializer is moved
+	let value = serde_json::Value::deserialize(deserializer)?;
+	
+	match <HashMap<String, serde_json::Value>>::deserialize(value.clone()) {
+		Ok(deps) => Ok(Dependencies(
+			deps.into_iter().map(|(id, json)| {
+				// Shorthand is just "[mod.id]": "[version]"
+				match parse_comparable_version(json.clone()) {
+					Ok(version) => Ok(Dependency {
+						id: id.clone(),
+						version,
+						importance: DependencyImportance::Required,
+						platforms: all_platforms(),
+					}),
+					// Longhand is "[mod.id]": { ... }
+					Err(_) => Dependency::deserialize(json)
+						// The ID isn't parsed from the object itself but is the key
+						.map(|mut d| { d.id.clone_from(&id); d })
+						.map_err(D::Error::custom)
+				}.map(|r| (id, r))
+			}).collect::<Result<_, _>>()?
+		)),
+		Err(e) => {
+			// Can be removed after Geode hits v5
+			match <Vec<LegacyDependency>>::deserialize(value) {
+				Ok(deps) => {
+					let mut res = Dependencies::default();
+					for dep in deps {
+						res.0.insert(dep.id.clone(), Dependency {
+							id: dep.id,
+							version: dep.version,
+							importance: dep.importance,
+							platforms: dep.platforms
+						});
+					}
+					Ok(res)
+				}
+				Err(_) => Err(D::Error::custom(e))
+			}
+		}
+	}
 }
 
 #[derive(Default, Deserialize, PartialEq)]
@@ -347,8 +433,8 @@ pub struct ModFileInfo {
 	pub description: String,
 	#[serde(default)]
 	pub resources: ModResources,
-	#[serde(default)]
-	pub dependencies: Vec<Dependency>,
+	#[serde(default, deserialize_with = "parse_dependencies")]
+	pub dependencies: Dependencies,
 	pub api: Option<ModApi>,
 }
 
