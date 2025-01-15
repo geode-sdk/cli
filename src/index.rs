@@ -31,6 +31,9 @@ pub enum Index {
 		/// Existing access token to use
 		#[clap(long)]
 		token: Option<String>,
+
+		#[clap(long, conflicts_with = "token")]
+		github_token: Option<String>
 	},
 
 	/// Invalidate all existing access tokens (logout)
@@ -358,7 +361,7 @@ pub fn subcommand(cmd: Index) {
 			);
 			done!("Mod installed");
 		}
-		Index::Login { token } => index_auth::login(config, token),
+		Index::Login { token, github_token } => index_auth::login(config, token, github_token),
 		Index::Invalidate => index_auth::invalidate(config),
 		Index::Url { url } => {
 			if let Some(u) = url {

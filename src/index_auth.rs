@@ -33,7 +33,7 @@ pub fn copy_token(token: &str) {
 	}
 }
 
-pub fn login(config: &mut Config, token: Option<String>) {
+pub fn login(config: &mut Config, token: Option<String>, github_token: Option<String>) {
 	if let Some(token) = token {
 		config.index_token = Some(token);
 		config.save();
@@ -49,6 +49,25 @@ pub fn login(config: &mut Config, token: Option<String>) {
 	}
 
 	let client = reqwest::blocking::Client::new();
+
+	if let Some(github_token) = github_token {
+		let response = client
+			.post(index::get_index_url("/v1/login/github/token", config))
+			.header(USER_AGENT, "GeodeCli")
+			.json(&json!({ "token": github_token }))
+			.send()
+			.nice_unwrap("Unable to connect to Geode Index");
+
+		let parsed: ApiResponse<String> = match response.status().as_u16() {
+			400 => fatal!("Invalid Github Token"),
+			200 => response.json().nice_unwrap("Unable to parse login response"),
+			_ => fatal!("Unable to connect to Geode Index"),
+		};
+
+		config.index_token = Some(parsed.payload);
+		config.save();
+		done!("Successfully logged in via Github token");
+	}
 
 	let response: reqwest::blocking::Response = client
 		.post(index::get_index_url("/v1/login/github", config))
