@@ -349,9 +349,9 @@ pub fn subcommand(cmd: Index) {
 	let config = &mut _config;
 	match cmd {
 		Index::Install { id, version } => {
-			let mut config = Config::new().assert_is_setup();
+			let config = Config::new().assert_is_setup();
 			install_mod(
-				&mut config,
+				&config,
 				&id,
 				&version.unwrap_or(VersionReq::STAR),
 				false,

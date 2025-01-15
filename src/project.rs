@@ -305,7 +305,7 @@ pub fn check_dependencies(
 	});
 
 	// check all dependencies
-	for dep in mod_info.dependencies {
+	for dep in &mod_info.dependencies {
 		// Skip dependencies not on this platform
 		if !dep.platforms.contains(&platform) {
 			continue;
@@ -349,7 +349,7 @@ pub fn check_dependencies(
 		// otherwise try to find it on installed mods and then on index
 
 		// check index
-		let found_in_index = match find_index_dependency(&dep, &config) {
+		let found_in_index = match find_index_dependency(dep, &config) {
 			Ok(f) => f,
 			Err(e) => {
 				warn!("Failed to fetch dependency {} from index: {}", &dep.id, e);
@@ -358,16 +358,14 @@ pub fn check_dependencies(
 		};
 		// check installed mods
 		let found_in_installed =
-			find_dependency(&dep, &config.get_current_profile().mods_dir(), true, false)
+			find_dependency(dep, &config.get_current_profile().mods_dir(), true, false)
 				.nice_unwrap("Unable to read installed mods");
 
 		// if not found in either        hjfod  code
 		if !matches!(found_in_index, Found::Some(_, _))
 			&& !matches!(found_in_installed, Found::Some(_, _))
 		{
-			if dep.importance == DependencyImportance::Required
-				|| dep.required.is_some() && dep.required.unwrap()
-			{
+			if dep.importance == DependencyImportance::Required {
 				fail!(
 					"Dependency '{0}' not found in installed mods nor index! \
 					If this is a mod that hasn't been published yet, install it \
@@ -515,12 +513,10 @@ pub fn check_dependencies(
 		// add a note saying if the dependencey is required or not (for cmake to
 		// know if to link or not)
 		fs::write(
-			dep_dir.join(dep.id).join("geode-dep-options.json"),
+			dep_dir.join(&dep.id).join("geode-dep-options.json"),
 			format!(
 				r#"{{ "required": {} }}"#,
-				if dep.importance == DependencyImportance::Required
-					|| dep.required.is_some() && dep.required.unwrap()
-				{
+				if dep.importance == DependencyImportance::Required {
 					"true"
 				} else {
 					"false"
@@ -552,7 +548,7 @@ fn add_resource(dir: &Path, resource: ResourceType, files: Vec<PathBuf>) {
 		let mut new_resource: Vec<Value> = resource.into_iter().chain(files.clone().into_iter().filter_map(|x| {
 			if !x.exists() { 
 				warn!("{} {} does not exist", othername, x.display());
-				return None
+				None
 			} else {
 				Some(Value::String(x.as_os_str().to_str().unwrap().to_string()))
 			}
@@ -584,7 +580,7 @@ fn add_resource(dir: &Path, resource: ResourceType, files: Vec<PathBuf>) {
 			let mut new_fonts: Vec<Value> = fonts.into_iter().chain(files.into_iter().filter_map(|x| {
 				if !x.exists() { 
 					warn!("Font {} does not exist", x.display());
-					return None
+					None
 				} else {
 					Some(json!({
 						"path": x.as_os_str().to_str().unwrap().to_string(),
