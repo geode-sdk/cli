@@ -291,7 +291,7 @@ pub fn get_user_profile(config: &mut Config) -> DeveloperProfile {
 
 	let client = reqwest::blocking::Client::new();
 
-	let url = index::get_index_url("/v1/me".to_string(), config);
+	let url = index::get_index_url("/v1/me", config);
 
 	let response = client
 		.get(url)
@@ -345,7 +345,7 @@ pub fn edit_profile(config: &mut Config) {
 			match index {
 				1 => {
 					let new_display_name = ask_value("New display name", None, true);
-					let url = index::get_index_url("/v1/me".to_string(), config);
+					let url = index::get_index_url("/v1/me", config);
 					let response = client
 						.put(url)
 						.header(USER_AGENT, "GeodeCLI")

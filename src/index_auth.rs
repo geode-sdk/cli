@@ -55,7 +55,7 @@ pub fn login(config: &mut Config, token: Option<String>) {
 	let client = reqwest::blocking::Client::new();
 
 	let response: reqwest::blocking::Response = client
-		.post(index::get_index_url("/v1/login/github".to_string(), config))
+		.post(index::get_index_url("/v1/login/github", config))
 		.header(USER_AGENT, "GeodeCli")
 		.json(&{})
 		.send()
@@ -104,7 +104,7 @@ fn poll_login(
 
 	let response = client
 		.post(index::get_index_url(
-			"/v1/login/github/poll".to_string(),
+			"/v1/login/github/poll",
 			config,
 		))
 		.json(&body)
@@ -164,7 +164,7 @@ fn invalidate_index_tokens(config: &mut Config) {
 	let client = reqwest::blocking::Client::new();
 
 	let response = client
-		.delete(index::get_index_url("/v1/me/tokens".to_string(), config))
+		.delete(index::get_index_url("/v1/me/tokens", config))
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(token)
 		.send()

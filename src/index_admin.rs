@@ -300,7 +300,7 @@ fn list_pending_mods(config: &Config) {
 fn get_developer_profile(username: &str, config: &Config) -> Option<DeveloperProfile> {
 	let client = reqwest::blocking::Client::new();
 
-	let url = index::get_index_url("/v1/developers".to_string(), config);
+	let url = index::get_index_url("/v1/developers", config);
 
 	let response = client
 		.get(url)

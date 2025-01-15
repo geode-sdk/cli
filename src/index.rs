@@ -225,7 +225,7 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		download_link: download_link.to_string(),
 	};
 
-	let url = get_index_url("/v1/mods".to_string(), config);
+	let url = get_index_url("/v1/mods", config);
 
 	info!("Creating mod");
 
@@ -308,11 +308,11 @@ fn set_index_url(url: String, config: &mut Config) {
 	info!("Index URL set to: {}", config.index_url);
 }
 
-pub fn get_index_url(path: String, config: &Config) -> String {
+pub fn get_index_url(path: impl AsRef<str>, config: &Config) -> String {
 	format!(
 		"{}/{}",
 		config.index_url.trim_end_matches('/'),
-		path.trim_start_matches('/')
+		path.as_ref().trim_start_matches('/')
 	)
 }
 
