@@ -1,7 +1,8 @@
 #[cfg(not(target_os = "android"))]
 use cli_clipboard::ClipboardProvider;
 use reqwest::header::USER_AGENT;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde_json::json;
 
 use crate::{
 	config::Config, done, fatal, index, info, logging::ask_value, server::ApiResponse, warn,
@@ -14,11 +15,6 @@ struct LoginAttempt {
 	interval: i32,
 	uri: String,
 	code: String,
-}
-
-#[derive(Serialize)]
-struct LoginPoll {
-	uuid: String,
 }
 
 #[cfg(not(target_os = "android"))]
@@ -98,16 +94,12 @@ fn poll_login(
 	uuid: &str,
 	config: &mut Config,
 ) -> Option<String> {
-	let body: LoginPoll = LoginPoll {
-		uuid: uuid.to_string(),
-	};
-
 	let response = client
 		.post(index::get_index_url(
 			"/v1/login/github/poll",
 			config,
 		))
-		.json(&body)
+		.json(&json!({ "uuid": uuid }))
 		.header(USER_AGENT, "GeodeCLI")
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");

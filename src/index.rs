@@ -6,6 +6,7 @@ use clap::Subcommand;
 use reqwest::header::USER_AGENT;
 use semver::VersionReq;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sha3::{Digest, Sha3_256};
 use std::fs;
 use std::io::Cursor;
@@ -216,15 +217,6 @@ fn create_mod(download_link: &str, config: &mut Config) {
 
 	let client = reqwest::blocking::Client::new();
 
-	#[derive(Serialize)]
-	struct Payload {
-		download_link: String,
-	}
-
-	let payload = Payload {
-		download_link: download_link.to_string(),
-	};
-
 	let url = get_index_url("/v1/mods", config);
 
 	info!("Creating mod");
@@ -233,7 +225,7 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		.post(url)
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
-		.json(&payload)
+		.json(&json!({ "download_link": download_link }))
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
@@ -260,15 +252,6 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 
 	let client = reqwest::blocking::Client::new();
 
-	#[derive(Serialize)]
-	struct Payload {
-		download_link: String,
-	}
-
-	let payload = Payload {
-		download_link: download_link.to_string(),
-	};
-
 	let url = get_index_url(format!("/v1/mods/{}/versions", id), config);
 
 	info!("Updating mod");
@@ -277,7 +260,7 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 		.post(url)
 		.header(USER_AGENT, "GeodeCLI")
 		.bearer_auth(config.index_token.clone().unwrap())
-		.json(&payload)
+		.json(&json!({ "download_link": download_link }))
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
