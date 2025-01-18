@@ -26,7 +26,7 @@ Command-line utilities for working w/ Geode.
 4. Run `cd cli`
 5. Run `cargo install --path . --release`
 
-#### Method 3 - NIXOS USERS ONLY (From a Nix Flake):
+#### Method 3 - (NIXOS USERS ONLY) From a Nix Flake:
 - If you have flakes enabled, run `nix profile install github:geode-sdk/cli#default`
 - If not, run the following:
 ```bash
