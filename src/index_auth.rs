@@ -67,6 +67,7 @@ pub fn login(config: &mut Config, token: Option<String>, github_token: Option<St
 		config.index_token = Some(parsed.payload);
 		config.save();
 		done!("Successfully logged in via Github token");
+		return;
 	}
 
 	let response: reqwest::blocking::Response = client
