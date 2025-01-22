@@ -247,8 +247,8 @@ pub fn build_template(location: Option<PathBuf>) {
 
 	let mod_id = format!(
 		"{}.{}",
-		final_developer.to_lowercase().replace(' ', "_"),
-		final_name.to_lowercase().replace(' ', "_")
+		final_developer.to_lowercase().replace(' ', "_").replace("\"", ""),
+		final_name.to_lowercase().replace(' ', "_").replace("\"", "")
 	);
 
 	let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
@@ -262,11 +262,11 @@ pub fn build_template(location: Option<PathBuf>) {
 	create_template(CreateTemplate {
 		template,
 		project_location: final_location,
-		name: final_name,
+		name: final_name.replace("\"", "\\\""),
 		version: final_version,
 		id: mod_id,
-		developer: final_developer,
-		description: final_description,
+		developer: final_developer.replace("\"", "\\\""),
+		description: final_description.replace("\"", "\\\""),
 		strip,
 		action,
 	});
