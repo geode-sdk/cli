@@ -33,7 +33,7 @@ pub enum Index {
 		token: Option<String>,
 
 		#[clap(long, conflicts_with = "token")]
-		github_token: Option<String>
+		github_token: Option<String>,
 	},
 
 	/// Invalidate all existing access tokens (logout)
@@ -353,15 +353,13 @@ pub fn subcommand(cmd: Index) {
 	match cmd {
 		Index::Install { id, version } => {
 			let config = Config::new().assert_is_setup();
-			install_mod(
-				&config,
-				&id,
-				&version.unwrap_or(VersionReq::STAR),
-				false,
-			);
+			install_mod(&config, &id, &version.unwrap_or(VersionReq::STAR), false);
 			done!("Mod installed");
 		}
-		Index::Login { token, github_token } => index_auth::login(config, token, github_token),
+		Index::Login {
+			token,
+			github_token,
+		} => index_auth::login(config, token, github_token),
 		Index::Invalidate => index_auth::invalidate(config),
 		Index::Url { url } => {
 			if let Some(u) = url {
