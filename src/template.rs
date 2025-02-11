@@ -247,8 +247,14 @@ pub fn build_template(location: Option<PathBuf>) {
 
 	let mod_id = format!(
 		"{}.{}",
-		final_developer.to_lowercase().replace(' ', "_").replace("\"", ""),
-		final_name.to_lowercase().replace(' ', "_").replace("\"", "")
+		final_developer
+			.to_lowercase()
+			.replace(' ', "_")
+			.replace("\"", ""),
+		final_name
+			.to_lowercase()
+			.replace(' ', "_")
+			.replace("\"", "")
 	);
 
 	let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
