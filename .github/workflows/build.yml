@@ -4,138 +4,135 @@ on:
   workflow_dispatch:
     inputs:
       debug:
-        description: enable tmate debug
+        description: Enable tmate debug
         default: false
         type: boolean
   push:
     paths:
-    - "src/**"
-    - "Cargo.toml"
-    - "build.rs"
-    - ".github/workflows/build.yml"
+      - "src/**"
+      - "Cargo.toml"
+      - "build.rs"
+      - ".github/workflows/build.yml"
     branches: [ main ]
 
 jobs:
   build:
+    name: Build
     strategy:
       fail-fast: false
       matrix:
         config:
-        - name: "Windows"
-          id: win
-          os: ubuntu-latest
-          executable: 'geode.exe'
-          prebuild: 'sudo apt-get install gcc-mingw-w64-x86-64'
-          target: x86_64-pc-windows-gnu
+          - name: "Windows"
+            id: win
+            os: ubuntu-latest
+            executable: "geode.exe"
+            prebuild: "sudo apt-get install gcc-mingw-w64-x86-64"
+            target: x86_64-pc-windows-gnu
 
-        - name: "macOS"
-          id: mac
-          os: macos-latest
-          executable: 'geode'
-          prebuild: |
-            brew fetch --force --bottle-tag=ventura openssl@3
-            brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
-            export OPENSSL_STATIC=1
-            export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
-          target: x86_64-apple-darwin
+          - name: "macOS"
+            id: mac
+            os: macos-latest
+            executable: "geode"
+            prebuild: |
+              brew fetch --force --bottle-tag=ventura openssl@3
+              brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
+              export OPENSSL_STATIC=1
+              export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
+            target: x86_64-apple-darwin
 
-        - name: "Linux"
-          id: linux
-          os: ubuntu-22.04
-          # ubuntu-latest is currently a mix of 22.04 and 24.04
-          # so we are not able to use that until January 17, 2025 at least
-          # if we want compatibility with said version on GH actions
-          # see also https://github.com/actions/runner-images/issues/10636
-          executable: 'geode'
-          # some stupid old ubuntu versions cant install libssl3
-          prebuild: 'export OPENSSL_STATIC=1'
-          target: x86_64-unknown-linux-gnu
+          - name: "Linux"
+            id: linux
+            os: ubuntu-latest
+            executable: "geode"
+            prebuild: "export OPENSSL_STATIC=1"
+            target: x86_64-unknown-linux-gnu
 
     name: Build ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        toolchain: stable
-        targets: ${{ matrix.config.target }}
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.config.target }}
 
-    - uses: Swatinem/rust-cache@v2
-      with:
-        key: ${{ matrix.config.id }}
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.config.id }}
 
-    - name: Build
-      run: |
-        ${{ matrix.config.prebuild }}
-        cargo build --release --target ${{ matrix.config.target }}
+      - name: Build
+        run: |
+          ${{ matrix.config.prebuild }}
+          cargo build --release --target ${{ matrix.config.target }}
 
-    - name: Move to output folder
-      shell: bash
-      run: |
-        mkdir ./out
-        mv ./target/${{ matrix.config.target }}/release/${{ matrix.config.executable }} ./out
+      - name: Move executable to output folder
+        shell: bash
+        run: |
+          mkdir ./out
+          mv ./target/${{ matrix.config.target }}/release/${{ matrix.config.executable }} ./out
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: geode-cli-${{ matrix.config.id }}
-        path: ./out/
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: geode-cli-${{ matrix.config.id }}
+          path: ./out/
 
-    - name: Setup tmate session
-      if: ${{ failure() && inputs.debug && matrix.config.id == 'mac' }}
-      uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
+      - name: Setup tmate debug session
+        if: ${{ failure() && inputs.debug && matrix.config.id == 'mac' }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
 
   publish:
     name: Publish
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Declare Version Variables
-      id: ref
-      run: |
-        echo "version=$(cat VERSION | xargs)" >> $GITHUB_OUTPUT
-        echo "hash=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
+      - name: Declare version variables
+        id: ref
+        run: |
+          echo "version=$(cat VERSION | xargs)" >> $GITHUB_OUTPUT
+          echo "hash=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_OUTPUT
 
-    - name: Download Artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ${{ github.workspace }}/artifacts
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ github.workspace }}/artifacts
 
-    # TODO: change when this is fixed https://github.com/actions/download-artifact/issues/143
+      - name: Zip Windows artifacts
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: artifacts/geode-cli-win/geode.exe
+          dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-win.zip
 
-    - name: Zip Windows Artifacts
-      uses: vimtor/action-zip@v1.2
-      with:
-        files: artifacts/geode-cli-win/geode.exe
-        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-win.zip
+      - name: Zip macOS artifacts
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: artifacts/geode-cli-mac/geode
+          dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-mac.zip
 
-    - name: Zip macOS Artifacts
-      uses: vimtor/action-zip@v1.2
-      with:
-        files: artifacts/geode-cli-mac/geode
-        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-mac.zip
+      - name: Zip Linux artifacts
+        uses: vimtor/action-zip@v1.2
+        with:
+          files: artifacts/geode-cli-linux/geode
+          dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux.zip
 
-    - name: Zip Linux Artifacts
-      uses: vimtor/action-zip@v1.2
-      with:
-        files: artifacts/geode-cli-linux/geode
-        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux.zip
-
-    - name: Update Development Release
-      uses: andelf/nightly-release@main
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: nightly
-        name: 'Development Release'
-        body: Geode CLI development release for commit ${{ github.sha }}.
-        files: |
-          ./artifacts/*.zip
+      - name: Update development release
+        uses: andelf/nightly-release@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: nightly
+          name: "Development Release"
+          body: "Geode CLI development release for commit ${{ github.sha }}."
+          files: |
+            ./artifacts/*.zip
