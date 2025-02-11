@@ -2,7 +2,7 @@ use crate::spritesheet::SpriteSheet;
 use crate::NiceUnwrap;
 use clap::ValueEnum;
 use semver::{Version, VersionReq};
-use serde::{Deserialize, Deserializer, de::Error};
+use serde::{de::Error, Deserialize, Deserializer};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::fs;
@@ -338,30 +338,36 @@ fn parse_dependencies<'de, D>(deserializer: D) -> Result<Dependencies, D::Error>
 where
 	D: Deserializer<'de>,
 {
-	// This is all to avoid union types having terrible errors 
+	// This is all to avoid union types having terrible errors
 	// (they just log "failed to parse any variant of X")
 
 	// This is needed because deserializer is moved
 	let value = serde_json::Value::deserialize(deserializer)?;
-	
+
 	match <HashMap<String, serde_json::Value>>::deserialize(value.clone()) {
 		Ok(deps) => Ok(Dependencies(
-			deps.into_iter().map(|(id, json)| {
-				// Shorthand is just "[mod.id]": "[version]"
-				match parse_comparable_version(json.clone()) {
-					Ok(version) => Ok(Dependency {
-						id: id.clone(),
-						version,
-						importance: DependencyImportance::Required,
-						platforms: all_platforms(),
-					}),
-					// Longhand is "[mod.id]": { ... }
-					Err(_) => Dependency::deserialize(json)
-						// The ID isn't parsed from the object itself but is the key
-						.map(|mut d| { d.id.clone_from(&id); d })
-						.map_err(D::Error::custom)
-				}.map(|r| (id, r))
-			}).collect::<Result<_, _>>()?
+			deps.into_iter()
+				.map(|(id, json)| {
+					// Shorthand is just "[mod.id]": "[version]"
+					match parse_comparable_version(json.clone()) {
+						Ok(version) => Ok(Dependency {
+							id: id.clone(),
+							version,
+							importance: DependencyImportance::Required,
+							platforms: all_platforms(),
+						}),
+						// Longhand is "[mod.id]": { ... }
+						Err(_) => Dependency::deserialize(json)
+							// The ID isn't parsed from the object itself but is the key
+							.map(|mut d| {
+								d.id.clone_from(&id);
+								d
+							})
+							.map_err(D::Error::custom),
+					}
+					.map(|r| (id, r))
+				})
+				.collect::<Result<_, _>>()?,
 		)),
 		Err(e) => {
 			// Can be removed after Geode hits v5
@@ -369,16 +375,19 @@ where
 				Ok(deps) => {
 					let mut res = Dependencies::default();
 					for dep in deps {
-						res.0.insert(dep.id.clone(), Dependency {
-							id: dep.id,
-							version: dep.version,
-							importance: dep.importance,
-							platforms: dep.platforms
-						});
+						res.0.insert(
+							dep.id.clone(),
+							Dependency {
+								id: dep.id,
+								version: dep.version,
+								importance: dep.importance,
+								platforms: dep.platforms,
+							},
+						);
 					}
 					Ok(res)
 				}
-				Err(_) => Err(D::Error::custom(e))
+				Err(_) => Err(D::Error::custom(e)),
 			}
 		}
 	}
