@@ -1,6 +1,3 @@
-use serde_json::json;
-use clap::ValueEnum;
-use serde::Deserialize;
 use crate::logging::ask_value;
 use crate::mod_file::{PlatformName, ToGeodeString};
 use crate::util::mod_file::DependencyImportance;
@@ -14,22 +11,25 @@ use crate::{
 	},
 };
 use clap::Subcommand;
+use clap::ValueEnum;
 use edit_distance::edit_distance;
 use semver::Version;
+use serde::Deserialize;
+use serde_json::json;
+use serde_json::Value;
 use std::env;
 use std::{
 	collections::HashMap,
 	fs,
 	path::{Path, PathBuf},
 };
-use serde_json::Value;
 
 #[derive(Debug, Deserialize, Hash, PartialEq, Eq, Clone, Copy, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum ResourceType {
 	Sprite,
 	Font,
-	File
+	File,
 }
 
 #[derive(Subcommand, Debug)]
@@ -69,8 +69,8 @@ pub enum Project {
 	Add {
 		/// Type of resource to add
 		resource: ResourceType,
-		files: Vec<PathBuf>
-	}
+		files: Vec<PathBuf>,
+	},
 }
 
 fn find_build_directory(root: &Path) -> Option<PathBuf> {
@@ -534,36 +534,53 @@ pub fn check_dependencies(
 }
 
 fn add_resource(dir: &Path, resource: ResourceType, files: Vec<PathBuf>) {
-	let mut mod_json: HashMap<String, Value> = serde_json::from_reader(fs::File::open(dir.join("mod.json")).ok().nice_unwrap("Must be inside a project with a mod.json"))
-		.nice_unwrap("Unable to read mod.json");
-
+	let mut mod_json: HashMap<String, Value> = serde_json::from_reader(
+		fs::File::open(dir.join("mod.json"))
+			.ok()
+			.nice_unwrap("Must be inside a project with a mod.json"),
+	)
+	.nice_unwrap("Unable to read mod.json");
 
 	let mut do_thing = |name: &str, othername: &str| {
-		let resource = mod_json.get("resources")
+		let resource = mod_json
+			.get("resources")
 			.and_then(|x| x.get(name))
 			.and_then(|x| x.as_array())
 			.unwrap_or(&vec![])
 			.clone();
 
-		let mut new_resource: Vec<Value> = resource.into_iter().chain(files.clone().into_iter().filter_map(|x| {
-			if !x.exists() { 
-				warn!("{} {} does not exist", othername, x.display());
-				None
-			} else {
-				Some(Value::String(x.as_os_str().to_str().unwrap().to_string()))
-			}
-		})).collect();
+		let mut new_resource: Vec<Value> = resource
+			.into_iter()
+			.chain(files.clone().into_iter().filter_map(|x| {
+				if !x.exists() {
+					warn!("{} {} does not exist", othername, x.display());
+					None
+				} else {
+					Some(Value::String(x.as_os_str().to_str().unwrap().to_string()))
+				}
+			}))
+			.collect();
 
-		let mut duplicates: Vec<_> = new_resource.iter().filter(|x| new_resource.iter().filter(|y| y == x).count() > 1).collect();
+		let mut duplicates: Vec<_> = new_resource
+			.iter()
+			.filter(|x| new_resource.iter().filter(|y| y == x).count() > 1)
+			.collect();
 		duplicates.dedup();
-		duplicates.into_iter().for_each(|x| warn!("Duplicate {}: {}", othername, x));
+		duplicates
+			.into_iter()
+			.for_each(|x| warn!("Duplicate {}: {}", othername, x));
 
 		new_resource.dedup();
 
-		*mod_json.entry("resources".to_string()).or_insert(json!({}))
-			.as_object_mut().nice_unwrap("resources is not an object")
-			.entry(name.to_string()).or_insert(json!([]))
-			.as_array_mut().nice_unwrap(&format!("{} is not an array", name)) = new_resource;
+		*mod_json
+			.entry("resources".to_string())
+			.or_insert(json!({}))
+			.as_object_mut()
+			.nice_unwrap("resources is not an object")
+			.entry(name.to_string())
+			.or_insert(json!([]))
+			.as_array_mut()
+			.nice_unwrap(&format!("{} is not an array", name)) = new_resource;
 	};
 
 	match resource {
@@ -571,38 +588,67 @@ fn add_resource(dir: &Path, resource: ResourceType, files: Vec<PathBuf>) {
 		ResourceType::File => do_thing("files", "File"),
 
 		ResourceType::Font => {
-			let fonts = mod_json.get("resources")
+			let fonts = mod_json
+				.get("resources")
 				.and_then(|x| x.get("fonts"))
 				.and_then(|x| x.as_array())
 				.unwrap_or(&vec![])
 				.clone();
 
-			let mut new_fonts: Vec<Value> = fonts.into_iter().chain(files.into_iter().filter_map(|x| {
-				if !x.exists() { 
-					warn!("Font {} does not exist", x.display());
-					None
-				} else {
-					Some(json!({
-						"path": x.as_os_str().to_str().unwrap().to_string(),
-						"size": ask_value("Font Size", None, true).parse::<u32>().ok().nice_unwrap("Invalid font size!")
-					}))
-				}
-			})).collect();
+			let mut new_fonts: Vec<Value> = fonts
+				.into_iter()
+				.chain(files.into_iter().filter_map(|x| {
+					if !x.exists() {
+						warn!("Font {} does not exist", x.display());
+						None
+					} else {
+						let size = ask_value("Font Size", None, true)
+							.parse::<u32>()
+							.ok()
+							.nice_unwrap("Invalid font size!");
 
-			let mut duplicates: Vec<_> = new_fonts.iter().filter_map(|x| x.get("path")).filter(|x| new_fonts.iter().filter(|y| y.get("path").map(|y| y == *x).unwrap_or(false)).count() > 1).collect();
+						Some(json!({
+							"path": x.as_os_str().to_str().unwrap().to_string(),
+							"size": size
+						}))
+					}
+				}))
+				.collect();
+
+			let mut duplicates: Vec<_> = new_fonts
+				.iter()
+				.filter_map(|x| x.get("path"))
+				.filter(|x| {
+					new_fonts
+						.iter()
+						.filter(|y| y.get("path").map(|y| y == *x).unwrap_or(false))
+						.count() > 1
+				})
+				.collect();
 			duplicates.dedup();
-			duplicates.into_iter().for_each(|x| warn!("Duplicate Font: {}", x));
+			duplicates
+				.into_iter()
+				.for_each(|x| warn!("Duplicate Font: {}", x));
 
 			new_fonts.dedup();
 
-			*mod_json.entry("resources".to_string()).or_insert(json!({}))
-				.as_object_mut().nice_unwrap("resources is not an object")
-				.entry("fonts".to_string()).or_insert(json!([]))
-				.as_array_mut().nice_unwrap("fonts is not an array") = new_fonts;
+			*mod_json
+				.entry("resources".to_string())
+				.or_insert(json!({}))
+				.as_object_mut()
+				.nice_unwrap("resources is not an object")
+				.entry("fonts".to_string())
+				.or_insert(json!([]))
+				.as_array_mut()
+				.nice_unwrap("fonts is not an array") = new_fonts;
 		}
-};
+	};
 
-	fs::write(dir.join("mod.json"), serde_json::to_string_pretty(&mod_json).unwrap()).nice_unwrap("Failed to save mod.json");
+	fs::write(
+		dir.join("mod.json"),
+		serde_json::to_string_pretty(&mod_json).unwrap(),
+	)
+	.nice_unwrap("Failed to save mod.json");
 
 	done!("Resource added to mod.json");
 }
@@ -621,10 +667,8 @@ pub fn subcommand(cmd: Project) {
 			platform,
 			externals,
 		),
-		Project::Add { resource, files } => add_resource(
-			&std::env::current_dir().unwrap(),
-			resource,
-			files
-		),
+		Project::Add { resource, files } => {
+			add_resource(&std::env::current_dir().unwrap(), resource, files)
+		}
 	}
 }

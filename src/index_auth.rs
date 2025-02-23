@@ -60,7 +60,9 @@ pub fn login(config: &mut Config, token: Option<String>, github_token: Option<St
 
 		let parsed: ApiResponse<String> = match response.status().as_u16() {
 			400 => fatal!("Invalid Github Token"),
-			200 => response.json().nice_unwrap("Unable to parse login response"),
+			200 => response
+				.json()
+				.nice_unwrap("Unable to parse login response"),
 			_ => fatal!("Unable to connect to Geode Index"),
 		};
 
@@ -115,10 +117,7 @@ fn poll_login(
 	config: &mut Config,
 ) -> Option<String> {
 	let response = client
-		.post(index::get_index_url(
-			"/v1/login/github/poll",
-			config,
-		))
+		.post(index::get_index_url("/v1/login/github/poll", config))
 		.json(&json!({ "uuid": uuid }))
 		.header(USER_AGENT, "GeodeCLI")
 		.send()
