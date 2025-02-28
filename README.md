@@ -49,7 +49,7 @@ We provide linux binaries [in every release](https://github.com/geode-sdk/cli/re
 [geode-cli-bin](https://aur.archlinux.org/packages/geode-cli-bin)
 
 ### From source
-> **Note**: This require a [local rust installation](https://www.rust-lang.org/tools/install), and can take a very long time
+> **Note**: This requires a [local rust installation](https://www.rust-lang.org/tools/install), and may take a very long time
 ```
 cargo install --git https://github.com/geode-sdk/cli
 ```
