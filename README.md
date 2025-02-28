@@ -43,7 +43,7 @@ brew install geode-sdk/geode/geode-cli
 ### Linux
 We provide linux binaries [in every release](https://github.com/geode-sdk/cli/releases/latest).
 
-### Arch Linux (Unoffical AUR package)
+### Arch Linux (Unofficial AUR package)
 > **Note**: This package is unofficial and not maintained by us. Use at your own risk.
 
 [geode-cli-bin](https://aur.archlinux.org/packages/geode-cli-bin)
