@@ -322,10 +322,10 @@ fn extract_from_cache(
 	if !shut_up {
 		info!("Extracting '{}' from cache", path_name);
 	}
-	return cache_bundle.try_extract_cached_into(
+	cache_bundle.try_extract_cached_into(
 		path_name,
 		&working_dir.join(path.file_name().unwrap().to_str().unwrap()),
-	);
+	)
 }
 
 pub fn get_font_bundles(

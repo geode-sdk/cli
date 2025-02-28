@@ -5,7 +5,7 @@ use crate::{done, fatal, index_admin, index_auth, index_dev, info, NiceUnwrap};
 use clap::Subcommand;
 use reqwest::header::USER_AGENT;
 use semver::VersionReq;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use sha3::{Digest, Sha3_256};
 use std::fs;

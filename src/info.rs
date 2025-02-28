@@ -207,7 +207,7 @@ pub fn subcommand(cmd: Info) {
 			}
 
 			config.sdk_nightly =
-				Config::try_sdk_path().map_or(false, |path| path.join("bin/nightly").exists());
+				Config::try_sdk_path().is_ok_and(|path| path.join("bin/nightly").exists());
 
 			done!("Config setup finished");
 			config.save();

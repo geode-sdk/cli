@@ -366,10 +366,7 @@ fn update_dev_status(config: &Config) {
 
 	let client = reqwest::blocking::Client::new();
 
-	let url = index::get_index_url(
-		format!("/v1/developers/{}", developer.id).to_string(),
-		config,
-	);
+	let url = index::get_index_url(format!("/v1/developers/{}", developer.id), config);
 	let response = client
 		.put(url)
 		.bearer_auth(config.index_token.as_ref().unwrap())

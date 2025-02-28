@@ -580,7 +580,7 @@ fn add_resource(dir: &Path, resource: ResourceType, files: Vec<PathBuf>) {
 			.entry(name.to_string())
 			.or_insert(json!([]))
 			.as_array_mut()
-			.nice_unwrap(&format!("{} is not an array", name)) = new_resource;
+			.nice_unwrap(format!("{} is not an array", name)) = new_resource;
 	};
 
 	match resource {

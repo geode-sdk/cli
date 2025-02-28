@@ -151,7 +151,7 @@ pub fn run_profile(profile: Option<String>, background: RunBackground, launch_ar
 
 	if background == RunBackground::ForegroundStay {
 		info!("Press any key to exit");
-		crossterm_input::input().read_char().unwrap_or('\0');
+		_ = crossterm_input::input().read_char();
 	}
 }
 
