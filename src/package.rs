@@ -290,11 +290,23 @@ fn create_package(
 	);
 
 	// Custom hardcoded resources
-	for file in &["logo.png", "about.md", "changelog.md", "support.md"] {
+	for file in ["logo.png", "about.md", "changelog.md", "support.md"] {
 		let path = root_path.join(file);
 		if path.exists() {
 			std::fs::copy(path, working_dir.join(file))
 				.nice_unwrap(format!("Could not copy {file}"));
+		}
+	}
+
+	// Use readme as about.md if its missing
+	if !root_path.join("about.md").exists() {
+		for file in ["README.md", "readme.md", "Readme.md"] {
+			let path = root_path.join(file);
+			if path.exists() {
+				std::fs::copy(path, working_dir.join("about.md"))
+					.nice_unwrap(format!("Could not copy {file}"));
+				break;
+			}
 		}
 	}
 
