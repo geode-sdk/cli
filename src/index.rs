@@ -7,7 +7,6 @@ use reqwest::header::USER_AGENT;
 use semver::VersionReq;
 use serde::Deserialize;
 use serde_json::json;
-use sha3::{Digest, Sha3_256};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -140,18 +139,16 @@ pub fn install_mod(
 		.mods_dir()
 		.join(format!("{id}.geode"));
 
-	let mut hasher = Sha3_256::new();
-	hasher.update(&bytes);
-	let hash = hex::encode(hasher.finalize());
+	let hash = sha256::digest(bytes.as_ref());
 
-	if hash != found_version.version {
+	if hash != found_version.hash {
 		fatal!(
-			"Downloaded file doesn't match nice_unwraped hash\n\
+			"Downloaded file doesn't match expected hash\n\
 			    {hash}\n\
 			 vs {}\n\
 			Try again, and if the issue persists, report this on GitHub: \
 			https://github.com/geode-sdk/cli/issues/new",
-			found_version.version
+			found_version.hash
 		);
 	}
 

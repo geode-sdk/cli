@@ -38,7 +38,6 @@ semver = "1.0.23"
 reqwest = { version = "0.12.5", features = ["json", "blocking"] }
 cfg-if = "1.0.0"
 regex = "1.10.5"
-sha3 = "0.10.8"
 hex = "0.4.3"
 edit-distance = "2.1.0"
 which = "6.0.1"
