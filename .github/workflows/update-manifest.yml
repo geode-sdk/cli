@@ -20,7 +20,7 @@ jobs:
       with:
         repository: geode-sdk/homebrew-geode
         path: homebrew-geode
-        token: ${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}
+        token: ${{ secrets.GEODE_BOT_SSH_KEY }}
 
     - name: Fetch release info
       uses: actions/github-script@v6
@@ -53,9 +53,8 @@ jobs:
       shell: bash
       working-directory: ${{ github.workspace }}/homebrew-geode
       run: |
-        git config --local user.email "${{ secrets.GEODE_BOT_EMAIL }}"
+        git config --local user.email "98838525+GeodeBot@users.noreply.github.com"
         git config --local user.name "GeodeBot"
         git add .
         git commit -m "Update CLI"
-        git remote set-url origin "https://GeodeBot:${{ secrets.GEODE_BOT_PUSH_BIN_TOKEN }}@github.com/geode-sdk/homebrew-geode.git"
-        git push || true
+        git push
