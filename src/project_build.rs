@@ -113,6 +113,15 @@ pub fn build_project(
 				conf_args.push("-DGEODE_DONT_INSTALL_MODS=1".into());
 			}
 		}
+		PlatformName::IOS => {
+			if cross_compiling && cfg!(not(target_os = "macos")) {
+				fatal!("Sorry! but we do not know of any way to cross-compile to iOS when not using MacOS.");
+			}
+			conf_args.push("-DCMAKE_SYSTEM_NAME=iOS".into());
+			conf_args.push("-DGEODE_TARGET_PLATFORM=iOS".into());
+			// TODO: cli cant install to a mobile device, yet
+			conf_args.push("-DGEODE_DONT_INSTALL_MODS=1".into());
+		}
 	}
 
 	let build_type = config_type.unwrap_or_else(|| {
