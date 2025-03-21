@@ -23,6 +23,8 @@ geode index mods create
 ## Installation
 *(For more in depth information see the docs.)*
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/geode-sdk-cli.svg)](https://repology.org/project/geode-sdk-cli/versions)
+
 ### Windows (scoop)
 ```
 scoop bucket add extras
