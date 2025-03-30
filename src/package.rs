@@ -444,6 +444,10 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
 
 		for file in files {
+			// skip files in folders
+			if file.contains('/') {
+				continue;
+			}
 			if potential_names.iter().any(|x| file.ends_with(*x)) {
 				println!("{}", file);
 
