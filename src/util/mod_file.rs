@@ -222,6 +222,7 @@ pub enum PlatformName {
 	#[serde(rename = "win")]
 	#[value(alias = "win")]
 	Windows,
+	#[serde(rename = "mac")]
 	#[value(alias = "mac")]
 	MacOS,
 	#[serde(rename = "mac-intel")]
