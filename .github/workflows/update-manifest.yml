@@ -20,7 +20,7 @@ jobs:
       with:
         repository: geode-sdk/homebrew-geode
         path: homebrew-geode
-        token: ${{ secrets.GEODE_BOT_SSH_KEY }}
+        ssh-key: ${{ secrets.GEODE_BOT_SSH_KEY }}
 
     - name: Fetch release info
       uses: actions/github-script@v6
