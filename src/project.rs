@@ -439,7 +439,7 @@ pub fn check_dependencies(
 		let path_to_dep_geode;
 		let _geode_info;
 		match (found_in_installed, found_in_index) {
-			(Found::Some(inst_path, inst_info), Found::Some(_, _)) => {
+			(Found::Some(_, _), Found::Some(inst_path, inst_info)) => {
 				info!("Dependency '{}' found", dep.id);
 				path_to_dep_geode = inst_path;
 				_geode_info = inst_info;
