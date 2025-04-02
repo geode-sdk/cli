@@ -306,8 +306,27 @@ pub fn check_dependencies(
 
 	// check all dependencies
 	for dep in &mod_info.dependencies {
+		let mut platforms = dep.platforms.clone();
+
+		// Fix platform aliases
+		if platforms.contains(&PlatformName::Android) {
+			platforms.insert(PlatformName::Android64);
+			platforms.insert(PlatformName::Android32);
+		}
+
+		if platforms.contains(&PlatformName::MacOS) {
+			platforms.insert(PlatformName::MacArm);
+			platforms.insert(PlatformName::MacIntel);
+		}
+		if platform == PlatformName::MacOS
+			&& (platforms.contains(&PlatformName::MacArm)
+				|| platforms.contains(&PlatformName::MacIntel))
+		{
+			platforms.insert(PlatformName::MacOS);
+		}
+
 		// Skip dependencies not on this platform
-		if !dep.platforms.contains(&platform) {
+		if !platforms.contains(&platform) {
 			continue;
 		}
 
