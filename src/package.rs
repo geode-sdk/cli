@@ -438,7 +438,7 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		.nice_unwrap("Unable to create zip writer");
 
 	for archive in &mut archives {
-		let potential_names = [".dylib", ".so", ".dll", ".lib"];
+		let potential_names = [".dylib", ".so", ".dll", ".lib", ".pdb"];
 
 		// Rust borrow checker lol xd
 		let files: Vec<_> = archive.file_names().map(|x| x.to_string()).collect();
