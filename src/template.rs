@@ -232,13 +232,13 @@ pub fn build_template(location: Option<PathBuf>) {
 		println!();
 		info!("Here you can use any github repository");
 		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
-		is_local_repo = true;
 		ask_value("Template", Some(""), false)
 	} else if template_index == template_options.len() - 1 {
+		is_local_repo = true;
 		println!();
 		info!("Here you can use any local git repository");
-		info!("Please provide a local path to clone the repository from.");
-		info!("It can be either a relative or a full path.");
+		info!("Please provide a local path to clone the repository from");
+		info!("It can be either a relative or a full path");
 		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
 		ask_value("Template", Some(""), false)
 	} else {
