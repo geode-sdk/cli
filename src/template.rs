@@ -13,6 +13,7 @@ use std::path::PathBuf;
 
 struct CreateTemplate {
 	pub template: String,
+	pub is_local_repo: bool,
 	pub project_location: PathBuf,
 	pub name: String,
 	pub version: String,
@@ -57,13 +58,23 @@ fn create_template(template: CreateTemplate) {
 	};
 
 	// Clone repository
-	RepoBuilder::new()
-		.branch(branch)
-		.clone(
-			format!("https://github.com/{}", used_template).as_str(),
-			&template.project_location,
-		)
-		.nice_unwrap("Unable to clone repository");
+	if template.is_local_repo {
+		RepoBuilder::new()
+			.branch(branch)
+			.clone(
+				used_template,
+				&template.project_location,
+			)
+			.nice_unwrap("Unable to clone repository");
+	} else { 
+		RepoBuilder::new()
+			.branch(branch)
+			.clone(
+				format!("https://github.com/{}", used_template).as_str(),
+				&template.project_location,
+			)
+			.nice_unwrap("Unable to clone repository");
+	}
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
 		warn!("Unable to remove .git directory");
@@ -184,6 +195,7 @@ pub fn build_template(location: Option<PathBuf>) {
 
 	info!("Choose a template for the mod to be created:");
 
+	let mut is_local_repo = false;
 	let template_options = [
 		(
 			"Default - Simple mod that adds a button to the main menu.",
@@ -193,7 +205,14 @@ pub fn build_template(location: Option<PathBuf>) {
 			"Minimal - Minimal mod with only the bare minimum to compile.",
 			"minimal",
 		),
-		("Other..", ""),
+		(
+			"Github Repository - Use your own custom template from github.", 
+			""
+		),
+		(
+			"Local Repository - Mod template from your own local git repository.",
+			""
+		),
 	];
 
 	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
@@ -209,10 +228,18 @@ pub fn build_template(location: Option<PathBuf>) {
 		.nice_unwrap("Unable to get template")
 		.unwrap_or(0);
 
-	let template = if template_index == template_options.len() - 1 {
+	let template = if template_index == template_options.len() - 2 {
 		println!();
 		info!("Here you can use any github repository");
 		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
+		is_local_repo = true;
+		ask_value("Template", Some(""), false)
+	} else if template_index == template_options.len() - 1 {
+		println!();
+		info!("Here you can use any local git repository");
+		info!("Please provide a local path to clone the repository from.");
+		info!("It can be either a relative or a full path.");
+		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
 		ask_value("Template", Some(""), false)
 	} else {
 		template_options[template_index].1.to_string()
@@ -267,6 +294,7 @@ pub fn build_template(location: Option<PathBuf>) {
 	info!("Creating project {}", mod_id);
 	create_template(CreateTemplate {
 		template,
+		is_local_repo,
 		project_location: final_location,
 		name: final_name.replace("\"", "\\\""),
 		version: final_version,
