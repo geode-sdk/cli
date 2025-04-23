@@ -13,7 +13,6 @@ use std::path::PathBuf;
 
 struct CreateTemplate {
 	pub template: String,
-	pub is_local_repo: bool,
 	pub project_location: PathBuf,
 	pub name: String,
 	pub version: String,
@@ -43,38 +42,20 @@ fn create_template(template: CreateTemplate) {
 	} else if template.template.is_empty() {
 		("geode-sdk/example-mod", "main")
 	} else {
-		(
-			"geode-sdk/example-mod",
-			match template.template.to_ascii_lowercase().as_str() {
-				"default" => "main",
-				"minimal" => "minimal",
-				"custom layer" => "custom-layer",
-				_ => {
-					warn!("Invalid template name, using default template");
-					"main"
-				}
-			},
-		)
+		(template.template.as_str(), "main")
 	};
 
+	// Remove this if you dont think its needed
+	info!("Cloning {}", used_template);
+
 	// Clone repository
-	if template.is_local_repo {
-		RepoBuilder::new()
-			.branch(branch)
-			.clone(
-				used_template,
-				&template.project_location,
-			)
-			.nice_unwrap("Unable to clone repository");
-	} else { 
-		RepoBuilder::new()
-			.branch(branch)
-			.clone(
-				format!("https://github.com/{}", used_template).as_str(),
-				&template.project_location,
-			)
-			.nice_unwrap("Unable to clone repository");
-	}
+	RepoBuilder::new()
+		.branch(branch)
+		.clone(
+			used_template,
+			&template.project_location,
+		)
+		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
 		warn!("Unable to remove .git directory");
@@ -195,7 +176,6 @@ pub fn build_template(location: Option<PathBuf>) {
 
 	info!("Choose a template for the mod to be created:");
 
-	let mut is_local_repo = false;
 	let template_options = [
 		(
 			"Default - Simple mod that adds a button to the main menu.",
@@ -232,9 +212,8 @@ pub fn build_template(location: Option<PathBuf>) {
 		println!();
 		info!("Here you can use any github repository");
 		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
-		ask_value("Template", Some(""), false)
+		format!("https://github.com/{}", ask_value("Template", Some(""), false))
 	} else if template_index == template_options.len() - 1 {
-		is_local_repo = true;
 		println!();
 		info!("Here you can use any local git repository");
 		info!("Please provide a local path to clone the repository from");
@@ -294,7 +273,6 @@ pub fn build_template(location: Option<PathBuf>) {
 	info!("Creating project {}", mod_id);
 	create_template(CreateTemplate {
 		template,
-		is_local_repo,
 		project_location: final_location,
 		name: final_name.replace("\"", "\\\""),
 		version: final_version,
