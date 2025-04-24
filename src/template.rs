@@ -179,11 +179,11 @@ pub fn build_template(location: Option<PathBuf>) {
 	let template_options = [
 		(
 			"Default - Simple mod that adds a button to the main menu.",
-			"",
+			"https://github.com/geode-sdk/example-mod",
 		),
 		(
 			"Minimal - Minimal mod with only the bare minimum to compile.",
-			"minimal",
+			"https://github.com/geode-sdk/example-mod@minimal",
 		),
 		(
 			"Github Repository - Use your own custom template from github.", 
