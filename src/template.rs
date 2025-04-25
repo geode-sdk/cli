@@ -51,10 +51,7 @@ fn create_template(template: CreateTemplate) {
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
-		.clone(
-			used_template,
-			&template.project_location,
-		)
+		.clone(used_template, &template.project_location)
 		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
@@ -186,12 +183,12 @@ pub fn build_template(location: Option<PathBuf>) {
 			"https://github.com/geode-sdk/example-mod@minimal",
 		),
 		(
-			"Github Repository - Use your own custom template from github.", 
-			""
+			"GitHub Repository - Use your own custom template from github.",
+			"",
 		),
 		(
 			"Local Repository - Mod template from your own local git repository.",
-			""
+			"",
 		),
 	];
 
@@ -212,14 +209,14 @@ pub fn build_template(location: Option<PathBuf>) {
 		println!();
 		info!("Here you can use any github repository");
 		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
-		format!("https://github.com/{}", ask_value("Template", Some(""), false))
+		format!("https://github.com/{}", ask_value("Template", None, true))
 	} else if template_index == template_options.len() - 1 {
 		println!();
 		info!("Here you can use any local git repository");
 		info!("Please provide a local path to clone the repository from");
 		info!("It can be either a relative or a full path");
 		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
-		ask_value("Template", Some(""), false)
+		ask_value("Template", None, true)
 	} else {
 		template_options[template_index].1.to_string()
 	};
