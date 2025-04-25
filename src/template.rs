@@ -45,7 +45,6 @@ fn create_template(template: CreateTemplate) {
 		(template.template.as_str(), "main")
 	};
 
-	// Remove this if you dont think its needed
 	info!("Cloning {}", used_template);
 
 	// Clone repository
