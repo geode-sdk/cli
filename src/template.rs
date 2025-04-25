@@ -42,27 +42,15 @@ fn create_template(template: CreateTemplate) {
 	} else if template.template.is_empty() {
 		("geode-sdk/example-mod", "main")
 	} else {
-		(
-			"geode-sdk/example-mod",
-			match template.template.to_ascii_lowercase().as_str() {
-				"default" => "main",
-				"minimal" => "minimal",
-				"custom layer" => "custom-layer",
-				_ => {
-					warn!("Invalid template name, using default template");
-					"main"
-				}
-			},
-		)
+		(template.template.as_str(), "main")
 	};
+
+	info!("Cloning {}", used_template);
 
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
-		.clone(
-			format!("https://github.com/{}", used_template).as_str(),
-			&template.project_location,
-		)
+		.clone(used_template, &template.project_location)
 		.nice_unwrap("Unable to clone repository");
 
 	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
@@ -187,13 +175,20 @@ pub fn build_template(location: Option<PathBuf>) {
 	let template_options = [
 		(
 			"Default - Simple mod that adds a button to the main menu.",
-			"",
+			"https://github.com/geode-sdk/example-mod",
 		),
 		(
 			"Minimal - Minimal mod with only the bare minimum to compile.",
-			"minimal",
+			"https://github.com/geode-sdk/example-mod@minimal",
 		),
-		("Other..", ""),
+		(
+			"GitHub Repository - Use your own custom template from github.",
+			"",
+		),
+		(
+			"Local Repository - Mod template from your own local git repository.",
+			"",
+		),
 	];
 
 	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
@@ -209,11 +204,18 @@ pub fn build_template(location: Option<PathBuf>) {
 		.nice_unwrap("Unable to get template")
 		.unwrap_or(0);
 
-	let template = if template_index == template_options.len() - 1 {
+	let template = if template_index == template_options.len() - 2 {
 		println!();
 		info!("Here you can use any github repository");
 		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
-		ask_value("Template", Some(""), false)
+		format!("https://github.com/{}", ask_value("Template", None, true))
+	} else if template_index == template_options.len() - 1 {
+		println!();
+		info!("Here you can use any local git repository");
+		info!("Please provide a local path to clone the repository from");
+		info!("It can be either a relative or a full path");
+		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
+		ask_value("Template", None, true)
 	} else {
 		template_options[template_index].1.to_string()
 	};
