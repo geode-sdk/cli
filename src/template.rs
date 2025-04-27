@@ -45,12 +45,8 @@ fn create_template(template: CreateTemplate) {
 		(template.template.as_str(), "main")
 	};
 
-<<<<<<< HEAD
 	// Remove this if you dont think its needed
 	info!("Cloning branch {} of repository {}", branch, used_template);
-=======
-	info!("Cloning {}", used_template);
->>>>>>> 2e47e160633bdd716e79c546308112893a4e3038
 
 	// Clone repository
 	RepoBuilder::new()
