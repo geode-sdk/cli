@@ -44,10 +44,10 @@ fn create_template(template: CreateTemplate) {
 	} else {
 		(template.template.as_str(), "main")
 	};
-
+  
 	// Remove this if you dont think its needed
 	info!("Cloning branch {} of repository {}", branch, used_template);
-
+	
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
