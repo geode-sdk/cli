@@ -40,13 +40,13 @@ fn create_template(template: CreateTemplate) {
 	} else if template.template.contains('/') {
 		(template.template.as_str(), "main")
 	} else if template.template.is_empty() {
-		("geode-sdk/example-mod", "main")
+		("https://github.com/geode-sdk/example-mod", "main")
 	} else {
 		(template.template.as_str(), "main")
 	};
 
 	// Remove this if you dont think its needed
-	info!("Cloning {}", used_template);
+	info!("Cloning branch {} of repository {}", branch, used_template);
 
 	// Clone repository
 	RepoBuilder::new()
