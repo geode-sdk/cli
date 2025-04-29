@@ -1,6 +1,6 @@
 use crate::logging::ask_value;
 use crate::mod_file::{PlatformName, ToGeodeString};
-use crate::util::mod_file::DependencyImportance;
+use crate::util::mod_file::{DependencyImportance, GDVersion};
 use crate::{done, fail, fatal, index, info, warn, NiceUnwrap};
 use crate::{
 	file::read_dir_recursive,
@@ -270,6 +270,39 @@ pub fn check_dependencies(
 
 	let mod_info = parse_mod_info(&input);
 
+	let platform = platform.unwrap_or_else(|| {
+		PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform")
+	});
+
+	// Check if platform is supported
+	match mod_info.gd {
+		GDVersion::Simple(_) => {}
+		GDVersion::Detailed(gd) => {
+			match platform {
+				PlatformName::Windows => {
+					if gd.win.is_none() {
+						fatal!("Geometry Dash version not specified for Windows, please specify one in mod.json");
+					}
+				}
+				PlatformName::MacOS | PlatformName::MacArm | PlatformName::MacIntel => {
+					if gd.mac.is_none() {
+						fatal!("Geometry Dash version not specified for macOS, please specify one in mod.json");
+					}
+				}
+				PlatformName::Android | PlatformName::Android32 | PlatformName::Android64 => {
+					if gd.android.is_none() {
+						fatal!("Geometry Dash version not specified for Android, please specify one in mod.json");
+					}
+				}
+				PlatformName::IOS => {
+					if gd.ios.is_none() {
+						fatal!("Geometry Dash version not specified for iOS, please specify one in mod.json");
+					}
+				}
+			}
+		}
+	}
+
 	// If no dependencies, skippy wippy
 	if mod_info.dependencies.is_empty() {
 		return;
@@ -299,10 +332,6 @@ pub fn check_dependencies(
 
 	let dep_dir = output.join("geode-deps");
 	fs::create_dir_all(&dep_dir).nice_unwrap("Unable to create dependency directory");
-
-	let platform = platform.unwrap_or_else(|| {
-		PlatformName::current().nice_unwrap("Unknown platform, please specify one with --platform")
-	});
 
 	// check all dependencies
 	for dep in &mod_info.dependencies {
