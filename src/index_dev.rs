@@ -144,17 +144,17 @@ fn get_own_mods(validated: bool, config: &mut Config) -> Vec<SimpleDevMod> {
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 200 {
-		let body: ApiResponse<String> = response
-			.json()
-			.nice_unwrap("Unable to parse response from Geode Index");
-		fatal!("Unable to fetch mods: {}", body.error);
-	}
-
 	if response.status() == 401 {
 		config.index_token = None;
 		config.save();
 		fatal!("Invalid token. Please login again.");
+	}
+
+	if !response.status().is_success() {
+		let body: ApiResponse<String> = response
+			.json()
+			.nice_unwrap("Unable to parse response from Geode Index");
+		fatal!("Unable to fetch mods: {}", body.error);
 	}
 
 	let mods = response
@@ -248,7 +248,7 @@ fn add_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
@@ -274,7 +274,7 @@ fn remove_developer(mod_to_edit: &SimpleDevMod, config: &mut Config) {
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
@@ -300,7 +300,7 @@ pub fn get_user_profile(config: &mut Config) -> DeveloperProfile {
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
@@ -358,7 +358,7 @@ pub fn edit_profile(config: &mut Config) {
 						.send()
 						.nice_unwrap("Unable to connect to Geode Index");
 
-					if response.status() != 204 {
+					if !response.status().is_success() {
 						let body: ApiResponse<String> = response
 							.json()
 							.nice_unwrap("Unable to parse response from Geode Index");

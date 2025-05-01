@@ -79,7 +79,7 @@ pub fn login(config: &mut Config, token: Option<String>, github_token: Option<St
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		fatal!("Unable to connect to Geode Index");
 	}
 
@@ -123,7 +123,7 @@ fn poll_login(
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		return None;
 	}
 
@@ -186,7 +186,7 @@ fn invalidate_index_tokens(config: &mut Config) {
 		config.save();
 		fatal!("Invalid token. Please login again.");
 	}
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		fatal!("Unable to invalidate token");
 	}
 }

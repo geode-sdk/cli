@@ -180,7 +180,7 @@ fn get_pending_mods(page: i32, config: &Config) -> PaginatedData<PendingMod> {
 		.send()
 		.nice_unwrap("Failed to connect to the Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		if let Ok(body) = response.json::<ApiResponse<String>>() {
 			warn!("{}", body.error);
 		}
@@ -310,7 +310,7 @@ fn get_developer_profile(username: &str, config: &Config) -> Option<DeveloperPro
 		.send()
 		.nice_unwrap("Unable to connect to Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		warn!("Unable to fetch profile: {}", response.status());
 		return None;
 	}
@@ -374,7 +374,7 @@ fn update_dev_status(config: &Config) {
 		.send()
 		.nice_unwrap("Failed to update developer");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		let json = response.json::<serde_json::Value>();
 		if let Ok(j) = json {
 			if j.is_object() && j.as_object().unwrap().contains_key("error") {
@@ -406,7 +406,7 @@ fn validate_mod(version: &PendingModVersion, id: &str, config: &Config) {
 		.send()
 		.nice_unwrap("Failed to connect to the Geode Index");
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		if let Ok(body) = response.json::<ApiResponse<String>>() {
 			warn!("{}", body.error);
 		}
@@ -433,7 +433,7 @@ fn reject_mod(version: &PendingModVersion, id: &str, config: &Config) {
 		.send()
 		.nice_unwrap("Failed to connect to the Geode Index");
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		if let Ok(body) = response.json::<ApiResponse<String>>() {
 			warn!("{}", body.error);
 		}
@@ -454,7 +454,7 @@ fn download_mod(version: &PendingModVersion, id: &str, config: &Config) {
 		.send()
 		.nice_unwrap("Failed to connect to the Geode Index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		if let Ok(body) = response.json::<ApiResponse<String>>() {
 			warn!("{}", body.error);
 		}

@@ -184,7 +184,7 @@ fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, Str
 		.send()
 		.map_err(|x| format!("Failed to download dependency: {}", x))?;
 
-	if result.status() != 200 {
+	if !result.status().is_success() {
 		return Err(format!(
 			"Failed to download dependency. Bad status code: {}",
 			result.status()

@@ -235,7 +235,7 @@ fn create_mod(download_link: &str, config: &mut Config) {
 		fatal!("Invalid token. Please login again.");
 	}
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
@@ -270,7 +270,7 @@ fn update_mod(id: &str, download_link: &str, config: &mut Config) {
 		fatal!("Invalid token. Please login again.");
 	}
 
-	if response.status() != 204 {
+	if !response.status().is_success() {
 		let body: ApiResponse<String> = response
 			.json()
 			.nice_unwrap("Unable to parse response from Geode Index");
@@ -330,7 +330,7 @@ pub fn get_mod_versions(
 		.send()
 		.nice_unwrap("Couldn't connect to the index");
 
-	if response.status() != 200 {
+	if !response.status().is_success() {
 		return Err("Failed to fetch mod versions".to_string());
 	}
 
