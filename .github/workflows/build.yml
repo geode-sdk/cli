@@ -33,10 +33,12 @@ jobs:
           os: macos-latest
           executable: 'geode'
           prebuild: |
-            brew fetch --force --bottle-tag=ventura openssl@3
-            brew reinstall $(brew --cache --bottle-tag=ventura openssl@3)
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+            arch -x86_64 brew update
+            arch -x86_64 brew reinstall openssl@3
             export OPENSSL_STATIC=1
-            export OPENSSL_DIR="/opt/homebrew/opt/openssl@3"
+            export OPENSSL_DIR="$(arch -x86_64 brew --prefix openssl@3)"
           target: x86_64-apple-darwin
 
         - name: "Linux"
