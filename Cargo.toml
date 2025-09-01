@@ -17,36 +17,32 @@ clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
 clap_mangen = "0.2.21"
 
-colored = "2.1.0"
-dirs = "5.0.1"
+colored = "3.0.0"
+dirs = "6.0.0"
 fontdue = "0.9.2"
-git2 = "0.19.0"
+git2 = "0.20.2"
 glob = "0.3.1"
 image = "0.25.1"
 imageproc = "0.25.0"
-signed-distance-field = "0.6.3"
 path-absolutize = "3.1.1"
 plist = "1.6.1"
-rustyline = "14.0.0"
+rustyline = "17.0.1"
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = { version = "1.0.117", features = ["preserve_order"] }
 sha256 = "1.5.0"
-texture_packer = "0.29.0"
+texture_packer = "0.30.0"
 walkdir = "2.5.0"
-zip = "2.5.0"
+zip = "4.6.0"
 semver = "1.0.23"
 reqwest = { version = "0.12.5", features = ["json", "blocking"] }
-cfg-if = "1.0.0"
 regex = "1.10.5"
-hex = "0.4.3"
 edit-distance = "2.1.0"
-which = "6.0.1"
 vec1 = { version = "1.12.1", features = ["serde"] }
 crossterm_input = "0.5.0"
 open = "5.1.4"
-rand = "0.8.5"
+rand = "0.9.2"
 tempfile = "3"
-dialoguer = "0.11.0"
+dialoguer = "0.12.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 terminal-clipboard = "0.4.1"
@@ -55,7 +51,7 @@ terminal-clipboard = "0.4.1"
 cli-clipboard = "0.4.0"
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.52.0"
+winreg = "0.55.0"
 ansi_term = "0.12"
 
 [build-dependencies]

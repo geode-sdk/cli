@@ -197,7 +197,7 @@ fn submit(action: MyModAction, config: &mut Config) {
 			.by_name("mod.json")
 			.nice_unwrap("Unable to read mod.json");
 
-		let json = serde_json::from_reader::<ZipFile, SimpleModJson>(json_file)
+		let json = serde_json::from_reader::<ZipFile<Cursor<Vec<u8>>>, SimpleModJson>(json_file)
 			.nice_unwrap("Unable to parse mod.json");
 
 		id = Some(json.id);
