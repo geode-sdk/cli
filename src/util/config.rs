@@ -159,7 +159,7 @@ impl Config {
 		}
 	}
 
-	pub fn get_current_profile(&self) -> Ref<Profile> {
+	pub fn get_current_profile(&'_ self) -> Ref<'_, Profile> {
 		self.get_profile(&self.current_profile)
 			.nice_unwrap("No current profile found!")
 			.borrow()
