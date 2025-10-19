@@ -408,11 +408,21 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.48"
+version = "4.5.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be8c97f3a6f02b9e24cadc12aaba75201d18754b53ea0a9d99642f806ccdb4c9"
+checksum = "1a554639e42d0c838336fc4fbedb9e2df3ad1fa4acda149f9126b4ccfcd7900f"
 dependencies = [
  "clap",
+]
+
+[[package]]
+name = "clap_complete_nushell"
+version = "4.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9801fe85d7986742027c6d365728a6a4ecb6d2b09866de18be836fef7ebf7df1"
+dependencies = [
+ "clap",
+ "clap_complete",
 ]
 
 [[package]]
@@ -1017,6 +1027,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "clap",
  "clap_complete",
+ "clap_complete_nushell",
  "clap_mangen",
  "cli-clipboard",
  "colored",
