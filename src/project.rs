@@ -158,6 +158,31 @@ impl Found {
 	}
 }
 
+fn find_existing_dependency(
+	dep: &Dependency,
+	_config: &Config,
+) -> Result<Found, String> {
+	let mut path = env::temp_dir();
+	path.push(format!("{}.geode", dep.id));
+
+	if path.exists() {
+		let mod_info =
+			try_parse_mod_info(&path).map_err(|x| format!("Couldn't parse mod.json: {}", x))?;
+
+		if !dep.version.matches(&mod_info.version) {
+			info!(
+				"Dependency '{}' found in cache, but version '{}' does not match required '{}'",
+				dep.id, mod_info.version, dep.version
+			);
+			return Ok(Found::Wrong(mod_info.version));
+		}
+
+		Ok(Found::Some(path, mod_info))
+	} else {
+		Ok(Found::None)
+	}
+}
+
 fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, String> {
 	info!("Fetching dependency from index");
 	let found = index::get_mod_versions(
@@ -396,160 +421,177 @@ pub fn check_dependencies(
 
 		// otherwise try to find it on installed mods and then on index
 
-		// check index
-		let found_in_index = match find_index_dependency(dep, &config) {
+		// dont check others if already downloaded
+		let path_to_dep_geode;
+		let _geode_info;
+
+		let found_existing = match find_existing_dependency(dep, &config) {
 			Ok(f) => f,
 			Err(e) => {
-				warn!("Failed to fetch dependency {} from index: {}", &dep.id, e);
+				warn!("Failed to fetch dependency {} from cache: {}", &dep.id, e);
 				Found::None
 			}
 		};
-		// check installed mods
-		let found_in_installed =
-			find_dependency(dep, &config.get_current_profile().mods_dir(), true, false)
-				.nice_unwrap("Unable to read installed mods");
 
-		// if not found in either        hjfod  code
-		if !matches!(found_in_index, Found::Some(_, _))
-			&& !matches!(found_in_installed, Found::Some(_, _))
-		{
-			if dep.importance == DependencyImportance::Required {
-				fail!(
-					"Dependency '{0}' not found in installed mods nor index! \
-					If this is a mod that hasn't been published yet, install it \
-					locally first, or if it's a closed-source mod that won't be \
-					on the index, mark it as external in your CMake using \
-					setup_geode_mod(... EXTERNALS {0}:{1})",
-					dep.id,
-					dep.version
-				);
-				errors = true;
-			} else {
-				info!(
-					"Dependency '{}' not found in installed mods nor index",
-					dep.id
-				)
-			}
-			// bad version
-			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::Wrong(ver), _) | (in_index, Found::Wrong(ver)) => {
-					info!(
-						"Version '{ver}' of the mod was found in {}, but it was \
-						rejected because version '{}' is required by the dependency",
-						if matches!(in_index, Found::Wrong(_)) {
-							"index"
-						} else {
-							"installed mods"
-						},
+		if let Found::Some(inst_path, inst_info) = found_existing {
+			info!("Dependency '{}' found in cache", dep.id);
+			path_to_dep_geode = inst_path;
+			_geode_info = inst_info;
+		}
+		else {
+			// check index
+			let found_in_index = match find_index_dependency(dep, &config) {
+				Ok(f) => f,
+				Err(e) => {
+					warn!("Failed to fetch dependency {} from index: {}", &dep.id, e);
+					Found::None
+				}
+			};
+			// check installed mods
+			let found_in_installed =
+				find_dependency(dep, &config.get_current_profile().mods_dir(), true, false)
+					.nice_unwrap("Unable to read installed mods");
+
+			// if not found in either        hjfod  code
+			if !matches!(found_in_index, Found::Some(_, _))
+				&& !matches!(found_in_installed, Found::Some(_, _))
+			{
+				if dep.importance == DependencyImportance::Required {
+					fail!(
+						"Dependency '{0}' not found in installed mods nor index! \
+						If this is a mod that hasn't been published yet, install it \
+						locally first, or if it's a closed-source mod that won't be \
+						on the index, mark it as external in your CMake using \
+						setup_geode_mod(... EXTERNALS {0}:{1})",
+						dep.id,
 						dep.version
 					);
-				}
-				_ => {}
-			}
-			// misspelled message
-			match (&found_in_index, &found_in_installed) {
-				(in_index @ Found::Maybe(m), _) | (in_index, Found::Maybe(m)) => {
+					errors = true;
+				} else {
 					info!(
-						"Another mod with a similar ID was found in {}: {m} \
-						- maybe you misspelled?",
-						if matches!(in_index, Found::Maybe(_)) {
-							"index"
-						} else {
-							"installed mods"
-						}
-					);
+						"Dependency '{}' not found in installed mods nor index",
+						dep.id
+					)
 				}
-				_ => {}
+				// bad version
+				match (&found_in_index, &found_in_installed) {
+					(in_index @ Found::Wrong(ver), _) | (in_index, Found::Wrong(ver)) => {
+						info!(
+							"Version '{ver}' of the mod was found in {}, but it was \
+							rejected because version '{}' is required by the dependency",
+							if matches!(in_index, Found::Wrong(_)) {
+								"index"
+							} else {
+								"installed mods"
+							},
+							dep.version
+						);
+					}
+					_ => {}
+				}
+				// misspelled message
+				match (&found_in_index, &found_in_installed) {
+					(in_index @ Found::Maybe(m), _) | (in_index, Found::Maybe(m)) => {
+						info!(
+							"Another mod with a similar ID was found in {}: {m} \
+							- maybe you misspelled?",
+							if matches!(in_index, Found::Maybe(_)) {
+								"index"
+							} else {
+								"installed mods"
+							}
+						);
+					}
+					_ => {}
+				}
+				// skip rest
+				continue;
 			}
-			// skip rest
-			continue;
-		}
 
-		let path_to_dep_geode;
-		let _geode_info;
-		match (found_in_installed, found_in_index) {
-			(Found::Some(_, _), Found::Some(inst_path, inst_info)) => {
-				info!("Dependency '{}' found", dep.id);
-				path_to_dep_geode = inst_path;
-				_geode_info = inst_info;
-			}
+			match (found_in_installed, found_in_index) {
+				(Found::Some(_, _), Found::Some(inst_path, inst_info)) => {
+					info!("Dependency '{}' found", dep.id);
+					path_to_dep_geode = inst_path;
+					_geode_info = inst_info;
+				}
 
-			(Found::Some(inst_path, inst_info), _) => {
-				warn!(
-					"Dependency '{}' found in installed mods, but not on the \
-					mods index - make sure that the mod is published on the \
-					index when you publish yours, as otherwise users won't be \
-					able to install your mod through the index!",
-					dep.id
-				);
-				info!(
-					"If '{0}' is a closed-source mod that won't be released on \
-					the index, mark it as external in your CMake with \
-					setup_geode_mod(... EXTERNALS {0}:{1})",
-					dep.id, dep.version
-				);
-				path_to_dep_geode = inst_path;
-				_geode_info = inst_info;
-			}
-
-			(Found::Wrong(version), Found::Some(path, indx_info)) => {
-				if version > indx_info.version {
+				(Found::Some(inst_path, inst_info), _) => {
 					warn!(
-						"Dependency '{0}' found in installed mods, but as \
-						version '{1}' whereas required is '{2}'. Index has valid \
-						version '{3}', but not using it as it appears you have \
-						a newer version installed. Either manually downgrade \
-						the installed '{0}' to '{3}', or update your mod.json's \
-						dependency requirements",
-						dep.id, version, dep.version, indx_info.version
+						"Dependency '{}' found in installed mods, but not on the \
+						mods index - make sure that the mod is published on the \
+						index when you publish yours, as otherwise users won't be \
+						able to install your mod through the index!",
+						dep.id
 					);
-					continue;
+					info!(
+						"If '{0}' is a closed-source mod that won't be released on \
+						the index, mark it as external in your CMake with \
+						setup_geode_mod(... EXTERNALS {0}:{1})",
+						dep.id, dep.version
+					);
+					path_to_dep_geode = inst_path;
+					_geode_info = inst_info;
 				}
-				info!(
-					"Dependency '{}' found on the index, installing \
-					(update '{}' => '{}')",
-					dep.id, version, indx_info.version
-				);
-				let geode_path = config
-					.get_current_profile()
-					.mods_dir()
-					.join(format!("{}.geode", indx_info.id));
-				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
-				path_to_dep_geode = geode_path;
-				_geode_info = indx_info;
+
+				(Found::Wrong(version), Found::Some(path, indx_info)) => {
+					if version > indx_info.version {
+						warn!(
+							"Dependency '{0}' found in installed mods, but as \
+							version '{1}' whereas required is '{2}'. Index has valid \
+							version '{3}', but not using it as it appears you have \
+							a newer version installed. Either manually downgrade \
+							the installed '{0}' to '{3}', or update your mod.json's \
+							dependency requirements",
+							dep.id, version, dep.version, indx_info.version
+						);
+						continue;
+					}
+					info!(
+						"Dependency '{}' found on the index, installing \
+						(update '{}' => '{}')",
+						dep.id, version, indx_info.version
+					);
+					let geode_path = config
+						.get_current_profile()
+						.mods_dir()
+						.join(format!("{}.geode", indx_info.id));
+					std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+					path_to_dep_geode = geode_path;
+					_geode_info = indx_info;
+				}
+
+				(_, Found::Some(path, indx_info)) => {
+					info!(
+						"Dependency '{}' found on the index, installing (version '{}')",
+						dep.id, indx_info.version
+					);
+					let geode_path = config
+						.get_current_profile()
+						.mods_dir()
+						.join(format!("{}.geode", indx_info.id));
+					std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
+					path_to_dep_geode = geode_path;
+					_geode_info = indx_info;
+				}
+
+				_ => unreachable!(),
 			}
 
-			(_, Found::Some(path, indx_info)) => {
-				info!(
-					"Dependency '{}' found on the index, installing (version '{}')",
-					dep.id, indx_info.version
-				);
-				let geode_path = config
-					.get_current_profile()
-					.mods_dir()
-					.join(format!("{}.geode", indx_info.id));
-				std::fs::copy(path, &geode_path).nice_unwrap("Failed to install .geode");
-				path_to_dep_geode = geode_path;
-				_geode_info = indx_info;
-			}
+			// check already installed dependencies
+			// let found_in_deps = find_dependency(
+			// 	&dep, &dep_dir, false
+			// ).nice_unwrap("Unable to read dependencies");
 
-			_ => unreachable!(),
+			// !this check may be added back at some point, but for now there's not
+			// too much performance benefit from doing this, and doing it might
+			// cause issues if the dependency has changes
+			// check if dependency already installed
+			// if let Found::Some(_, info) = found_in_deps {
+			// 	if info.version == geode_info.version {
+			// 		continue;
+			// 	}
+			// }
 		}
-
-		// check already installed dependencies
-		// let found_in_deps = find_dependency(
-		// 	&dep, &dep_dir, false
-		// ).nice_unwrap("Unable to read dependencies");
-
-		// !this check may be added back at some point, but for now there's not
-		// too much performance benefit from doing this, and doing it might
-		// cause issues if the dependency has changes
-		// check if dependency already installed
-		// if let Found::Some(_, info) = found_in_deps {
-		// 	if info.version == geode_info.version {
-		// 		continue;
-		// 	}
-		// }
 
 		// unzip the whole .geode package because there's only like a few
 		// extra files there aside from the lib, headers, and resources

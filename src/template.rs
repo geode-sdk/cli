@@ -252,11 +252,11 @@ pub fn build_template(location: Option<PathBuf>) {
 		"{}.{}",
 		final_developer
 			.to_lowercase()
-			.replace(' ', "_")
+			.replace(' ', "-")
 			.replace("\"", ""),
 		final_name
 			.to_lowercase()
-			.replace(' ', "_")
+			.replace(' ', "-")
 			.replace("\"", "")
 	);
 
