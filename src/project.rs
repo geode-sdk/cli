@@ -319,7 +319,7 @@ pub fn check_dependencies(
 						fatal!("Geometry Dash version not specified for Android, please specify one in mod.json");
 					}
 				}
-				PlatformName::IOS => {
+				PlatformName::Ios => {
 					if gd.ios.is_none() {
 						fatal!("Geometry Dash version not specified for iOS, please specify one in mod.json");
 					}

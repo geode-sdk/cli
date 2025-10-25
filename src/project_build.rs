@@ -113,7 +113,7 @@ pub fn build_project(
 				conf_args.push("-DGEODE_DONT_INSTALL_MODS=1".into());
 			}
 		}
-		PlatformName::IOS => {
+		PlatformName::Ios => {
 			if cross_compiling && cfg!(not(target_os = "macos")) {
 				fatal!("Sorry! but we do not know of any way to cross-compile to iOS when not using MacOS.");
 			}

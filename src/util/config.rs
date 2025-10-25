@@ -39,25 +39,6 @@ fn default_index_url() -> String {
 	"https://api.geode-sdk.org".to_string()
 }
 
-// old config.json structures for migration
-// TODO: remove this in 3.0
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct OldConfigInstallation {
-	pub path: PathBuf,
-	pub executable: String,
-}
-
-// TODO: remove this in 3.0
-#[derive(Serialize, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub struct OldConfig {
-	pub default_installation: usize,
-	pub working_installation: Option<usize>,
-	pub installations: Option<Vec<OldConfigInstallation>>,
-	pub default_developer: Option<String>,
-}
-
 pub fn profile_platform_default() -> String {
 	if cfg!(target_os = "windows") {
 		"win".to_owned()
@@ -159,7 +140,7 @@ impl Config {
 		}
 	}
 
-	pub fn get_current_profile(&'_ self) -> Ref<'_, Profile> {
+	pub fn get_current_profile(&self) -> Ref<'_, Profile> {
 		self.get_profile(&self.current_profile)
 			.nice_unwrap("No current profile found!")
 			.borrow()

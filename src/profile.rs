@@ -145,13 +145,19 @@ pub fn run_profile(profile: Option<String>, background: RunBackground, launch_ar
 	info!("Starting Geometry Dash");
 
 	let mut child = cmd.spawn().nice_unwrap("Unable to start Geometry Dash");
-	if background != RunBackground::Background {
-		child.wait().unwrap();
-	}
 
-	if background == RunBackground::ForegroundStay {
-		info!("Press any key to exit");
-		_ = crossterm_input::input().read_char();
+	match background {
+		RunBackground::Foreground => {
+			child.wait().unwrap();
+		}
+
+		RunBackground::ForegroundStay => {
+			child.wait().unwrap();
+			info!("Press any key to exit");
+			_ = crossterm_input::input().read_char();
+		}
+
+		RunBackground::Background => {}
 	}
 }
 
