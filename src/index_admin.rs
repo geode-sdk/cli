@@ -485,7 +485,7 @@ pub fn get_random_message() -> String {
 		"You're an admin, Harry",
 	];
 
-	let mut rng = rand::thread_rng();
-	let index = rng.gen_range(0..messages.len());
+	let mut rng = rand::rng();
+	let index = rng.random_range(0..messages.len());
 	messages[index].to_string()
 }
