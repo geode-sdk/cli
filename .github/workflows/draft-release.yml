@@ -19,6 +19,17 @@ jobs:
           API_URL="https://api.github.com/repos/geode-sdk/cli/actions/workflows/build.yml/runs?per_page=1&branch=$BRANCH&event=push&status=success"
           RUN_ID=$(curl $API_URL | jq .workflow_runs[0].id)
 
+          # test if release already exists
+          set +e
+          curl --fail "https://api.github.com/repos/geode-sdk/cli/releases/tags/$VERSION" --silent --output /dev/null
+          RESULT=$?
+          set -e
+          
+          if [ $RESULT -eq 0 ]; then
+            echo "Release $VERSION already exists! Not replacing it.."
+            exit 1
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
