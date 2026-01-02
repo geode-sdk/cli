@@ -926,7 +926,7 @@ pub fn subcommand(cmd: Sdk) {
 						dirs::document_dir()
 							.nice_unwrap(
 								"No default path available! \
-								Please provide the path manually as an\
+								Please provide the path manually as an \
 								argument to `geode sdk install`",
 							)
 							.join("Geode")
