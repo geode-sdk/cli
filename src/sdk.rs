@@ -306,7 +306,7 @@ fn get_linux_shell_info(shell: UserShell, path: &Path) -> Option<LinuxShellConfi
 		}),
 		UserShell::Zsh => Some(LinuxShellConfig {
 			profile: format!("{}/.zshenv", home),
-			profile_bak: format!("{}/.zshenv", home),
+			profile_bak: format!("{}/.zshenv.bak", home),
 			regex: Regex::new("export GEODE_SDK=.*").unwrap(),
 			replace_with: format!("export GEODE_SDK={}", path.to_str().unwrap()),
 		}),
