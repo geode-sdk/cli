@@ -3,7 +3,7 @@ use crate::util::logging::ask_confirm;
 use clap::Subcommand;
 use colored::Colorize;
 use git2::build::{CheckoutBuilder, RepoBuilder};
-use git2::{FetchOptions, RemoteCallbacks, Repository};
+use git2::{FetchOptions, RemoteCallbacks, Repository, StatusOptions};
 use path_absolutize::Absolutize;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -484,11 +484,23 @@ fn update(config: &mut Config, branch: Option<String>) {
 
 		done!("Successfully updated SDK.");
 	} else {
-		fail!("Cannot update SDK, it has local changes");
-		info!(
-			"Go into the repository at {} and manually run `git pull`",
-			Config::sdk_path().to_str().unwrap()
-		);
+		let mut opts = StatusOptions::new();
+		opts.renames_head_to_index(true)
+			.include_untracked(true)
+			.recurse_untracked_dirs(true);
+
+		let statuses = repo.statuses(Some(&mut opts));
+		if statuses.is_ok_and(|x| !x.is_empty()) {
+			fail!("Cannot update SDK, it has local changes");
+			info!(
+				"Go into the repository at {} and manually run `git pull`",
+				Config::sdk_path().to_str().unwrap()
+			);
+		} else {
+			switch_to_tag(config, &repo);
+
+			done!("Successfully updated SDK.");
+		}
 	}
 }
 
