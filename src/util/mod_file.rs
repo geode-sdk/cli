@@ -283,6 +283,10 @@ fn all_platforms() -> HashSet<PlatformName> {
 	])
 }
 
+fn default_required() -> bool {
+	true
+}
+
 #[derive(Default, Deserialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum DependencyImportance {
@@ -299,7 +303,7 @@ pub struct Dependency {
 	#[serde(deserialize_with = "parse_comparable_version")]
 	pub version: VersionReq,
 	pub importance: Option<DependencyImportance>,
-	#[serde(default)]
+	#[serde(default = "default_required")]
 	pub required: bool,
 	#[serde(default = "all_platforms")]
 	pub platforms: HashSet<PlatformName>,
