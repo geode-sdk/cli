@@ -213,7 +213,10 @@ pub fn build_template(location: Option<PathBuf>) {
 		info!("Please provide a local path to clone the repository from");
 		info!("It can be either a relative or a full path");
 		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
-		ask_value("Template", None, true)
+		dunce::canonicalize(ask_value("Template", None, true))
+			.nice_unwrap("Local repository does not exist")
+			.to_string_lossy()
+			.into_owned()
 	} else {
 		template_options[template_index].1.to_string()
 	};
