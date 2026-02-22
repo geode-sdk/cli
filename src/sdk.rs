@@ -393,7 +393,7 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 	fetch_repo_info(&repo);
 
 	switch_to_tag(config, &repo);
-  install_binaries(config, None, None);
+  	install_binaries(config, None, None);
 
 	done!("Successfully installed SDK");
 	info!("Please restart your command line to have the GEODE_SDK enviroment variable set.");
