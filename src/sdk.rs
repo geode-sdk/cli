@@ -442,67 +442,70 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 }
 
 fn update(config: &mut Config, branch: Option<String>) {
-	// Switch branch if necessary
-	match branch.as_deref().unwrap_or(if config.sdk_nightly {
-		"nightly"
-	} else {
-		"stable"
-	}) {
-		"nightly" => {
-			info!("Switching to nightly");
-			config.sdk_nightly = true;
-			config.sdk_version = None;
-		}
-		"stable" => {
-			info!("Switching to stable");
-			config.sdk_nightly = false;
-			config.sdk_version = None;
-		}
-		ver => {
-			info!("Switching to {}", ver);
-			config.sdk_nightly = false;
-			config.sdk_version = Some(ver.into());
-		}
-	};
+    // Switch branch if necessary
+    match branch.as_deref().unwrap_or(if config.sdk_nightly {
+        "nightly"
+    } else {
+        "stable"
+    }) {
+        "nightly" => {
+            info!("Switching to nightly");
+            config.sdk_nightly = true;
+            config.sdk_version = None;
+        }
+        "stable" => {
+            info!("Switching to stable");
+            config.sdk_nightly = false;
+            config.sdk_version = None;
+        }
+        ver => {
+            info!("Switching to {}", ver);
+            config.sdk_nightly = false;
+            config.sdk_version = Some(ver.into());
+        }
+    };
 
-	info!("Updating SDK");
+    info!("Updating SDK");
 
-	// Initialize repository
-	let repo = Repository::open(Config::sdk_path())
-		.nice_unwrap("Could not initialize local SDK repository");
+    // Initialize repository
+    let repo = Repository::open(Config::sdk_path())
+        .nice_unwrap("Could not initialize local SDK repository");
 
-	// Fetch
-	let merge_analysis = fetch_repo_info(&repo);
+    // Fetch
+    let merge_analysis = fetch_repo_info(&repo);
 
-	if merge_analysis.is_up_to_date() {
-		switch_to_tag(config, &repo);
+    if merge_analysis.is_up_to_date() {
+        switch_to_tag(config, &repo);
+        install_binaries(config, None, None);
 
-		done!("SDK is up to date");
-	} else if merge_analysis.is_fast_forward() {
-		// Change head and checkout
+        done!("SDK is up to date");
+    } else if merge_analysis.is_fast_forward() {
+        // Change head and checkout
 
-		switch_to_tag(config, &repo);
+        switch_to_tag(config, &repo);
+        install_binaries(config, None, None);
 
-		done!("Successfully updated SDK.");
-	} else {
-		let mut opts = StatusOptions::new();
-		opts.renames_head_to_index(true)
-			.include_untracked(true)
-			.recurse_untracked_dirs(true);
+        done!("Successfully updated SDK.");
+    } else {
+        let mut opts = StatusOptions::new();
+        opts.renames_head_to_index(true)
+            .include_untracked(true)
+            .recurse_untracked_dirs(true);
 
-		let statuses = repo.statuses(Some(&mut opts));
-		if statuses.is_ok_and(|x| !x.is_empty()) {
-			fail!("Cannot update SDK, it has local changes");
-			info!(
-				"Go into the repository at {} and manually run `git pull`",
-				Config::sdk_path().to_str().unwrap()
-			);
-		} else {
-			switch_to_tag(config, &repo);
+        let statuses = repo.statuses(Some(&mut opts));
+        if statuses.is_ok_and(|x| !x.is_empty()) {
+            fail!("Cannot update SDK, it has local changes");
+            info!(
+                "Go into the repository at {} and manually run `git pull`",
+                Config::sdk_path().to_str().unwrap()
+            );
+        } else {
+            switch_to_tag(config, &repo);
+            install_binaries(config, None, None);
 
-			done!("Successfully updated SDK.");
-		}
-	}
+            done!("Successfully updated SDK.");
+        }
+    }
 }
 
 fn switch_to_ref(repo: &Repository, name: &str) {
