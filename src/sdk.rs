@@ -393,10 +393,11 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 	fetch_repo_info(&repo);
 
 	switch_to_tag(config, &repo);
+  install_binaries(config, None, None);
 
 	done!("Successfully installed SDK");
 	info!("Please restart your command line to have the GEODE_SDK enviroment variable set.");
-	info!("Use `geode sdk install-binaries` to install pre-built binaries");
+	info!("Pre-built binaries have been automatically installed. However, if you would like to install them yourself in the future, you can run `geode sdk install-binaries`.");
 }
 
 fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
