@@ -181,8 +181,8 @@ fn initialize_spritesheet_bundle(
 		let real_frame_h: u32 = if frame.rotated { frame.frame.w } else { frame.frame.h };
 
 		// subtract original center from new center to get the offset
-		let offset_x: i32 = (frame.source.x + real_frame_w / 2) as i32 - (frame.source.w / 2) as i32;
-		let offset_y: i32 = (frame.source.y + real_frame_h / 2) as i32 - (frame.source.h / 2) as i32;
+		let offset_x: f64 = frame.source.x as f64 + (real_frame_w as f64 - frame.source.w as f64)/2.0;
+		let offset_y: f64 = frame.source.y as f64 + (real_frame_h as f64 - frame.source.h as f64)/2.0;
 
 		(sprite_name_in_sheet(name), json!({
 			"spriteOffset": format!("{{{},{}}}", offset_x, -offset_y),
