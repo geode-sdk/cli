@@ -20,7 +20,6 @@ struct CreateTemplate {
 	pub developer: String,
 	pub description: String,
 	pub strip: bool,
-	pub action: bool,
 }
 
 fn create_template(template: CreateTemplate) {
@@ -44,10 +43,10 @@ fn create_template(template: CreateTemplate) {
 	} else {
 		(template.template.as_str(), "main")
 	};
-  
+
 	// Remove this if you dont think its needed
 	info!("Cloning branch {} of repository {}", branch, used_template);
-	
+
 	// Clone repository
 	RepoBuilder::new()
 		.branch(branch)
@@ -96,19 +95,17 @@ fn create_template(template: CreateTemplate) {
 
 	// Add cross-platform action
 	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
-	if template.action {
-		let action_path = template
-			.project_location
-			.join(".github/workflows/multi-platform.yml");
-		fs::create_dir_all(action_path.parent().unwrap())
-			.nice_unwrap("Unable to create .github/workflows directory");
-		let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
-		fs::write(
-			action_path,
-			action.text().nice_unwrap("Unable to write action"),
-		)
-		.nice_unwrap("Unable to write action");
-	}
+	let action_path = template
+		.project_location
+		.join(".github/workflows/multi-platform.yml");
+	fs::create_dir_all(action_path.parent().unwrap())
+		.nice_unwrap("Unable to create .github/workflows directory");
+	let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
+	fs::write(
+		action_path,
+		action.text().nice_unwrap("Unable to write action"),
+	)
+	.nice_unwrap("Unable to write action");
 
 	let mod_json_path = template.project_location.join("mod.json");
 
@@ -260,8 +257,6 @@ pub fn build_template(location: Option<PathBuf>) {
 			.replace("\"", "")
 	);
 
-	let action = ask_confirm("Do you want to add the cross-platform Github action?", true);
-
 	let strip = ask_confirm(
 		"Do you want to remove comments from the default template?",
 		false,
@@ -277,6 +272,5 @@ pub fn build_template(location: Option<PathBuf>) {
 		developer: final_developer.replace("\"", "\\\""),
 		description: final_description.replace("\"", "\\\""),
 		strip,
-		action,
 	});
 }
