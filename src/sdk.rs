@@ -486,6 +486,7 @@ fn update(config: &mut Config, branch: Option<String>) {
         install_binaries(config, None, None);
 
         done!("Successfully updated SDK.");
+		info!("Pre-built binaries have been automatically installed as well, but if you wish to install them manually in the future, run `geode sdk install-binaries`.")
     } else {
         let mut opts = StatusOptions::new();
         opts.renames_head_to_index(true)
@@ -504,6 +505,7 @@ fn update(config: &mut Config, branch: Option<String>) {
             install_binaries(config, None, None);
 
             done!("Successfully updated SDK.");
+			info!("Pre-built binaries have been automatically installed as well, but if you wish to install them manually in the future, run `geode sdk install-binaries`.")
         }
     }
 }
