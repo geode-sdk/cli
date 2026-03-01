@@ -166,10 +166,6 @@ pub fn invalidate(config: &mut Config) {
 }
 
 fn invalidate_index_tokens(config: &mut Config) {
-	if config.index_token.is_none() {
-		fatal!("You are not logged in");
-	}
-
 	let token = config.index_token.clone().unwrap();
 
 	let client = reqwest::blocking::Client::new();
