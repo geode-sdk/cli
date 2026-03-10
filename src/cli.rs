@@ -1,4 +1,6 @@
 use crate::mod_file::PlatformName;
+use clap::{Command, ValueEnum};
+use clap_complete::Generator;
 
 /// Command-line interface for Geode
 #[derive(clap::Parser, Debug)]
@@ -6,6 +8,40 @@ use crate::mod_file::PlatformName;
 pub struct Args {
 	#[clap(subcommand)]
 	pub command: GeodeCommands,
+}
+
+#[derive(Debug, ValueEnum, Clone)]
+pub enum Shell {
+	Bash,
+	Elvish,
+	Fish,
+	PowerShell,
+	Zsh,
+	Nushell,
+}
+
+impl Generator for Shell {
+	fn file_name(&self, name: &str) -> String {
+		match self {
+			Shell::Bash => format!("{}.bash", name),
+			Shell::Elvish => format!("{}.elv", name),
+			Shell::Fish => format!("{}.fish", name),
+			Shell::PowerShell => format!("_{}.ps1", name),
+			Shell::Zsh => format!("_{}", name),
+			Shell::Nushell => clap_complete_nushell::Nushell.file_name(name),
+		}
+	}
+
+	fn generate(&self, cmd: &Command, buf: &mut dyn std::io::Write) {
+		match self {
+			Shell::Bash => clap_complete::shells::Bash.generate(cmd, buf),
+			Shell::Elvish => clap_complete::shells::Elvish.generate(cmd, buf),
+			Shell::Fish => clap_complete::shells::Fish.generate(cmd, buf),
+			Shell::PowerShell => clap_complete::shells::PowerShell.generate(cmd, buf),
+			Shell::Zsh => clap_complete::shells::Zsh.generate(cmd, buf),
+			Shell::Nushell => clap_complete_nushell::Nushell.generate(cmd, buf),
+		}
+	}
 }
 
 #[derive(clap::Subcommand, Debug)]
@@ -17,7 +53,7 @@ pub enum GeodeCommands {
 	},
 
 	/// Generate shell completions and print it to stdout
-	Completions { shell: clap_complete::Shell },
+	Completions { shell: Shell },
 
 	/// Generate manpage and print it to stdout
 	GenerateManpage {},
