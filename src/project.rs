@@ -229,7 +229,7 @@ fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, Str
 			Err(e) => {
 				warn!("Failed to download dependency: {e}");
 				warn!("Waiting a second and trying again...");
-				std::thread::sleep(Duration::from_secs(1));
+				std::thread::sleep(Duration::from_secs(2));
 			}
 		}
 	}

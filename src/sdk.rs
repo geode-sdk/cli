@@ -15,6 +15,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::Duration;
 
 #[cfg(target_os = "macos")]
 use crate::launchctl;
@@ -24,6 +25,8 @@ use winreg::RegKey;
 
 use crate::confirm;
 use crate::{done, fail, fatal, info, warn, NiceUnwrap};
+
+const BINARIES_DOWNLOAD_ATTEMPTS: usize = 5;
 
 #[derive(Deserialize)]
 struct GithubReleaseAsset {
@@ -52,7 +55,14 @@ enum UserShell {
 }
 
 fn download_url(url: &str, file_name: &Path) -> Result<(), Box<dyn std::error::Error>> {
-	let res = reqwest::blocking::get(url)?;
+	let client = reqwest::blocking::Client::new();
+
+	let res = client
+		.get(url)
+		.send()?
+		.error_for_status()
+		.map_err(|e| format!("server returned error: {e}"))?;
+
 	let mut file = fs::File::create(file_name)?;
 	let mut content = std::io::Cursor::new(res.bytes()?);
 	std::io::copy(&mut content, &mut file)?;
@@ -657,16 +667,40 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		}
 	}
 
-	if target_url.is_none() {
+	let Some(target_url) = target_url else {
 		fatal!("No binaries found for current platform! ({platform})");
-	}
+	};
 
 	fs::create_dir_all(&target_dir).nice_unwrap("Unable to create directory for binaries");
-
-	info!("Downloading");
-
 	let temp_zip = target_dir.join("temp.zip");
-	download_url(&target_url.unwrap(), &temp_zip).nice_unwrap("Downloading binaries failed");
+
+	let mut successful = false;
+	for i in 0..BINARIES_DOWNLOAD_ATTEMPTS {
+		if i == 0 {
+			info!("Downloading");
+		} else {
+			info!("Downloading (attempt {})", i + 1);
+		}
+
+		match download_url(&target_url, &temp_zip) {
+			Ok(()) => {
+				successful = true;
+				break;
+			}
+
+			Err(e) => {
+				warn!("Failed to download binaries, waiting and trying again: {e}");
+				std::thread::sleep(Duration::from_secs(2));
+			}
+		}
+	}
+
+	if !successful {
+		fatal!(
+			"Failed to download binaries after {} attempts",
+			BINARIES_DOWNLOAD_ATTEMPTS
+		);
+	}
 
 	let file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
 	let mut zip = zip::ZipArchive::new(file).nice_unwrap("Downloaded ZIP appears to be corrupted");
