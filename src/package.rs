@@ -13,6 +13,7 @@ use crate::util::mod_file::{parse_mod_info, ModFileInfo};
 use crate::util::spritesheet;
 use crate::{cache, project};
 use crate::{done, fatal, info, warn, NiceUnwrap};
+use crate::file::copy_dir_recursive;
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -215,6 +216,16 @@ fn create_resources(
 	for file in &mod_info.resources.libraries {
 		std::fs::copy(file, working_dir.join(file.file_name().unwrap()))
 			.nice_unwrap(format!("Unable to copy file at '{}'", file.display()));
+	}
+
+	if !&mod_info.resources.folders.is_empty() {
+		info!("Copying folders");
+	}
+	// Move other resources
+	for folder in &mod_info.resources.folders {
+		let dest = output_dir.join(folder.file_name().unwrap());
+		copy_dir_recursive(folder, &dest)
+			.nice_unwrap(format!("Unable to copy folder at '{}'", folder.display()));
 	}
 }
 

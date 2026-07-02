@@ -206,6 +206,9 @@ pub struct ModResources {
 	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
 	pub files: Vec<PathBuf>,
 
+	#[serde(deserialize_with = "parse_glob", default = "Vec::new")]
+	pub folders: Vec<PathBuf>,
+
 	#[serde(deserialize_with = "parse_spritesheets", default = "HashMap::new")]
 	pub spritesheets: HashMap<String, SpriteSheet>,
 
