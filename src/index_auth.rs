@@ -139,29 +139,18 @@ pub fn invalidate(config: &mut Config) {
 		warn!("You are not logged in");
 		return;
 	}
-	loop {
-		let response = ask_value(
-			"Do you want to log out of all devices (y/n)",
-			Some("n"),
-			true,
-		);
+	let response = ask_confirm(
+		"Do you want to log out of all devices?",
+		false
+	);
 
-		match response.to_lowercase().as_str() {
-			"y" => {
-				invalidate_index_tokens(config);
-				config.index_token = None;
-				config.save();
-				done!("All tokens for the current account have been invalidated successfully");
-				break;
-			}
-			"n" => {
-				done!("Operation cancelled");
-				break;
-			}
-			_ => {
-				warn!("Invalid response");
-			}
-		}
+	if response {
+		invalidate_index_tokens(config);
+		config.index_token = None;
+		config.save();
+		done!("All tokens for the current account have been invalidated successfully");
+	} else {
+		done!("Operation canceled");
 	}
 }
 
