@@ -18,11 +18,14 @@ use serde::Deserialize;
 use serde_json::json;
 use serde_json::Value;
 use std::env;
+use std::time::Duration;
 use std::{
 	collections::HashMap,
 	fs,
 	path::{Path, PathBuf},
 };
+
+const DEPENDENCY_DOWNLOAD_ATTEMPTS: usize = 3;
 
 #[derive(Debug, Deserialize, Hash, PartialEq, Eq, Clone, Copy, ValueEnum)]
 #[serde(rename_all = "lowercase")]
@@ -180,6 +183,20 @@ fn find_existing_dependency(dep: &Dependency, _config: &Config) -> Result<Found,
 	}
 }
 
+fn download_index_dependency(url: &str) -> Result<Vec<u8>, String> {
+	let client = reqwest::blocking::Client::new();
+
+	Ok(client
+		.get(url)
+		.send()
+		.map_err(|x| format!("Failed to download dependency: {x}"))?
+		.error_for_status()
+		.map_err(|x| format!("Error downloading dependency: {x}"))?
+		.bytes()
+		.map_err(|x| format!("Failed to read dependency bytes: {x}"))?
+		.into())
+}
+
 fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, String> {
 	info!("Fetching dependency from index");
 	let found = index::get_mod_versions(
@@ -199,23 +216,30 @@ fn find_index_dependency(dep: &Dependency, config: &Config) -> Result<Found, Str
 	info!("Dependency found: {}, version {}", dep.id, first.version);
 	info!("Downloading dependency");
 
-	let client = reqwest::blocking::Client::new();
+	// try to download multiple times
 
-	let result = client
-		.get(&first.download_link)
-		.send()
-		.map_err(|x| format!("Failed to download dependency: {}", x))?;
+	let mut bytes = None;
+	for _ in 0..DEPENDENCY_DOWNLOAD_ATTEMPTS {
+		match download_index_dependency(&first.download_link) {
+			Ok(b) => {
+				bytes = Some(b);
+				break;
+			}
 
-	if !result.status().is_success() {
-		return Err(format!(
-			"Failed to download dependency. Bad status code: {}",
-			result.status()
-		));
+			Err(e) => {
+				warn!("Failed to download dependency: {e}");
+				warn!("Waiting a second and trying again...");
+				std::thread::sleep(Duration::from_secs(2));
+			}
+		}
 	}
 
-	let bytes = result
-		.bytes()
-		.map_err(|x| format!("Failed to parse dependency binary: {}", x))?;
+	let Some(bytes) = bytes else {
+		return Err(format!(
+			"Failed to download dependency after {} attempts",
+			DEPENDENCY_DOWNLOAD_ATTEMPTS
+		));
+	};
 
 	info!("Success");
 	info!("Writing dependency to temp file");
