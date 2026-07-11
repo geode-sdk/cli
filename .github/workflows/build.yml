@@ -53,6 +53,13 @@ jobs:
           prebuild: 'export OPENSSL_STATIC=1'
           target: x86_64-unknown-linux-gnu
 
+        - name: "Linux ARM64"
+          id: linux-arm
+          os: ubuntu-22.04-arm
+          executable: 'geode'
+          prebuild: 'export OPENSSL_STATIC=1'
+          target: aarch64-unknown-linux-gnu
+
     name: Build ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
@@ -130,6 +137,12 @@ jobs:
       with:
         files: artifacts/geode-cli-linux/geode
         dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux.zip
+
+    - name: Zip Linux ARM Artifacts
+      uses: vimtor/action-zip@v1.2
+      with:
+        files: artifacts/geode-cli-linux-arm/geode
+        dest: artifacts/geode-cli-${{ steps.ref.outputs.hash }}-linux-arm.zip
 
     - name: Update Development Release
       uses: andelf/nightly-release@main

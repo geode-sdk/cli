@@ -74,6 +74,7 @@ jobs:
           mv geode-cli-win.zip geode-cli-${{ steps.info.outputs.version }}-win.zip
           mv geode-cli-mac.zip geode-cli-${{ steps.info.outputs.version }}-mac.zip
           mv geode-cli-linux.zip geode-cli-${{ steps.info.outputs.version }}-linux.zip
+          mv geode-cli-linux-arm.zip geode-cli-${{ steps.info.outputs.version }}-linux-arm.zip
 
       - name: Create Draft Release
         uses: softprops/action-gh-release@v1
