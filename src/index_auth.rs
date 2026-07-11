@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-	config::Config, done, fatal, index, info, logging::ask_value, server::ApiResponse, warn,
+	config::Config, done, fatal, index, info, logging::ask_confirm, server::ApiResponse, warn,
 	NiceUnwrap,
 };
 
