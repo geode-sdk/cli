@@ -761,8 +761,10 @@ fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 						"aarch64-apple-darwin.tar.gz",
 						#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 						"x86_64-apple-darwin.tar.gz",
-						#[cfg(not(target_os = "macos"))]
-						"x86_64-unknown-linux-musl.tar.gz",
+						#[cfg(all(not(target_os = "macos"), target_arch = "aarch64"))]
+						"aarch64-unknown-linux-musl.tar.gz",
+						#[cfg(all(not(target_os = "macos"), target_arch = "x86_64"))]
+						"x86_64-unknown-linux-musl.tar.gz"
 					)
 				})
 			})
