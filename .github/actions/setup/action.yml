@@ -23,7 +23,7 @@ runs:
       fi
 
   - name: Download
-    uses: robinraju/release-downloader@v1.10
+    uses: robinraju/release-downloader@v1.13
     with:
       repository: geode-sdk/cli
       latest: ${{ inputs.version == 'latest' }}
