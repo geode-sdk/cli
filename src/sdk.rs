@@ -3,7 +3,7 @@ use crate::util::logging::ask_confirm;
 use clap::Subcommand;
 use colored::Colorize;
 use git2::build::{CheckoutBuilder, RepoBuilder};
-use git2::{FetchOptions, RemoteCallbacks, Repository, StatusOptions};
+use git2::{FetchOptions, ProxyOptions, RemoteCallbacks, Repository, StatusOptions};
 use path_absolutize::Absolutize;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -348,8 +348,13 @@ fn clone_repo(url: &str, into: &Path) -> Result<Repository, git2::Error> {
 		true
 	});
 
+	// Let git2 derive user proxy settings
+	let mut proxy = ProxyOptions::new();
+	proxy.auto();
+
 	let mut fetch = FetchOptions::new();
 	fetch.remote_callbacks(callbacks);
+	fetch.proxy_options(proxy);
 
 	let mut builder = RepoBuilder::new();
 	builder.fetch_options(fetch);
@@ -422,9 +427,17 @@ fn fetch_repo_info(repo: &git2::Repository) -> git2::MergeAnalysis {
 		true
 	});
 
+	// Let git2 derive user proxy settings
+	let mut proxy = ProxyOptions::new();
+	proxy.auto();
+
+	let mut fetch = FetchOptions::new();
+	fetch.remote_callbacks(callbacks);
+	fetch.proxy_options(proxy);
+
 	let res = remote.fetch(
 		&["main"],
-		Some(FetchOptions::new().remote_callbacks(callbacks)),
+		Some(&mut fetch),
 		None,
 	);
 	if res.as_ref().is_err_and(|e| {
