@@ -1,18 +1,65 @@
 use crate::config::Config;
 use crate::sdk::get_version;
+use crate::util::config::Template;
 use crate::util::logging::{ask_confirm, ask_value};
-use crate::{done, info, warn, NiceUnwrap};
+use crate::{done, fatal, info, warn, NiceUnwrap};
 use git2::build::RepoBuilder;
+use minijinja::{context, Environment};
 use path_absolutize::Absolutize;
-use regex::Regex;
 
+use clap::Subcommand;
 use serde::Serialize;
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
+use tempfile::TempDir;
+use walkdir::WalkDir;
 
-struct CreateTemplate {
-	pub template: String,
+#[derive(Subcommand, Debug)]
+#[clap(rename_all = "kebab-case")]
+pub enum Templates {
+	/// Create a new template
+	Create {
+		/// The name of the template
+		name: String,
+		/// URL to the template git repository or local path
+		repository: String,
+
+		/// The description of the template
+		#[arg(short, long)]
+		description: Option<String>,
+		/// Subfolder to use within the provided repository
+		#[arg(short, long)]
+		subfolder: Option<String>,
+	},
+
+	/// Modify a template
+	Modify {
+		/// The name of the template to modify
+		name: String,
+		/// URL to the new template git repository or local path
+		#[arg(short, long)]
+		repository: Option<String>,
+		/// The new description of the template
+		#[arg(short, long)]
+		description: Option<String>,
+		/// Subfolder to use within the provided repository
+		#[arg(short, long)]
+		subfolder: Option<String>,
+	},
+
+	/// List all available templates
+	List,
+
+	/// Delete a template
+	Delete {
+		/// The name of the template to delete
+		name: String,
+	},
+}
+
+struct CreateTemplate<'a> {
+	pub template: &'a Template,
 	pub project_location: PathBuf,
 	pub name: String,
 	pub version: String,
@@ -20,6 +67,12 @@ struct CreateTemplate {
 	pub developer: String,
 	pub description: String,
 	pub strip: bool,
+}
+
+/// This may be either a reference to a local directory or to a subfolder in a cloned repository.
+struct TemplateRepo {
+	target: PathBuf,
+	_temp_dir: Option<TempDir>,
 }
 
 fn create_template(template: CreateTemplate) {
@@ -34,118 +87,164 @@ fn create_template(template: CreateTemplate) {
 			.nice_unwrap("Unable to create project directory");
 	}
 
-	let (used_template, branch) = if template.template.contains('@') {
-		template.template.split_once('@').unwrap()
-	} else if template.template.contains('/') {
-		(template.template.as_str(), "main")
-	} else if template.template.is_empty() {
-		("https://github.com/geode-sdk/example-mod", "main")
-	} else {
-		(template.template.as_str(), "main")
+	let repo = clone_repo(&template);
+	for entry in WalkDir::new(&repo.target) {
+		let entry = entry.unwrap();
+		let rel = entry.path().strip_prefix(&repo.target).unwrap();
+		if rel.starts_with(".git") {
+			// do not copy .git
+			continue;
+		}
+
+		let dest = template.project_location.join(rel);
+		if entry.file_type().is_dir() {
+			fs::create_dir_all(&dest)
+				.nice_unwrap(format!("failed to create dir {}", dest.display()));
+		} else {
+			fs::copy(entry.path(), &dest)
+				.nice_unwrap(format!("failed to copy file to {}", dest.display()));
+		}
+	}
+
+	let mut env = Environment::new();
+	let context = context! {
+		id => &template.id,
+		name => &template.name,
+		escaped_name => sanitize_project_name(&template.name),
+		geode => &get_version().to_string(),
+		version => &template.version,
+		developer => &template.developer,
+		description => &template.description,
+		comments => !template.strip,
 	};
 
-	// Remove this if you dont think its needed
-	info!("Cloning branch {} of repository {}", branch, used_template);
+	for entry in WalkDir::new(&template.project_location) {
+		let entry = entry.unwrap();
+		if entry.file_type().is_dir() {
+			continue;
+		}
+		let rel = entry
+			.path()
+			.strip_prefix(&template.project_location)
+			.unwrap();
 
-	// Clone repository
-	RepoBuilder::new()
-		.branch(branch)
-		.clone(used_template, &template.project_location)
-		.nice_unwrap("Unable to clone repository");
+		// skip some potentially problematic folders
+		if rel.starts_with(".git") || rel.starts_with("build") || rel.starts_with(".github") {
+			continue;
+		}
 
-	if fs::remove_dir_all(template.project_location.join(".git")).is_err() {
-		warn!("Unable to remove .git directory");
-	}
+		// skip non text files
+		let allowed_extensions = [
+			"txt", "md", "json", "yaml", "yml", "toml", "c", "cpp", "m", "mm", "h", "hpp", "cc",
+			"hh", "cxx", "hxx", "py",
+		];
+		let ext = entry
+			.path()
+			.extension()
+			.map(|s| s.to_string_lossy().to_lowercase())
+			.unwrap_or_default();
+		if !allowed_extensions.contains(&ext.as_str()) {
+			continue;
+		}
 
-	// Replace "Template" with project name (no spaces)
-	let filtered_name: String = template
-		.name
-		.chars()
-		.filter(|c| !c.is_whitespace())
-		.collect();
-
-	for file in &["README.md", "CMakeLists.txt"] {
-		let file = template.project_location.join(file);
-
-		let Ok(contents) = fs::read_to_string(&file) else {
+		let Ok(contents) = fs::read_to_string(entry.path()) else {
 			continue;
 		};
-		let contents = contents.replace("Template", &filtered_name);
-		fs::write(file, contents).unwrap();
+
+		if contents.trim().is_empty() {
+			continue;
+		}
+
+		env.add_template_owned(rel.to_string_lossy().into_owned(), contents)
+			.nice_unwrap(format!("failed to add template {}", entry.path().display()));
 	}
 
-	// Strip comments from template
-	if template.strip {
-		let cmake_path = template.project_location.join("CMakeLists.txt");
-		let cpp_path = template.project_location.join("src/main.cpp");
+	for (name, tmpl) in env.templates() {
+		let path = template.project_location.join(name);
+		let rendered = tmpl
+			.render(&context)
+			.nice_unwrap(format!("failed to render template {}", path.display()));
 
-		let cmake_regex = Regex::new(r"\n#.*").unwrap();
-		let cpp_regex = Regex::new(r"(?m)^.*/\*[\s\S]*?\*/\r?\n?|^.*//.*\r?\n?").unwrap();
+		if rendered.trim().is_empty() {
+			// if a file is empty, but it was still added as a template, likely the entire file is wrapped in conditional blocks,
+			// and they all evaluated as false. so remove the file instead of keeping an empty one
+			let _ = fs::remove_file(&path);
+		}
 
-		let cmake_text = fs::read_to_string(&cmake_path)
-			.nice_unwrap("Unable to read template file CMakeLists.txt");
-		let cpp_text =
-			fs::read_to_string(&cpp_path).nice_unwrap("Unable to read template file main.cpp");
-
-		fs::write(cmake_path, &*cmake_regex.replace_all(&cmake_text, ""))
-			.nice_unwrap("Unable to access template file CMakeLists.txt");
-		fs::write(cpp_path, &*cpp_regex.replace_all(&cpp_text, ""))
-			.nice_unwrap("Unable to access template file main.cpp");
+		fs::write(&path, rendered).unwrap();
 	}
-
-	// Add cross-platform action
-	// Download the action from https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml
-	let action_path = template
-		.project_location
-		.join(".github/workflows/multi-platform.yml");
-	fs::create_dir_all(action_path.parent().unwrap())
-		.nice_unwrap("Unable to create .github/workflows directory");
-	let action = reqwest::blocking::get("https://raw.githubusercontent.com/geode-sdk/build-geode-mod/main/examples/multi-platform.yml").nice_unwrap("Unable to download action");
-	fs::write(
-		action_path,
-		action.text().nice_unwrap("Unable to write action"),
-	)
-	.nice_unwrap("Unable to write action");
 
 	let mod_json_path = template.project_location.join("mod.json");
 
-	let mod_json_content: String = {
-		if mod_json_path.exists() {
-			let mod_json =
-				fs::read_to_string(&mod_json_path).nice_unwrap("Unable to read mod.json file");
+	if !mod_json_path.exists() {
+		// Default mod.json
+		let mod_json = json!({
+			"geode":        get_version().to_string(),
+			"version":      template.version,
+			"id":           template.id,
+			"name":         template.name,
+			"developer":    template.developer,
+			"description":  template.description,
+		});
 
-			mod_json
-				.replace("$GEODE_VERSION", &get_version().to_string())
-				.replace("$MOD_VERSION", &template.version)
-				.replace("$MOD_ID", &template.id)
-				.replace("$MOD_NAME", &template.name)
-				.replace("$MOD_DEVELOPER", &template.developer)
-				.replace("$MOD_DESCRIPTION", &template.description)
-		} else {
-			// Default mod.json
-			let mod_json = json!({
-				"geode":        get_version().to_string(),
-				"version":      template.version,
-				"id":           template.id,
-				"name":         template.name,
-				"developer":    template.developer,
-				"description":  template.description,
-			});
+		// Format neatly
+		let buf = Vec::new();
+		let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+		let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+		mod_json.serialize(&mut ser).unwrap();
 
-			// Format neatly
-			let buf = Vec::new();
-			let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
-			let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-			mod_json.serialize(&mut ser).unwrap();
+		// Write formatted json
+		let mod_json_content = String::from_utf8(ser.into_inner()).unwrap();
 
-			// Write formatted json
-			String::from_utf8(ser.into_inner()).unwrap()
-		}
-	};
-
-	fs::write(mod_json_path, mod_json_content)
-		.nice_unwrap("Unable to write mod.json, are permissions correct?");
+		fs::write(mod_json_path, mod_json_content)
+			.nice_unwrap("Unable to write mod.json, are permissions correct?");
+	}
 	done!("Succesfully initialized project! Happy modding :)");
+}
+
+fn clone_repo(template: &CreateTemplate) -> TemplateRepo {
+	let repo = &template.template.repository;
+	let subfolder = &template.template.subfolder;
+
+	// is this a remote repo?
+	if repo.starts_with("http://")
+		|| repo.starts_with("https://")
+		|| repo.starts_with("git@")
+		|| repo.starts_with("ssh://")
+	{
+		let temp_dir = TempDir::new().nice_unwrap("Unable to create temporary directory");
+
+		RepoBuilder::new()
+			.clone(repo, temp_dir.path())
+			.nice_unwrap("Unable to clone repository");
+
+		let mut target = temp_dir.path().to_path_buf();
+		if let Some(subfolder) = subfolder {
+			target = target.join(subfolder);
+		}
+
+		TemplateRepo {
+			target,
+			_temp_dir: Some(temp_dir),
+		}
+	} else {
+		let mut target = PathBuf::from(repo);
+		if let Some(subfolder) = subfolder {
+			target = target.join(subfolder);
+		}
+
+		if !target.exists() {
+			fatal!(
+				"The specified template path does not exist: {}",
+				target.display()
+			);
+		}
+
+		TemplateRepo {
+			target,
+			_temp_dir: None,
+		}
+	}
 }
 
 fn possible_name(path: &Option<PathBuf>) -> Option<String> {
@@ -169,54 +268,16 @@ pub fn build_template(location: Option<PathBuf>) {
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
 	info!("Choose a template for the mod to be created:");
-
-	let template_options = [
-		(
-			"Default - Simple mod that adds a button to the main menu.",
-			"https://github.com/geode-sdk/example-mod",
-		),
-		(
-			"Minimal - Minimal mod with only the bare minimum to compile.",
-			"https://github.com/geode-sdk/example-mod@minimal",
-		),
-		(
-			"GitHub Repository - Use your own custom template from github.",
-			"",
-		),
-		(
-			"Local Repository - Mod template from your own local git repository.",
-			"",
-		),
-	];
+	info!("Note: you can create your own templates via 'geode template create'");
 
 	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
-		.items(
-			template_options
-				.iter()
-				.map(|(name, _)| name)
-				.collect::<Vec<_>>()
-				.as_slice(),
-		)
+		.items(config.templates.iter().map(|t| t.describe()))
 		.default(0)
 		.interact_opt()
 		.nice_unwrap("Unable to get template")
 		.unwrap_or(0);
 
-	let template = if template_index == template_options.len() - 2 {
-		println!();
-		info!("Here you can use any github repository");
-		info!("Use this syntax: 'user/repo' or 'user/repo@branch'");
-		format!("https://github.com/{}", ask_value("Template", None, true))
-	} else if template_index == template_options.len() - 1 {
-		println!();
-		info!("Here you can use any local git repository");
-		info!("Please provide a local path to clone the repository from");
-		info!("It can be either a relative or a full path");
-		info!("Use this syntax: '/path/to/repo' or '/path/to/repo@branch'");
-		ask_value("Template", None, true)
-	} else {
-		template_options[template_index].1.to_string()
-	};
+	let template = &config.templates[template_index];
 
 	let final_name = ask_value("Name", possible_name(&location).as_deref(), true);
 
@@ -273,4 +334,109 @@ pub fn build_template(location: Option<PathBuf>) {
 		description: final_description.replace("\"", "\\\""),
 		strip,
 	});
+}
+
+fn sanitize_project_name(mut name: &str) -> String {
+	name = name.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+
+	if name.is_empty() {
+		return "mod".to_string();
+	}
+
+	name.chars()
+		.map(|c| match c {
+			'A'..='Z' | 'a'..='z' | '0'..='9' | '_' | '-' | '.' => c,
+			_ => '_',
+		})
+		.collect()
+}
+
+fn create_new_template(config: &mut Config, template: Template) {
+	if config.templates.iter().any(|t| t.name == template.name) {
+		fatal!(
+			"A template with the name '{}' already exists",
+			template.name
+		);
+	}
+
+	config.templates.push(template);
+}
+
+fn modify_template(
+	config: &mut Config,
+	name: String,
+	description: Option<String>,
+	repository: Option<String>,
+	subfolder: Option<String>,
+) {
+	let template = config
+		.templates
+		.iter_mut()
+		.find(|t| t.name == name)
+		.unwrap_or_else(|| fatal!("No template with the name '{}' exists", name));
+
+	if let Some(desc) = description {
+		template.description = (!desc.is_empty()).then_some(desc);
+	}
+	if let Some(repo) = repository {
+		template.repository = repo;
+	}
+	if let Some(subfolder) = subfolder {
+		template.subfolder = (!subfolder.is_empty()).then_some(subfolder);
+	}
+}
+
+fn list_templates(config: &Config) {
+	for (i, template) in config.templates.iter().enumerate() {
+		info!("{}. {}", i + 1, template.describe());
+		info!(" - Repository: {}", template.repository);
+		if let Some(subfolder) = &template.subfolder {
+			info!(" - Subfolder: {}", subfolder);
+		}
+	}
+}
+
+fn delete_template(config: &mut Config, name: String) {
+	config.templates.retain(|t| t.name != name);
+}
+
+pub fn subcommand(cmd: Templates) {
+	let mut config = Config::new();
+
+	match cmd {
+		Templates::Create {
+			name,
+			description,
+			repository,
+			subfolder,
+		} => {
+			create_new_template(
+				&mut config,
+				Template {
+					name,
+					description,
+					repository,
+					subfolder,
+				},
+			);
+		}
+		Templates::Modify {
+			name,
+			description,
+			repository,
+			subfolder,
+		} => {
+			modify_template(&mut config, name, description, repository, subfolder);
+		}
+
+		Templates::List => {
+			list_templates(&config);
+		}
+
+		Templates::Delete { name } => {
+			delete_template(&mut config, name);
+		}
+	}
+
+	config.save();
 }
