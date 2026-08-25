@@ -567,7 +567,11 @@ fn merge_packages(inputs: Vec<PathBuf>, zstd: bool, optimize_pngs: bool) {
 		}
 	}
 
+	// close archive so it can be safely overwritten
+	drop(first_archive);
+
 	out_archive.finish().nice_unwrap("Unable to write to zip");
+
 	out_file
 		.persist(inputs[0].clone())
 		.nice_unwrap("Unable to persist zip");
