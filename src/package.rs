@@ -3,17 +3,28 @@ use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use clap::Subcommand;
+use semver::Version;
+use tempfile::NamedTempFile;
 use zip::write::FileOptions;
-use zip::ZipWriter;
+use zip::{CompressionMethod, ZipWriter};
 
 use crate::config::Config;
+use crate::file::copy_dir_recursive;
 use crate::util::bmfont;
 use crate::util::cache::CacheBundle;
-use crate::util::mod_file::{parse_mod_info, ModFileInfo};
+use crate::util::mod_file::{ModFileInfo, parse_mod_info};
 use crate::util::spritesheet;
+use crate::{NiceUnwrap, done, fatal, info, warn};
 use crate::{cache, project};
-use crate::{done, fatal, info, warn, NiceUnwrap};
-use crate::file::copy_dir_recursive;
+
+// Level for new packages, which is typically either local builds or intermediate CI builds with 1 platform,
+// here it's best for it to be a low level for speed, as the package will be merged later anyway
+const ZSTD_LEVEL_NEW: i64 = 3;
+// Level for merged packages, most often used for release CI builds, here we can afford to spend a few extra seconds to compress.
+// Level 18 was chosen as a sweet spot that provides very good compression for most mods while not being unreasonably slow like 19+
+const ZSTD_LEVEL_MERGED: i64 = 18;
+// Zstd support was added to the loader in v5.9.0
+const ZSTD_MIN_GEODE_VERSION: Version = Version::new(5, 9, 0);
 
 #[derive(Subcommand, Debug)]
 #[clap(rename_all = "kebab-case")]
@@ -43,12 +54,24 @@ pub enum Package {
 		/// Whether to install the generated package after creation
 		#[clap(short, long)]
 		install: bool,
+
+		/// Use zstd level 3 compression instead of deflate, improving file size and decompression speeds.
+		#[clap(long)]
+		zstd: bool,
 	},
 
 	/// Merge multiple packages
 	Merge {
 		/// Packages to merge
 		packages: Vec<PathBuf>,
+
+		/// Use zstd level 18 compression instead of deflate, significantly reducing size at the cost of taking a few extra seconds.
+		#[clap(long)]
+		zstd: bool,
+
+		/// Apply slow but lossless recompression to all PNG files, reducing size of resources.
+		#[clap(long)]
+		optimize_pngs: bool,
 	},
 
 	/// Check the dependencies of a project.
@@ -101,34 +124,38 @@ pub fn install(config: &Config, pkg_path: &Path) {
 	);
 }
 
-fn zip_folder(path: &Path, output: &Path) {
+fn zip_folder(path: &Path, output: &Path, zstd_level: Option<i64>) {
 	info!("Zipping");
 
 	// Setup zip
 	let mut zip_file = ZipWriter::new(fs::File::create(output).unwrap());
-	let zip_options =
-		FileOptions::<()>::default().compression_method(zip::CompressionMethod::Deflated);
 
 	// Iterate files in target path
 	for item in walkdir::WalkDir::new(path) {
 		let item = item.unwrap();
+		let metadata = item.metadata().unwrap();
 
 		// Only look at files
-		if item.metadata().unwrap().is_file() {
-			// Relativize
-			let mut relative_path = item
-				.path()
-				.strip_prefix(path)
-				.unwrap()
-				.to_str()
-				.unwrap()
-				.to_string();
-
-			relative_path = relative_path.replace('\\', "/");
-
-			zip_file.start_file(relative_path, zip_options).unwrap();
-			zip_file.write_all(&fs::read(item.path()).unwrap()).unwrap();
+		if !metadata.is_file() {
+			continue;
 		}
+
+		let file_name = item.file_name().to_str().unwrap();
+		let options = zip_file_options(file_name, zstd_level);
+
+		// Relativize
+		let mut relative_path = item
+			.path()
+			.strip_prefix(path)
+			.unwrap()
+			.to_str()
+			.unwrap()
+			.to_string();
+
+		relative_path = relative_path.replace('\\', "/");
+
+		zip_file.start_file(relative_path, options).unwrap();
+		zip_file.write_all(&fs::read(item.path()).unwrap()).unwrap();
 	}
 
 	zip_file.finish().nice_unwrap("Unable to zip");
@@ -256,9 +283,15 @@ fn create_package(
 	binaries: Vec<PathBuf>,
 	raw_output: Option<PathBuf>,
 	do_install: bool,
+	use_zstd: bool,
 ) {
 	// Parse mod.json
 	let mod_file_info = parse_mod_info(root_path);
+
+	// if `use_zstd` is true but the mod targets an outdated loader version, throw an error
+	if use_zstd {
+		assert_zstd_support(&mod_file_info.geode);
+	}
 
 	// path to the final .geode file
 	let mut output = raw_output.unwrap_or(root_path.join(format!("{}.geode", mod_file_info.id)));
@@ -390,7 +423,7 @@ fn create_package(
 
 	new_cache.save(working_dir);
 
-	zip_folder(working_dir, &output);
+	zip_folder(working_dir, &output, use_zstd.then_some(ZSTD_LEVEL_NEW));
 
 	if do_install {
 		let config = Config::new().assert_is_setup();
@@ -410,14 +443,26 @@ pub fn mod_json_from_archive<R: Seek + Read>(input: &mut zip::ZipArchive<R>) -> 
 	serde_json::from_str::<serde_json::Value>(&text).nice_unwrap("Unable to parse mod.json")
 }
 
-fn merge_packages(inputs: Vec<PathBuf>) {
+fn merge_packages(inputs: Vec<PathBuf>, zstd: bool, optimize_pngs: bool) {
 	let mut archives: Vec<_> = inputs
 		.iter()
 		.map(|x| {
-			zip::ZipArchive::new(fs::File::options().read(true).write(true).open(x).unwrap())
+			zip::ZipArchive::new(fs::File::options().read(true).open(x).unwrap())
 				.nice_unwrap("Unable to unzip")
 		})
 		.collect();
+
+	// Zstd requires Geode v5.9.0+
+	if zstd {
+		let mod_json = mod_json_from_archive(&mut archives[0]);
+		let geode_version = mod_json
+			.get("geode")
+			.and_then(|x| x.as_str())
+			.and_then(|x| x.replace('v', "").parse::<Version>().ok())
+			.nice_unwrap("Did not find geode version in mod.json");
+
+		assert_zstd_support(&geode_version);
+	}
 
 	// Sanity check
 	let mut mod_ids: Vec<_> = archives
@@ -445,9 +490,46 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 		}
 	});
 
-	let mut out_archive = ZipWriter::new_append(archives.remove(0).into_inner())
-		.nice_unwrap("Unable to create zip writer");
+	// copy all files from first archive, re-compress resources
+	let mut first_archive = archives.remove(0);
+	let file_names: Vec<_> = first_archive.file_names().map(|x| x.to_string()).collect();
 
+	// store the temporary file in the same folder as the other .geode files, to avoid cross-device links
+	let out_temp_dir = inputs[0].parent().unwrap();
+	let mut out_file =
+		NamedTempFile::new_in(out_temp_dir).nice_unwrap("Failed to create temp file");
+	let mut out_archive = ZipWriter::new(&mut out_file);
+
+	for name in file_names {
+		let mut entry = first_archive.by_name(&name).unwrap();
+
+		// if zstd and png optimization are disabled, we can copy 1:1 which is faster
+		if !zstd && !optimize_pngs {
+			out_archive
+				.raw_copy_file(entry)
+				.nice_unwrap("Unable to copy file between zips");
+			continue;
+		}
+
+		let mut data = Vec::new();
+		entry
+			.read_to_end(&mut data)
+			.nice_unwrap("Unable to read file from zip");
+
+		if name.ends_with(".png") && optimize_pngs {
+			data = oxipng::optimize_from_memory(&data, &oxipng::Options::from_preset(4))
+				.nice_unwrap("Failed to optimize .png");
+		}
+
+		write_file_to_zip(
+			&mut out_archive,
+			&name,
+			&data,
+			zstd.then_some(ZSTD_LEVEL_MERGED),
+		);
+	}
+
+	// for the remainder of archives, copy just the binaries
 	for archive in &mut archives {
 		let potential_names = [".dylib", ".so", ".dll", ".lib", ".pdb"];
 
@@ -462,14 +544,37 @@ fn merge_packages(inputs: Vec<PathBuf>) {
 			if potential_names.iter().any(|x| file.ends_with(*x)) {
 				println!("{}", file);
 
-				out_archive
-					.raw_copy_file(archive.by_name(&file).nice_unwrap("Unable to fetch file"))
-					.nice_unwrap("Unable to transfer binary");
+				if !zstd {
+					out_archive
+						.raw_copy_file(archive.by_name(&file).nice_unwrap("Unable to fetch file"))
+						.nice_unwrap("Unable to transfer binary");
+				} else {
+					let mut data = Vec::new();
+					archive
+						.by_name(&file)
+						.nice_unwrap("Unable to fetch file")
+						.read_to_end(&mut data)
+						.nice_unwrap("Unable to read file from zip");
+
+					write_file_to_zip(
+						&mut out_archive,
+						&file,
+						&data,
+						zstd.then_some(ZSTD_LEVEL_MERGED),
+					);
+				}
 			}
 		}
 	}
 
+	// close archive so it can be safely overwritten
+	drop(first_archive);
+
 	out_archive.finish().nice_unwrap("Unable to write to zip");
+
+	out_file
+		.persist(inputs[0].clone())
+		.nice_unwrap("Unable to persist zip");
 	done!(
 		"Successfully merged binaries into {}",
 		inputs[0].to_str().unwrap()
@@ -488,13 +593,18 @@ pub fn subcommand(cmd: Package) {
 			binary: binaries,
 			output,
 			install,
-		} => create_package(&root_path, binaries, output, install),
+			zstd,
+		} => create_package(&root_path, binaries, output, install, zstd),
 
-		Package::Merge { packages } => {
+		Package::Merge {
+			packages,
+			zstd,
+			optimize_pngs,
+		} => {
 			if packages.len() < 2 {
 				fatal!("Merging requires at least two packages");
 			}
-			merge_packages(packages)
+			merge_packages(packages, zstd, optimize_pngs)
 		}
 
 		#[allow(deprecated)]
@@ -510,4 +620,45 @@ pub fn subcommand(cmd: Package) {
 			shut_up,
 		} => create_package_resources_only(&root_path, &output, shut_up),
 	}
+}
+
+fn assert_zstd_support(target_geode_version: &Version) {
+	if target_geode_version < &ZSTD_MIN_GEODE_VERSION {
+		fatal!(
+			"Zstd compression is not supported by the target loader version {}. Please update the loader version in mod.json to {} or newer or disable Zstd compression.",
+			target_geode_version,
+			ZSTD_MIN_GEODE_VERSION
+		);
+	}
+}
+
+fn zip_file_options(name: &'_ str, zstd_level: Option<i64>) -> FileOptions<'_, ()> {
+	if let Some(mut level) = zstd_level
+		&& name != "mod.json"
+	{
+		// for .png files just use level 3, they are already hardly compressible
+		if name.ends_with(".png") {
+			level = 3;
+		}
+
+		FileOptions::default()
+			.compression_method(CompressionMethod::Zstd)
+			.compression_level(Some(level))
+	} else {
+		// store mod.json as deflate, so that older Geode versions can still parse it instead of throwing an invalid metadata error
+		FileOptions::default().compression_method(CompressionMethod::Deflated)
+	}
+}
+
+fn write_file_to_zip<W: Write + Seek>(
+	zip: &mut ZipWriter<W>,
+	name: &str,
+	data: &[u8],
+	zstd_level: Option<i64>,
+) {
+	let opts = zip_file_options(name, zstd_level);
+	zip.start_file(name, opts)
+		.nice_unwrap("Unable to start file in zip");
+	zip.write_all(data)
+		.nice_unwrap("Unable to write file to zip");
 }
