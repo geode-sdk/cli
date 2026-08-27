@@ -182,7 +182,7 @@ fn set_sdk_env(path: &Path) -> bool {
 			use std::ffi::c_void;
 
 			#[link(name = "user32")]
-			extern "system" {
+			unsafe extern "system" {
 				fn SendMessageTimeoutW(
 					hwnd: *const c_void,
 					msg: u32,
