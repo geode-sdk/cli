@@ -24,7 +24,7 @@ use crate::launchctl;
 use winreg::RegKey;
 
 use crate::confirm;
-use crate::{done, fail, fatal, info, warn, NiceUnwrap};
+use crate::{NiceUnwrap, done, fail, fatal, info, warn};
 
 const BINARIES_DOWNLOAD_ATTEMPTS: usize = 5;
 
@@ -232,7 +232,9 @@ fn set_sdk_env(path: &Path) -> bool {
 		let shell = match detect_user_shell() {
 			Some(s) => s,
 			None => {
-				warn!("Couldn't detect user shell. The CLI only supports bash, zsh and fish for setting the GEODE_SDK environment variable at the moment.");
+				warn!(
+					"Couldn't detect user shell. The CLI only supports bash, zsh and fish for setting the GEODE_SDK environment variable at the moment."
+				);
 				return false;
 			}
 		};
@@ -256,7 +258,10 @@ fn set_sdk_env(path: &Path) -> bool {
 		if shell_data.regex.find(&contents).is_none() {
 			contents.push_str(format!("\n{}", shell_data.replace_with).as_str());
 			if let Err(e) = std::fs::write(&shell_data.profile, contents) {
-				warn!("Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup", e, &shell_data.profile);
+				warn!(
+					"Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup",
+					e, &shell_data.profile
+				);
 				return false;
 			}
 		} else {
@@ -264,7 +269,10 @@ fn set_sdk_env(path: &Path) -> bool {
 				.regex
 				.replace(&contents, shell_data.replace_with.as_str());
 			if let Err(e) = std::fs::write(&shell_data.profile, r.as_bytes()) {
-				warn!("Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup", e, &shell_data.profile);
+				warn!(
+					"Couldn't write profile file: {}. Please check if {} is intact, otherwise apply the created backup",
+					e, &shell_data.profile
+				);
 				return false;
 			}
 		}
@@ -371,7 +379,9 @@ fn install(config: &mut Config, path: PathBuf, force: bool) {
 			return;
 		} else {
 			let env_sdk_path = std::env::var("GEODE_SDK").unwrap();
-			info!("GEODE_SDK ({env_sdk_path}) is already set, but seems to point to an invalid sdk installation.");
+			info!(
+				"GEODE_SDK ({env_sdk_path}) is already set, but seems to point to an invalid sdk installation."
+			);
 			if !crate::logging::ask_confirm("Do you wish to proceed?", true) {
 				fatal!("Aborting");
 			}
@@ -798,7 +808,7 @@ fn download_xwin(dest: &Path) -> Result<(), Box<dyn std::error::Error>> {
 						#[cfg(all(not(target_os = "macos"), target_arch = "aarch64"))]
 						"aarch64-unknown-linux-musl.tar.gz",
 						#[cfg(all(not(target_os = "macos"), target_arch = "x86_64"))]
-						"x86_64-unknown-linux-musl.tar.gz"
+						"x86_64-unknown-linux-musl.tar.gz",
 					)
 				})
 			})
@@ -953,31 +963,31 @@ pub fn subcommand(cmd: Sdk) {
 				return;
 			}
 
-			if !force {
-				if let Some(path) = get_sdk_path() {
-					fatal!(
-						"SDK is already installed at {} - if you meant to \
+			if !force && let Some(path) = get_sdk_path() {
+				fatal!(
+					"SDK is already installed at {} - if you meant to \
 						update the SDK, use `geode sdk update`, or if you \
 						want to change the install location use the --reinstall \
 						option",
-						path.display()
-					);
-				}
+					path.display()
+				);
 			}
 
+			let error = "No default path available! \
+        Please provide the path manually as an \
+        argument to `geode sdk install`";
 			let actual_path = match path {
 				Some(p) => p,
 				None => {
 					let default_path = if cfg!(target_os = "macos") {
 						PathBuf::from("/Users/Shared/Geode/sdk")
-					} else {
-						dirs::document_dir()
-							.nice_unwrap(
-								"No default path available! \
-								Please provide the path manually as an \
-								argument to `geode sdk install`",
-							)
+					} else if cfg!(target_os = "linux") {
+						dirs::data_local_dir()
+							.nice_unwrap(error)
 							.join("Geode")
+							.join("sdk")
+					} else {
+						dirs::document_dir().nice_unwrap(error).join("Geode")
 					};
 					if !confirm!(
 						"Installing at default path {}. Is this okay?",
