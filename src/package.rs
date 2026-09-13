@@ -1,4 +1,4 @@
-use std::fs::{self, read_dir};
+use std::fs;
 use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
@@ -333,46 +333,40 @@ fn create_package(
 		false,
 	);
 
-	// Custom hardcoded resources
-	for file in ["logo.png", "about.md", "changelog.md", "support.md"] {
-		let path = root_path.join(file);
-		if path.exists() {
-			std::fs::copy(path, working_dir.join(file))
-				.nice_unwrap(format!("Could not copy {file}"));
-		}
-	}
-
-	// Use readme as about.md if its missing
-	if !root_path.join("about.md").exists() {
-		for file in ["README.md", "readme.md", "Readme.md"] {
-			let path = root_path.join(file);
-			if path.exists() {
-				std::fs::copy(path, working_dir.join("about.md"))
-					.nice_unwrap(format!("Could not copy {file}"));
-				break;
-			}
-		}
-	}
-
-	// Copy headers
-	if let Some(ref api) = mod_file_info.api {
-		for header in &api.include {
-			let out = working_dir.join(header);
-			out.parent().map(fs::create_dir_all);
-			fs::copy(root_path.join(header), &out).nice_unwrap(format!(
-				"Unable to copy header {} to {}",
-				header.display(),
-				out.display()
-			));
-		}
-	}
-
+	let mut readme_path: Option<PathBuf> = None;
+	let mut about_added = false;
 	let mut binaries_added = false;
-	for file in read_dir(root_path).nice_unwrap("Unable to read root directory") {
-		let Ok(file) = file else {
+
+	// Custom hardcoded resources
+	for dir_entry in root_path
+		.read_dir()
+		.expect("root_path should be a directory")
+	{
+		let Ok(dir_entry) = dir_entry else {
 			continue;
 		};
-		let path = file.path();
+
+		let lowercase = dir_entry.file_name().to_ascii_lowercase();
+		let path = dir_entry.path();
+
+		if lowercase == "readme.md" {
+			readme_path = Some(path.clone());
+		}
+
+		if lowercase == "about.md" {
+			about_added = true;
+		}
+
+		if lowercase == "logo.png"
+			|| lowercase == "about.md"
+			|| lowercase == "changelog.md"
+			|| lowercase == "support.md"
+		{
+			std::fs::copy(&path, working_dir.join(dir_entry.file_name()))
+				.nice_unwrap(format!("Could not copy {}", path.to_str().unwrap_or("")));
+		}
+
+		// Extension handling
 		let Some(name) = path.file_stem() else {
 			continue;
 		};
@@ -388,6 +382,26 @@ fn create_package(
 			std::fs::copy(path, working_dir.join(&binary))
 				.nice_unwrap(format!("Unable to copy binary '{}'", binary));
 			binaries_added = true;
+		}
+	}
+
+	if !about_added && let Some(readme_path) = readme_path {
+		std::fs::copy(&readme_path, working_dir.join("about.md")).nice_unwrap(format!(
+			"Could not copy {}",
+			readme_path.to_str().unwrap_or("")
+		));
+	}
+
+	// Copy headers
+	if let Some(ref api) = mod_file_info.api {
+		for header in &api.include {
+			let out = working_dir.join(header);
+			out.parent().map(fs::create_dir_all);
+			fs::copy(root_path.join(header), &out).nice_unwrap(format!(
+				"Unable to copy header {} to {}",
+				header.display(),
+				out.display()
+			));
 		}
 	}
 
