@@ -82,6 +82,12 @@ pub enum GeodeCommands {
 		commands: crate::project::Project,
 	},
 
+	/// Tools for managing mod templates
+	Templates {
+		#[clap(subcommand)]
+		commands: crate::template::Templates,
+	},
+
 	/// Options for working with .geode packages
 	Package {
 		#[clap(subcommand)]
