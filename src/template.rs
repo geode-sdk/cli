@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::sdk::get_version;
 use crate::util::logging::{ask_confirm, ask_value};
 use crate::{done, info, warn, NiceUnwrap};
+use git2::{FetchOptions, ProxyOptions};
 use git2::build::RepoBuilder;
 use path_absolutize::Absolutize;
 use regex::Regex;
@@ -47,8 +48,18 @@ fn create_template(template: CreateTemplate) {
 	// Remove this if you dont think its needed
 	info!("Cloning branch {} of repository {}", branch, used_template);
 
+	// Let git2 derive user proxy settings
+	let mut proxy = ProxyOptions::new();
+	proxy.auto();
+
+	let mut fetch = FetchOptions::new();
+	fetch.proxy_options(proxy);
+
+	let mut builder = RepoBuilder::new();
+	builder.fetch_options(fetch);
+
 	// Clone repository
-	RepoBuilder::new()
+	builder
 		.branch(branch)
 		.clone(used_template, &template.project_location)
 		.nice_unwrap("Unable to clone repository");
