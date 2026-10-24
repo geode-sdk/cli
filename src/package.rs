@@ -392,14 +392,45 @@ fn create_package(
 		));
 	}
 
-	// Copy headers
+	// Copy headers & cmake scripts
 	if let Some(ref api) = mod_file_info.api {
 		for header in &api.include {
-			let out = working_dir.join(header);
+			// strip the prefix, if provided
+			let rel_path = if let Some(prefix) = api.include_strip_prefix.as_ref() {
+				header.strip_prefix(prefix).unwrap_or(header)
+			} else {
+				header
+			};
+
+			if rel_path.is_absolute() {
+				fatal!(
+					"Header path '{}' is absolute, which is disallowed",
+					rel_path.display()
+				);
+			}
+
+			let out = working_dir.join(rel_path);
 			out.parent().map(fs::create_dir_all);
 			fs::copy(root_path.join(header), &out).nice_unwrap(format!(
 				"Unable to copy header {} to {}",
 				header.display(),
+				out.display()
+			));
+		}
+
+		for path in &api.cmake {
+			if path.is_absolute() {
+				fatal!(
+					"Cmake script path '{}' is absolute, which is disallowed",
+					path.display()
+				);
+			}
+
+			let out = working_dir.join(path);
+			out.parent().map(fs::create_dir_all);
+			fs::copy(root_path.join(path), &out).nice_unwrap(format!(
+				"Unable to copy cmake script {} to {}",
+				path.display(),
 				out.display()
 			));
 		}
