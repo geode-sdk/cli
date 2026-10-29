@@ -394,13 +394,21 @@ fn create_package(
 
 	// Copy headers & cmake scripts
 	if let Some(ref api) = mod_file_info.api {
+		let stripped_prefix = match &api.include_strip_prefix {
+			Some(prefix) => prefix.as_path(),
+			None => {
+				// for mods targetting v6, strip the `include/`
+				if mod_file_info.geode.major >= 6 {
+					Path::new("include/")
+				} else {
+					Path::new("")
+				}
+			}
+		};
+
 		for header in &api.include {
 			// strip the prefix, if provided
-			let rel_path = if let Some(prefix) = api.include_strip_prefix.as_ref() {
-				header.strip_prefix(prefix).unwrap_or(header)
-			} else {
-				header
-			};
+			let rel_path = header.strip_prefix(stripped_prefix).unwrap_or(header);
 
 			if rel_path.is_absolute() {
 				fatal!(

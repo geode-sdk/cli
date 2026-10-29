@@ -416,7 +416,8 @@ where
 pub struct ModApi {
 	#[serde(default, deserialize_with = "parse_glob_rel")]
 	pub include: Vec<PathBuf>,
-	#[serde(default = "default_include_strip_prefix")]
+	/// Note: the value of None means "automatic", so = "include/" for Geode v6 and "" for older versions.
+	#[serde(default)]
 	pub include_strip_prefix: Option<PathBuf>,
 	#[serde(default, deserialize_with = "parse_glob_rel")]
 	pub cmake: Vec<PathBuf>,
@@ -522,8 +523,4 @@ pub fn try_parse_mod_info(root_path: &Path) -> Result<ModFileInfo, String> {
 
 pub fn parse_mod_info(root_path: &Path) -> ModFileInfo {
 	try_parse_mod_info(root_path).nice_unwrap("Failed to parse mod.json")
-}
-
-fn default_include_strip_prefix() -> Option<PathBuf> {
-	Some(PathBuf::from("include/"))
 }
