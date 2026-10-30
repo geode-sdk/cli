@@ -37,7 +37,7 @@ jobs:
             #export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
             #brew update
             #brew reinstall openssl@3
-            #export OPENSSL_STATIC=1
+            export OPENSSL_STATIC=1
             #export OPENSSL_DIR="$(brew --prefix openssl@3)"
           target: x86_64-apple-darwin
 
