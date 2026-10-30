@@ -268,7 +268,7 @@ pub fn build_template(location: Option<PathBuf>) {
 	info!("You can change any of the properties you set here later on by editing the generated mod.json file.");
 
 	info!("Choose a template for the mod to be created:");
-	info!("Note: you can create your own templates via 'geode template create'");
+	info!("Note: you can create your own templates via 'geode templates create'");
 
 	let template_index = dialoguer::Select::with_theme(&dialoguer::theme::ColorfulTheme::default())
 		.items(config.templates.iter().map(|t| t.describe()))
