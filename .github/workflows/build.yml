@@ -21,24 +21,18 @@ jobs:
       fail-fast: false
       matrix:
         config:
-        # - name: "Windows"
-        #   id: win
-        #   os: ubuntu-latest
-        #   executable: 'geode.exe'
-        #   prebuild: 'sudo apt-get install gcc-mingw-w64-x86-64'
-        #   target: x86_64-pc-windows-gnu
+        - name: "Windows"
+          id: win
+          os: ubuntu-latest
+          executable: 'geode.exe'
+          prebuild: 'sudo apt-get install gcc-mingw-w64-x86-64'
+          target: x86_64-pc-windows-gnu
 
         - name: "macOS"
           id: mac
           os: macos-latest
           executable: 'geode'
-          prebuild: |
-            #/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            #export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-            #brew update
-            #brew reinstall openssl@3
-            export OPENSSL_STATIC=1
-            #export OPENSSL_DIR="$(brew --prefix openssl@3)"
+          prebuild: 'export OPENSSL_STATIC=1'
           target: x86_64-apple-darwin
 
         - name: "Linux"
@@ -53,12 +47,12 @@ jobs:
           prebuild: 'export OPENSSL_STATIC=1'
           target: x86_64-unknown-linux-gnu
 
-        # - name: "Linux ARM64"
-        #   id: linux-arm
-        #   os: ubuntu-22.04-arm
-        #   executable: 'geode'
-        #   prebuild: 'export OPENSSL_STATIC=1'
-        #   target: aarch64-unknown-linux-gnu
+        - name: "Linux ARM64"
+          id: linux-arm
+          os: ubuntu-22.04-arm
+          executable: 'geode'
+          prebuild: 'export OPENSSL_STATIC=1'
+          target: aarch64-unknown-linux-gnu
 
     name: Build ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
