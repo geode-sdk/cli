@@ -393,17 +393,29 @@ fn modify_template(
 }
 
 fn list_templates(config: &Config) {
+	if config.templates.is_empty() {
+		info!("No templates are currently configured, add one with `geode templates create`");
+		return;
+	}
+
 	for (i, template) in config.templates.iter().enumerate() {
+		if i > 0 {
+			println!();
+		}
+
 		println!("{}. {}", i + 1, template.describe());
 		println!(" - Repository: {}", template.repository);
 		if let Some(subfolder) = &template.subfolder {
 			println!(" - Subfolder: {}", subfolder);
 		}
-		println!();
 	}
 }
 
 fn delete_template(config: &mut Config, name: String) {
+	if config.templates.len() == 1 {
+		fatal!("You cannot delete the last remaining template, add another template before being able to delete any");
+	}
+
 	if let Some(pos) = config.templates.iter().position(|t| t.name == name) {
 		config.templates.remove(pos);
 		done!("Successfully deleted template '{}'", name);
