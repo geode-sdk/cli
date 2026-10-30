@@ -13,7 +13,7 @@ on:
     - "Cargo.toml"
     - "build.rs"
     - ".github/workflows/build.yml"
-    branches: [ main ]
+    branches: '**'
 
 jobs:
   build:
@@ -21,44 +21,44 @@ jobs:
       fail-fast: false
       matrix:
         config:
-        - name: "Windows"
-          id: win
-          os: ubuntu-latest
-          executable: 'geode.exe'
-          prebuild: 'sudo apt-get install gcc-mingw-w64-x86-64'
-          target: x86_64-pc-windows-gnu
+        # - name: "Windows"
+        #   id: win
+        #   os: ubuntu-latest
+        #   executable: 'geode.exe'
+        #   prebuild: 'sudo apt-get install gcc-mingw-w64-x86-64'
+        #   target: x86_64-pc-windows-gnu
 
         - name: "macOS"
           id: mac
           os: macos-latest
           executable: 'geode'
           prebuild: |
-            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
             export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-            arch -x86_64 brew update
-            arch -x86_64 brew reinstall openssl@3
+            brew update
+            brew reinstall openssl@3
             export OPENSSL_STATIC=1
-            export OPENSSL_DIR="$(arch -x86_64 brew --prefix openssl@3)"
+            export OPENSSL_DIR="$(brew --prefix openssl@3)"
           target: x86_64-apple-darwin
 
-        - name: "Linux"
-          id: linux
-          os: ubuntu-22.04
-          # ubuntu-latest is currently a mix of 22.04 and 24.04
-          # so we are not able to use that until January 17, 2025 at least
-          # if we want compatibility with said version on GH actions
-          # see also https://github.com/actions/runner-images/issues/10636
-          executable: 'geode'
-          # some stupid old ubuntu versions cant install libssl3
-          prebuild: 'export OPENSSL_STATIC=1'
-          target: x86_64-unknown-linux-gnu
+        # - name: "Linux"
+        #   id: linux
+        #   os: ubuntu-22.04
+        #   # ubuntu-latest is currently a mix of 22.04 and 24.04
+        #   # so we are not able to use that until January 17, 2025 at least
+        #   # if we want compatibility with said version on GH actions
+        #   # see also https://github.com/actions/runner-images/issues/10636
+        #   executable: 'geode'
+        #   # some stupid old ubuntu versions cant install libssl3
+        #   prebuild: 'export OPENSSL_STATIC=1'
+        #   target: x86_64-unknown-linux-gnu
 
-        - name: "Linux ARM64"
-          id: linux-arm
-          os: ubuntu-22.04-arm
-          executable: 'geode'
-          prebuild: 'export OPENSSL_STATIC=1'
-          target: aarch64-unknown-linux-gnu
+        # - name: "Linux ARM64"
+        #   id: linux-arm
+        #   os: ubuntu-22.04-arm
+        #   executable: 'geode'
+        #   prebuild: 'export OPENSSL_STATIC=1'
+        #   target: aarch64-unknown-linux-gnu
 
     name: Build ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
