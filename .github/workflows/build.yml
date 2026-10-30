@@ -13,7 +13,7 @@ on:
     - "Cargo.toml"
     - "build.rs"
     - ".github/workflows/build.yml"
-    branches: [ main ]
+    branches: '**'
 
 jobs:
   build:
@@ -32,13 +32,7 @@ jobs:
           id: mac
           os: macos-latest
           executable: 'geode'
-          prebuild: |
-            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            export PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-            arch -x86_64 brew update
-            arch -x86_64 brew reinstall openssl@3
-            export OPENSSL_STATIC=1
-            export OPENSSL_DIR="$(arch -x86_64 brew --prefix openssl@3)"
+          prebuild: 'export OPENSSL_STATIC=1'
           target: x86_64-apple-darwin
 
         - name: "Linux"
