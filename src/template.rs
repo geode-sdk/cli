@@ -167,11 +167,14 @@ fn create_template(template: CreateTemplate) {
 
 		if rendered.trim().is_empty() {
 			// if a file is empty, but it was still added as a template, likely the entire file is wrapped in conditional blocks,
-			// and they all evaluated as false. so remove the file instead of keeping an empty one
-			let _ = fs::remove_file(&path);
+			// and they all evaluated as false. so remove the file instead of keeping an empty one, unless it already was empty
+			let old_file = fs::read_to_string(&path).unwrap_or_default();
+			if !old_file.trim().is_empty() {
+				let _ = fs::remove_file(&path);
+			}
+		} else {
+			fs::write(&path, rendered).unwrap();
 		}
-
-		fs::write(&path, rendered).unwrap();
 	}
 
 	let mod_json_path = template.project_location.join("mod.json");
@@ -360,6 +363,7 @@ fn create_new_template(config: &mut Config, template: Template) {
 	}
 
 	config.templates.push(template);
+	done!("Successfully created new template");
 }
 
 fn modify_template(
@@ -384,20 +388,28 @@ fn modify_template(
 	if let Some(subfolder) = subfolder {
 		template.subfolder = (!subfolder.is_empty()).then_some(subfolder);
 	}
+
+	done!("Successfully updated template '{}'", name);
 }
 
 fn list_templates(config: &Config) {
 	for (i, template) in config.templates.iter().enumerate() {
-		info!("{}. {}", i + 1, template.describe());
-		info!(" - Repository: {}", template.repository);
+		println!("{}. {}", i + 1, template.describe());
+		println!(" - Repository: {}", template.repository);
 		if let Some(subfolder) = &template.subfolder {
-			info!(" - Subfolder: {}", subfolder);
+			println!(" - Subfolder: {}", subfolder);
 		}
+		println!();
 	}
 }
 
 fn delete_template(config: &mut Config, name: String) {
-	config.templates.retain(|t| t.name != name);
+	if let Some(pos) = config.templates.iter().position(|t| t.name == name) {
+		config.templates.remove(pos);
+		done!("Successfully deleted template '{}'", name);
+	} else {
+		fatal!("No template with the name '{}' exists", name);
+	}
 }
 
 pub fn subcommand(cmd: Templates) {
