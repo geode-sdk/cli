@@ -414,8 +414,13 @@ where
 
 #[derive(Default, Deserialize, PartialEq)]
 pub struct ModApi {
-	#[serde(deserialize_with = "parse_glob_rel")]
+	#[serde(default, deserialize_with = "parse_glob_rel")]
 	pub include: Vec<PathBuf>,
+	/// Note: the value of None means "automatic", so = "include/" for Geode v6 and "" for older versions.
+	#[serde(default)]
+	pub include_strip_prefix: Option<PathBuf>,
+	#[serde(default, deserialize_with = "parse_glob_rel")]
+	pub cmake: Vec<PathBuf>,
 }
 
 #[derive(PartialEq)]
