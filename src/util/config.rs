@@ -20,11 +20,33 @@ pub struct Profile {
 	other: HashMap<String, Value>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct Template {
+	pub name: String,
+	pub description: Option<String>,
+	/// Either a URL to a git repo or a path to a local folder
+	pub repository: String,
+	/// Subfolder inside the repository
+	pub subfolder: Option<String>,
+}
+
+impl Template {
+	pub fn describe(&self) -> String {
+		match &self.description {
+			Some(desc) => format!("{} - {}", self.name, desc),
+			None => self.name.clone(),
+		}
+	}
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Config {
 	pub current_profile: Option<String>,
 	pub profiles: Vec<RefCell<Profile>>,
+	#[serde(default = "default_templates")]
+	pub templates: Vec<Template>,
 	pub default_developer: Option<String>,
 	pub sdk_nightly: bool,
 	pub sdk_version: Option<String>,
@@ -37,6 +59,23 @@ pub struct Config {
 
 fn default_index_url() -> String {
 	"https://api.geode-sdk.org".to_string()
+}
+
+fn default_templates() -> Vec<Template> {
+	vec![
+		Template {
+			name: "Default".to_string(),
+			description: Some("Simple mod that adds a button to the main menu.".to_string()),
+			repository: "https://github.com/geode-sdk/template-mods".to_string(),
+			subfolder: Some("default".to_string()),
+		},
+		Template {
+			name: "Minimal".to_string(),
+			description: Some("Minimal mod with only the bare minimum to compile.".to_string()),
+			repository: "https://github.com/geode-sdk/template-mods".to_string(),
+			subfolder: Some("minimal".to_string()),
+		},
+	]
 }
 
 pub fn profile_platform_default() -> String {
@@ -195,12 +234,13 @@ impl Config {
 		Config {
 			current_profile: None,
 			profiles: Vec::new(),
+			templates: default_templates(),
 			default_developer: None,
 			sdk_nightly: false,
 			sdk_version: None,
-			other: HashMap::<String, Value>::new(),
+			other: HashMap::new(),
 			index_token: None,
-			index_url: "https://api.geode-sdk.org".to_string(),
+			index_url: default_index_url(),
 		}
 	}
 

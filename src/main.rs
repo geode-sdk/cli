@@ -35,6 +35,7 @@ fn main() {
 		GeodeCommands::Sdk { commands } => sdk::subcommand(commands),
 		GeodeCommands::Package { commands } => package::subcommand(commands),
 		GeodeCommands::Project { commands } => project::subcommand(commands),
+		GeodeCommands::Templates { commands } => template::subcommand(commands),
 		GeodeCommands::Index { commands } => index::subcommand(commands),
 		GeodeCommands::Run {
 			background,
