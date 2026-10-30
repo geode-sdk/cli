@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::server::{ApiResponse, PaginatedData};
 use crate::util::logging::ask_value;
-use crate::{done, fatal, index_admin, index_auth, index_dev, info, NiceUnwrap};
+use crate::{done, fatal, index_admin, index_auth, index_dev, deprecations, info, NiceUnwrap};
 use clap::Subcommand;
 use reqwest::header::USER_AGENT;
 use semver::VersionReq;
@@ -88,6 +88,11 @@ pub enum MyModAction {
 	Pending,
 	/// Edit data about a mod
 	Edit,
+    /// Manage mod deprecations
+    Deprecations {
+        #[clap(subcommand)]
+        command: DeprecateAction
+    }
 }
 
 #[derive(Deserialize, Debug, Clone, Subcommand, PartialEq)]
@@ -96,6 +101,29 @@ pub enum AdminAction {
 	ListPending,
 	/// Alter a developer's verified status
 	DevStatus,
+}
+
+#[derive(Deserialize, Debug, Clone, Subcommand, PartialEq)]
+pub enum DeprecateAction {
+    /// Add a deprecation to a mod
+    Add {
+        id: Option<String>,
+        reason: Option<String>
+    },
+    /// Remove a deprecation from a mod
+    Remove {
+        id: Option<String>
+    },
+    /// Get all deprecations from a mod
+    Get {
+        id: Option<String>
+    },
+    /// Update a deprecation for a mod
+    Update {
+        mod_id: Option<String>,
+        deprecation_id: Option<String>,
+        reason: Option<String>
+    }
 }
 
 pub fn install_mod(
@@ -371,6 +399,12 @@ pub fn subcommand(cmd: Index) {
 			MyModAction::Published => index_dev::print_own_mods(true, config),
 			MyModAction::Pending => index_dev::print_own_mods(false, config),
 			MyModAction::Edit => index_dev::edit_own_mods(config),
+            MyModAction::Deprecations { command } => match command {
+                DeprecateAction::Add { id, reason } => deprecations::add_deprecation(id, reason, config),
+                DeprecateAction::Remove { id } => deprecations::remove_deprecation(id, config),
+                DeprecateAction::Get { id } => deprecations::print_mod_deprecations(id, config),
+                DeprecateAction::Update { mod_id, deprecation_id, reason } => deprecations::update_deprecation(mod_id, deprecation_id, reason, config)
+            }
 		},
 		Index::Profile => index_dev::edit_profile(config),
 		Index::Admin { commands } => index_admin::subcommand(commands, config),
