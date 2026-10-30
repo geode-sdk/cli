@@ -129,13 +129,13 @@ fn create_template(template: CreateTemplate) {
 			.unwrap();
 
 		// skip some potentially problematic folders
-		if rel.starts_with(".git") || rel.starts_with("build") || rel.starts_with(".github") {
+		if rel.starts_with(".git") || rel.starts_with("build") || rel.starts_with(".github") || rel.starts_with(".forgejo") {
 			continue;
 		}
 
 		// skip non text files
 		let allowed_extensions = [
-			"txt", "md", "json", "yaml", "yml", "toml", "c", "cpp", "m", "mm", "h", "hpp", "cc",
+			"txt", "md", "json", "toml", "c", "cpp", "m", "mm", "h", "hpp", "cc",
 			"hh", "cxx", "hxx", "py",
 		];
 		let ext = entry
