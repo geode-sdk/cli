@@ -107,6 +107,8 @@ fn create_template(template: CreateTemplate) {
 	}
 
 	let mut env = Environment::new();
+	env.set_keep_trailing_newline(true);
+
 	let context = context! {
 		id => &template.id,
 		name => &template.name,
