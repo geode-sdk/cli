@@ -33,7 +33,8 @@ jobs:
           os: macos-latest
           executable: 'geode'
           prebuild: 'export OPENSSL_STATIC=1'
-          target: x86_64-apple-darwin
+          target: universal-apple-darwin
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
 
         - name: "Linux"
           id: linux
@@ -63,16 +64,25 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        targets: ${{ matrix.config.target }}
+        targets: ${{ matrix.config.targets || matrix.config.target }}
 
     - uses: Swatinem/rust-cache@v2
       with:
         key: ${{ matrix.config.id }}
 
     - name: Build
+      if: ${{ matrix.config.id != "mac" }}
       run: |
         ${{ matrix.config.prebuild }}
         cargo build --release --target ${{ matrix.config.target }}
+
+    - name: Build (macOS)
+      if: ${{ matrix.config.id == "mac" }}
+      run: |
+        ${{ matrix.config.prebuild }}
+        cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
+        mkdir -p target/${{ matrix.config.target }}/release
+        lipo -create target/x86_64-apple-darwin/release/${{ matrix.config.executable }} target/aarch64-apple-darwin/release/${{ matrix.config.executable }} -output target/${{ matrix.config.target }}/release/${{ matrix.config.executable }}
 
     - name: Move to output folder
       shell: bash
