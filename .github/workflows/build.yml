@@ -83,6 +83,7 @@ jobs:
         cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
         mkdir -p target/${{ matrix.config.target }}/release
         lipo -create target/x86_64-apple-darwin/release/${{ matrix.config.executable }} target/aarch64-apple-darwin/release/${{ matrix.config.executable }} -output target/${{ matrix.config.target }}/release/${{ matrix.config.executable }}
+        lipo -info target/${{ matrix.config.target }}/release/${{ matrix.config.executable }}
 
     - name: Move to output folder
       shell: bash
