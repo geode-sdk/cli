@@ -71,13 +71,13 @@ jobs:
         key: ${{ matrix.config.id }}
 
     - name: Build
-      if: ${{ matrix.config.id != "mac" }}
+      if: ${{ matrix.config.id != 'mac' }}
       run: |
         ${{ matrix.config.prebuild }}
         cargo build --release --target ${{ matrix.config.target }}
 
     - name: Build (macOS)
-      if: ${{ matrix.config.id == "mac" }}
+      if: ${{ matrix.config.id == 'mac' }}
       run: |
         ${{ matrix.config.prebuild }}
         cargo build --release --target x86_64-apple-darwin --target aarch64-apple-darwin
