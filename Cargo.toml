@@ -51,7 +51,7 @@ minijinja = "2.24.0"
 terminal-clipboard = "0.4.1"
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-cli-clipboard = "0.4.0"
+clipboard-rs = "0.3.5"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55.0"

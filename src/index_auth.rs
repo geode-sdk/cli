@@ -1,5 +1,5 @@
 #[cfg(not(target_os = "android"))]
-use cli_clipboard::ClipboardProvider;
+use clipboard_rs::Clipboard;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
 use serde_json::json;
@@ -19,8 +19,8 @@ struct LoginAttempt {
 
 #[cfg(not(target_os = "android"))]
 pub fn copy_token(token: &str) {
-	if let Ok(mut ctx) = cli_clipboard::ClipboardContext::new() {
-		if ctx.set_contents(token.to_string()).is_ok() {
+	if let Ok(ctx) = clipboard_rs::ClipboardContext::new() {
+		if ctx.set_text(token.to_string()).is_ok() {
 			done!("Token has been copied to your clipboard");
 		}
 	}
