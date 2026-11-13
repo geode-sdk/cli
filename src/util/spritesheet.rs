@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 use image::{imageops, ImageFormat, Pixel, Rgba, Rgba32FImage, RgbaImage};
 use serde_json::json;
-use texture_packer::exporter::ImageExporter;
 use texture_packer::texture::Texture;
 use texture_packer::{TexturePacker, TexturePackerConfig};
 
@@ -212,13 +211,30 @@ fn initialize_spritesheet_bundle(
 	plist::to_file_xml(&bundle.plist, &plist_file).nice_unwrap("Unable to write to plist file");
 
 	// Write png
-	let mut file = std::fs::File::create(&bundle.png).unwrap();
-
 	info!("Exporting");
 
-	let exporter = ImageExporter::export(&texture_packer, None).unwrap();
-	exporter
-		.write_to(&mut file, ImageFormat::Png)
+	let by_name: BTreeMap<&str, &Sprite> =
+		sprites.iter().map(|s| (s.name.as_str(), s)).collect();
+
+	let mut atlas = RgbaImage::new(texture_packer.width(), texture_packer.height());
+	for (name, f) in texture_packer.get_frames() {
+		let sprite = by_name[name.as_str()];
+		let (w, h) = if f.rotated {
+			(f.frame.h, f.frame.w)
+		} else {
+			(f.frame.w, f.frame.h)
+		};
+
+		let mut sub = imageops::crop_imm(&sprite.image, f.source.x, f.source.y, w, h).to_image();
+		if f.rotated {
+			sub = imageops::rotate90(&sub);
+		}
+
+		imageops::replace(&mut atlas, &sub, f.frame.x as i64, f.frame.y as i64);
+	}
+
+	image::DynamicImage::ImageRgba8(atlas)
+		.save_with_format(&bundle.png, ImageFormat::Png)
 		.nice_unwrap("Unable to write to png file");
 
 	done!(
