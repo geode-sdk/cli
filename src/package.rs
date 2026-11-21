@@ -362,7 +362,7 @@ fn create_package(
 			|| lowercase == "changelog.md"
 			|| lowercase == "support.md"
 		{
-			std::fs::copy(&path, working_dir.join(dir_entry.file_name()))
+			std::fs::copy(&path, working_dir.join(&lowercase))
 				.nice_unwrap(format!("Could not copy {}", path.to_str().unwrap_or("")));
 		}
 
