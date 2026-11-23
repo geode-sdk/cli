@@ -14,6 +14,7 @@ use std::env;
 #[allow(unused)]
 use std::ffi::OsStr;
 use std::fs;
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -33,11 +34,33 @@ const BINARIES_DOWNLOAD_ATTEMPTS: usize = 5;
 struct GithubReleaseAsset {
 	name: String,
 	browser_download_url: String,
+	digest: String,
 }
 
 #[derive(Deserialize)]
 struct GithubReleaseResponse {
 	assets: Vec<GithubReleaseAsset>,
+}
+
+#[derive(Deserialize)]
+struct IndexDownload {
+	url: String,
+	hash: String,
+}
+
+impl From<GithubReleaseAsset> for IndexDownload {
+	fn from(value: GithubReleaseAsset) -> Self {
+		let sha = value
+			.digest
+			.strip_prefix("sha256:")
+			.nice_unwrap("digest is not sha256")
+			.to_owned();
+
+		IndexDownload {
+			url: value.browser_download_url,
+			hash: sha,
+		}
+	}
 }
 
 #[allow(unused)]
@@ -602,42 +625,13 @@ fn switch_to_tag(config: &mut Config, repo: &Repository) {
 	done!("Updated head to v{}", latest_version.unwrap());
 }
 
-fn install_binaries(config: &mut Config, platform: Option<String>, version: Option<String>) {
-	let release_tag: String;
-	let target_dir: PathBuf;
-	if config.sdk_nightly {
-		info!("Installing nightly binaries");
-		release_tag = "nightly".into();
-		target_dir = Config::sdk_path().join("bin/nightly");
-	} else if version.is_some() {
-		let ver = Version::parse(
-			version
-				.as_deref()
-				.unwrap()
-				.strip_prefix('v')
-				.unwrap_or(version.as_deref().unwrap()),
-		)
-		.nice_unwrap("Invalid version specified");
-		info!("Installing binaries for {}", ver);
-
-		release_tag = format!("v{}", ver);
-		let mut stripped_ver = ver.clone();
-		stripped_ver.pre = Prerelease::EMPTY;
-		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
-	} else {
-		let ver = get_version();
-		info!("Installing binaries for {}", ver);
-		release_tag = format!("v{}", ver);
-		// remove any -beta or -alpha suffixes as geode cmake doesn't care about those
-		let mut stripped_ver = ver.clone();
-		stripped_ver.pre = Prerelease::EMPTY;
-		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
-	}
-
+fn fetch_binaries_github(
+	tag: &str,
+	platform: &str,
+) -> Result<IndexDownload, Box<dyn std::error::Error>> {
 	let res = reqwest::blocking::Client::new()
 		.get(format!(
-			"https://api.github.com/repos/geode-sdk/geode/releases/tags/{}",
-			release_tag
+			"https://api.github.com/repos/geode-sdk/geode/releases/tags/{tag}",
 		))
 		.header(USER_AGENT, "github_api/1.0")
 		.header(
@@ -647,13 +641,8 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		.send()
 		.nice_unwrap("Unable to get download info from GitHub")
 		.json::<GithubReleaseResponse>()
-		.nice_unwrap(format!("Could not parse Geode release \"{}\"", release_tag));
+		.nice_unwrap(format!("Could not parse Geode release \"{tag}\""));
 
-	let mut target_url: Option<String> = None;
-	let platform = platform
-		.as_deref()
-		.unwrap_or(env::consts::OS)
-		.to_lowercase();
 	for asset in res.assets {
 		// skip installers
 		if asset.name.to_lowercase().contains("installer") {
@@ -665,34 +654,115 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 			continue;
 		}
 
-		match platform.as_str() {
+		match platform {
 			"windows" | "linux" | "win" => {
 				if asset.name.to_lowercase().contains("-win") {
-					target_url = Some(asset.browser_download_url);
 					info!("Found binaries for platform Windows");
-					break;
+					return Ok(asset.into());
 				}
 			}
 			"macos" | "mac" => {
 				if asset.name.to_lowercase().contains("-mac") {
-					target_url = Some(asset.browser_download_url);
 					info!("Found binaries for platform MacOS");
-					break;
+					return Ok(asset.into());
 				}
 			}
 			os => {
 				if asset.name.to_lowercase().contains(&format!("-{os}")) {
-					target_url = Some(asset.browser_download_url);
 					info!("Found binaries for platform \"{os}\"");
-					break;
+					return Ok(asset.into());
 				}
 			}
 		}
 	}
 
-	let Some(target_url) = target_url else {
-		fatal!("No binaries found for current platform! ({platform})");
+	fatal!("No binaries found for current platform! ({platform})");
+}
+
+fn fetch_binaries_cdn(
+	version: &str,
+	platform: &str,
+) -> Result<IndexDownload, Box<dyn std::error::Error>> {
+	let res = reqwest::blocking::Client::new()
+		.get(format!(
+			"https://api.geode-sdk.org/v1/loader/versions/{version}",
+		))
+		.header(USER_AGENT, "GeodeCLI")
+		.send()
+		.nice_unwrap("Unable to get download info from Geode Index")
+		.error_for_status()
+		.nice_unwrap("Error returned by Geode Index")
+		.json::<serde_json::Value>()?;
+
+	let downloads = res
+		.get("payload")
+		.and_then(|x| x.get("downloads"))
+		.ok_or("did not find downloads object")?;
+
+	let platform_key = match platform {
+		"windows" | "linux" | "win" => "win",
+		"macos" | "mac" => "mac",
+		p => p,
 	};
+
+	let download_obj: IndexDownload = serde_json::from_value(
+		downloads
+			.get(platform_key)
+			.cloned()
+			.ok_or_else(|| format!("did not find download for platform '{platform}'"))?,
+	)?;
+
+	Ok(download_obj)
+}
+
+fn install_binaries(config: &mut Config, platform: Option<String>, version: Option<String>) {
+	let release_tag: String;
+	let target_dir: PathBuf;
+	let use_github: bool;
+
+	if config.sdk_nightly {
+		info!("Installing nightly binaries");
+		release_tag = "nightly".into();
+		target_dir = Config::sdk_path().join("bin/nightly");
+		use_github = true;
+	} else if version.is_some() {
+		let ver = Version::parse(
+			version
+				.as_deref()
+				.unwrap()
+				.strip_prefix('v')
+				.unwrap_or(version.as_deref().unwrap()),
+		)
+		.nice_unwrap("Invalid version specified");
+		info!("Installing binaries for {}", ver);
+
+		release_tag = ver.to_string();
+		let mut stripped_ver = ver.clone();
+		stripped_ver.pre = Prerelease::EMPTY;
+		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
+		use_github = false;
+	} else {
+		let ver = get_version();
+		info!("Installing binaries for {}", ver);
+		release_tag = ver.to_string();
+		// remove any -beta or -alpha suffixes as geode cmake doesn't care about those
+		let mut stripped_ver = ver.clone();
+		stripped_ver.pre = Prerelease::EMPTY;
+		target_dir = Config::sdk_path().join(format!("bin/{}", stripped_ver));
+		use_github = false;
+	}
+
+	let platform = platform
+		.as_deref()
+		.unwrap_or(env::consts::OS)
+		.to_lowercase();
+
+	let download = if use_github {
+		fetch_binaries_github(&release_tag, &platform)
+	} else {
+		fetch_binaries_cdn(&release_tag, &platform)
+	}
+	.nice_unwrap("Failed to find download URL");
 
 	fs::create_dir_all(&target_dir).nice_unwrap("Unable to create directory for binaries");
 	let temp_zip = target_dir.join("temp.zip");
@@ -700,12 +770,12 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 	let mut successful = false;
 	for i in 0..BINARIES_DOWNLOAD_ATTEMPTS {
 		if i == 0 {
-			info!("Downloading");
+			info!("Downloading {}", download.url);
 		} else {
 			info!("Downloading (attempt {})", i + 1);
 		}
 
-		match download_url(&target_url, &temp_zip) {
+		match download_url(&download.url, &temp_zip) {
 			Ok(()) => {
 				successful = true;
 				break;
@@ -725,7 +795,24 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		);
 	}
 
-	let file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
+	let mut file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
+
+	// validate hash
+	let mut data = Vec::new();
+	file.read_to_end(&mut data)
+		.nice_unwrap("Failed to read downloaded file");
+	file.rewind().nice_unwrap("Failed to seek file");
+
+	let digest = sha256::digest(&data);
+	if digest != download.hash {
+		fatal!(
+			"Hash validation failed for {}, expected '{}' but downloaded file is '{}'",
+			download.url,
+			download.hash,
+			digest
+		);
+	}
+
 	let mut zip = zip::ZipArchive::new(file).nice_unwrap("Downloaded ZIP appears to be corrupted");
 	zip.extract(target_dir)
 		.nice_unwrap("Unable to unzip downloaded binaries");
