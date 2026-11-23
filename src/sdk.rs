@@ -4,6 +4,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use git2::build::{CheckoutBuilder, RepoBuilder};
 use git2::{FetchOptions, RemoteCallbacks, Repository, StatusOptions};
+use indicatif::{ProgressBar, ProgressStyle};
 use path_absolutize::Absolutize;
 use regex::Regex;
 use reqwest::header::{AUTHORIZATION, USER_AGENT};
@@ -55,7 +56,9 @@ enum UserShell {
 }
 
 fn download_url(url: &str, file_name: &Path) -> Result<(), Box<dyn std::error::Error>> {
-	let client = reqwest::blocking::Client::new();
+	let client = reqwest::blocking::Client::builder()
+		.timeout(Duration::from_mins(3))
+		.build()?;
 
 	let res = client
 		.get(url)
@@ -63,9 +66,19 @@ fn download_url(url: &str, file_name: &Path) -> Result<(), Box<dyn std::error::E
 		.error_for_status()
 		.map_err(|e| format!("server returned error: {e}"))?;
 
-	let mut file = fs::File::create(file_name)?;
-	let mut content = std::io::Cursor::new(res.bytes()?);
-	std::io::copy(&mut content, &mut file)?;
+	let total_bytes = res
+		.content_length()
+		.ok_or("server returned no content length")?;
+
+	let pb = ProgressBar::new(total_bytes);
+	pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, ETA {eta})")?.progress_chars("=>-"));
+
+	let mut file = std::fs::File::create(file_name)?;
+	let mut reader = pb.wrap_read(res);
+
+	std::io::copy(&mut reader, &mut file)?;
+	pb.finish_with_message("done");
+
 	Ok(())
 }
 
