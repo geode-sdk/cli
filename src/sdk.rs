@@ -14,7 +14,7 @@ use std::env;
 #[allow(unused)]
 use std::ffi::OsStr;
 use std::fs;
-use std::io::{Read, Seek};
+use std::io::{Cursor, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -795,14 +795,9 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		);
 	}
 
-	let mut file = fs::File::open(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
+	let data = fs::read(&temp_zip).nice_unwrap("Unable to read downloaded ZIP");
 
 	// validate hash
-	let mut data = Vec::new();
-	file.read_to_end(&mut data)
-		.nice_unwrap("Failed to read downloaded file");
-	file.rewind().nice_unwrap("Failed to seek file");
-
 	let digest = sha256::digest(&data);
 	if digest != download.hash {
 		fatal!(
@@ -813,7 +808,7 @@ fn install_binaries(config: &mut Config, platform: Option<String>, version: Opti
 		);
 	}
 
-	let mut zip = zip::ZipArchive::new(file).nice_unwrap("Downloaded ZIP appears to be corrupted");
+	let mut zip = zip::ZipArchive::new(Cursor::new(data)).nice_unwrap("Downloaded ZIP appears to be corrupted");
 	zip.extract(target_dir)
 		.nice_unwrap("Unable to unzip downloaded binaries");
 
