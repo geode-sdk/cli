@@ -46,6 +46,7 @@ tempfile = "3"
 dialoguer = "0.12.0"
 clap_complete_nushell = "4.5.10"
 minijinja = "2.24.0"
+indicatif = "0.18.6"
 
 [target.'cfg(target_os = "android")'.dependencies]
 terminal-clipboard = "0.4.1"
